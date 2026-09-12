@@ -49,3 +49,6 @@ local-xdebuginfo.php
 /.phpunit.cache/
 /vendor/
 /phpunit.phar
+
+# WP-CLI binary — local dev tooling only, not project code
+/wp-cli.phar

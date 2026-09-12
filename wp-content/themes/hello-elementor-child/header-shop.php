@@ -31,6 +31,7 @@ $viewport_content = apply_filters('hello_elementor_viewport_content', 'width=dev
 
 	<nav class="amq-shop-header__nav amq-header-nav">
 		<a href="/shop/">SHOP</a>
+		<a href="/castile/">CASTILE</a>
 		<a href="/blog/">BLOG</a>
 		<a href="/about/">ABOUT</a>
 		<a href="/contact/">CONTACT</a>

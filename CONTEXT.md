@@ -1,6 +1,8 @@
 # AMOURIQ Site
 
-A WordPress + WooCommerce site for AMOURIQ, a Thai organic skincare brand. This working directory is a restored UpdraftPlus backup of the live site **amouriq.co.th**. Theme in use: `hello-elementor-child` (a Hello Elementor child theme with AMOURIQ-specific mu-plugins). `pcoursewebbs` is an unrelated leftover theme from a different project and is not part of this context.
+A WordPress + WooCommerce site for AMOURIQ, a Thai organic skincare brand. This working directory is a restored UpdraftPlus backup of the live site **amouriq.co.th**.
+
+**Active theme vs. target theme (see ADR-0002):** the theme actually active right now (`wp_options.stylesheet`) is `pcoursewebbs`, a near-empty Blocksy child theme — that's what the live site currently renders with, including its Home page. `hello-elementor-child` (a Hello Elementor child theme with AMOURIQ-specific mu-plugins) is where all the AMOURIQ-specific custom work lives, but it is **not currently active** — it's an in-progress redesign. New feature work (this project included) is built against `hello-elementor-child`, by deliberate decision, even though it isn't live yet.
 
 ## Language
 
