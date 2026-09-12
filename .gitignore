@@ -42,3 +42,10 @@
 
 # Local dev noise
 local-xdebuginfo.php
+
+# PHPUnit cache, vendor/, and the standalone phpunit.phar (a local-only
+# fallback for machines where `composer install` can't reach Packagist —
+# see the run-command note in tests/bootstrap.php)
+/.phpunit.cache/
+/vendor/
+/phpunit.phar

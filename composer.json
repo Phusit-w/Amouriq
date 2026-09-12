@@ -1,0 +1,10 @@
+{
+    "name": "amouriq/castile-sales-page",
+    "description": "Dev tooling for the AMOURIQ CASTILE sales page feature (see .scratch/castile-sales-page/).",
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}
