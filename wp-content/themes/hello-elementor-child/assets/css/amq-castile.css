@@ -1,0 +1,88 @@
+/**
+ * CASTILE sales page (ticket 03) — scroll-triggered motion for sections
+ * 00-09.
+ *
+ * Targeting note: Elementor's Advanced-tab "CSS Classes" control does not
+ * render in this site's Elementor install (verified against
+ * wp-content/plugins/elementor/includes/elements/container.php and
+ * .../widgets/common-base.php — the control is registered, but its value
+ * is absent from rendered HTML; this Elementor version's editor-editing-panel
+ * ships a newer atomic-widgets/class-manager system that appears to have
+ * superseded it at render time). Targeting instead uses Elementor's own
+ * always-rendered ".elementor-element-<id>" class, core rendering behavior
+ * that isn't a togglable feature. These are literal selectors for the
+ * specific elements sections 00-09 use, not a reusable component class —
+ * that's the trade-off for working around the above.
+ *
+ * Content stays fully Elementor-editable: this file only ever adds a class
+ * (amq-castile.js) or styles by element id, never touches widget content.
+ * See docs/adr/0001-castile-sales-page-built-in-elementor.md.
+ *
+ * Honors prefers-reduced-motion: reduce by rendering the final state
+ * immediately (media query block at the bottom).
+ */
+
+.elementor-element-46d6b39, .elementor-element-8565c5d, .elementor-element-178d758,
+.elementor-element-f60a040, .elementor-element-1ae4342, .elementor-element-1922e0e,
+.elementor-element-cb54ad0, .elementor-element-a10e2a5, .elementor-element-a594814,
+.elementor-element-d411e14, .elementor-element-49c49a3, .elementor-element-815f34b,
+.elementor-element-fd11604 {
+	opacity: 0;
+	transform: translateY(20px);
+	transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.elementor-element-46d6b39.is-visible, .elementor-element-8565c5d.is-visible, .elementor-element-178d758.is-visible,
+.elementor-element-f60a040.is-visible, .elementor-element-1ae4342.is-visible, .elementor-element-1922e0e.is-visible,
+.elementor-element-cb54ad0.is-visible, .elementor-element-a10e2a5.is-visible, .elementor-element-a594814.is-visible,
+.elementor-element-d411e14.is-visible, .elementor-element-49c49a3.is-visible, .elementor-element-815f34b.is-visible,
+.elementor-element-fd11604.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+/* Section 09's "FREE ALKALI: NOT DETECTED" numeral reveals slightly after
+   its surrounding copy — a one-element approximation of the design brief's
+   eyebrow(0ms) -> headline(180ms) -> evidence(510ms) stagger. */
+.elementor-element-fd11604 {
+	transition-delay: 200ms;
+}
+
+.elementor-element-f9b9b55, .elementor-element-5fac264, .elementor-element-190f66d,
+.elementor-element-b3b4491, .elementor-element-2a05e74, .elementor-element-1ba9d18,
+.elementor-element-ef1e6e0, .elementor-element-500a59f, .elementor-element-6357f22,
+.elementor-element-a653aba {
+	font-variant-numeric: tabular-nums;
+}
+
+.elementor-element-7466111, .elementor-element-b0edbed, .elementor-element-9dd8676,
+.elementor-element-678f1c3, .elementor-element-cce8ca8, .elementor-element-7a8de10,
+.elementor-element-db7213b, .elementor-element-6d0f07f {
+	transform: scaleX(0);
+	transform-origin: left;
+	transition: transform 860ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.elementor-element-db7213b, .elementor-element-6d0f07f {
+	transition-duration: 960ms; /* emphasized rows (4h moisture / 8h water loss) */
+}
+.elementor-element-7466111.is-visible, .elementor-element-b0edbed.is-visible, .elementor-element-9dd8676.is-visible,
+.elementor-element-678f1c3.is-visible, .elementor-element-cce8ca8.is-visible, .elementor-element-7a8de10.is-visible,
+.elementor-element-db7213b.is-visible, .elementor-element-6d0f07f.is-visible {
+	transform: scaleX(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.elementor-element-46d6b39, .elementor-element-8565c5d, .elementor-element-178d758,
+	.elementor-element-f60a040, .elementor-element-1ae4342, .elementor-element-1922e0e,
+	.elementor-element-cb54ad0, .elementor-element-a10e2a5, .elementor-element-a594814,
+	.elementor-element-d411e14, .elementor-element-49c49a3, .elementor-element-815f34b,
+	.elementor-element-fd11604 {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+	.elementor-element-7466111, .elementor-element-b0edbed, .elementor-element-9dd8676,
+	.elementor-element-678f1c3, .elementor-element-cce8ca8, .elementor-element-7a8de10,
+	.elementor-element-db7213b, .elementor-element-6d0f07f {
+		transform: scaleX(1);
+		transition: none;
+	}
+}
