@@ -1,0 +1,328 @@
+a:2:{s:16:"site_wide_footer";a:1:{i:0;a:14:{s:2:"id";i:5287;s:5:"title";s:15:"Fix Cart Drawer";s:4:"code";s:2356:"document.addEventListener('DOMContentLoaded', function() {
+    var offcanvas = document.getElementById('offcanvas');
+    if (!offcanvas) return;
+
+    function openDrawer(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        offcanvas.removeAttribute('inert');
+        offcanvas.style.cssText = [
+            'position:fixed!important',
+            'right:0!important',
+            'left:auto!important',
+            'top:0!important',
+            'width:500px!important',
+            'max-width:100vw!important',
+            'height:100vh!important',
+            'z-index:999999!important',
+            'background:#fff!important',
+            'overflow-y:auto!important',
+            'transform:none!important',
+            'opacity:1!important',
+            'visibility:visible!important',
+            'display:flex!important',
+            'flex-direction:column!important',
+            'box-shadow:-5px 0 30px rgba(0,0,0,0.25)!important'
+        ].join(';');
+        var cart = offcanvas.querySelector('.ct-cart-content');
+        if (cart) cart.style.cssText = 'display:block!important';
+        document.body.style.overflow = 'hidden';
+        if (!document.querySelector('.ct-cart-overlay-custom')) {
+            var ov = document.createElement('div');
+            ov.className = 'ct-cart-overlay-custom';
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:99998;cursor:pointer;';
+            ov.addEventListener('click', closeDrawer);
+            document.body.appendChild(ov);
+        }
+    }
+
+    function closeDrawer() {
+        offcanvas.removeAttribute('style');
+        offcanvas.setAttribute('inert', '');
+        document.body.style.overflow = '';
+        var ov = document.querySelector('.ct-cart-overlay-custom');
+        if (ov) ov.remove();
+    }
+
+    var cartLink = document.querySelector('.ct-sticky-container .ct-header-cart[data-id="cart"] > a.ct-cart-item');
+    if (!cartLink) cartLink = document.querySelector('.ct-header-cart[data-id="cart"] > a.ct-cart-item');
+    if (cartLink) cartLink.addEventListener('click', openDrawer, true);
+
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('#offcanvas [class*="toggle-close"]')) closeDrawer();
+    });
+});";s:9:"code_type";s:2:"js";s:8:"location";s:16:"site_wide_footer";s:11:"auto_insert";i:1;s:13:"insert_number";i:1;s:9:"use_rules";b:0;s:5:"rules";a:0:{}s:8:"priority";i:10;s:14:"location_extra";s:0:"";s:20:"shortcode_attributes";a:0:{}s:13:"compiled_code";s:0:"";s:8:"modified";s:19:"2026-06-04 00:00:26";}}s:10:"everywhere";a:4:{i:0;a:14:{s:2:"id";i:4716;s:5:"title";s:144:"กันไม่ให้ยิง AJAX ถ้า “แต้มที่ใส่” มากกว่า “แต้มที่มี”";s:4:"code";s:4846:"// บล็อกการใช้แต้มเกินแบบกันทุกกรณี (click/submit/Enter) และทนต่อ AJAX ที่รีเฟรช DOM
+add_action('wp_footer', function () {
+  if (!(is_cart() || is_checkout())) return; ?>
+<script>
+jQuery(function($){
+
+  /* ====== Config: ตัวกรองแบบกว้าง ไม่ผูกปลั๊กอินใด ====== */
+  const FIELD_SEL = 'input[type="number"], input[type="text"]';
+  const BTN_SEL   = 'button, input[type="submit"], input[type="button"], a.button';
+
+  function isPointsField(el){
+    const s = (el.id+' '+el.name+' '+el.className).toLowerCase();
+    return /point|redeem|wpr/.test(s);
+  }
+  function isApplyPointsBtn(el){
+    const t = ($(el).text()+' '+($(el).val()||'')+' '+el.className+' '+el.id).toLowerCase();
+    return /apply.*point|point.*apply|ใช้แต้ม|แลกแต้ม|redeem/.test(t);
+  }
+
+  // หา field แต้มตัวแรกที่น่าจะใช้งาน
+  function getPointsField(){
+    const $candidates = $(FIELD_SEL).filter(function(){ return isPointsField(this); });
+    return $candidates.first();
+  }
+
+  // อ่านแต้มที่มีอยู่ (รองรับไทย/อังกฤษ)
+  function getAvailable($field){
+    // 1) ถ้ามี max ให้ใช้ก่อน
+    const m = parseInt($field.attr('max'),10);
+    if (!isNaN(m) && m>0) return m;
+
+    // 2) หา text รอบ ๆ
+    const $wrap = $field.closest('.wps_cart_points_wrapper, .mwb_wpr_points_wrapper, .woocommerce, form');
+    const txt = $wrap.text();
+    let mm = txt.match(/available\s*points[^0-9]*([0-9,]+)/i) ||
+             txt.match(/แต้ม(?:ที่มี|คงเหลือ)?[^0-9]*([0-9,]+)/i);
+    if (mm) return parseInt(mm[1].replace(/,/g,''),10);
+
+    // 3) สำรอง: มองหาเลขใกล้ ๆ
+    const near = ($field.nextAll().text()||'')+' '+($field.prevAll().text()||'');
+    mm = near.match(/([0-9][0-9,]{0,6})/);
+    return mm ? parseInt(mm[1].replace(/,/g,''),10) : NaN;
+  }
+
+  function getRequested($field){
+    return parseInt(String($field.val()||'').replace(/[^0-9]/g,''),10) || 0;
+  }
+
+  function showInlineError($field, msg){
+    $field.nextAll('.wps-points-error-inline').remove();
+    $('<div class="wps-points-error-inline" style="color:#b81c23;font-size:13px;margin-top:6px;">'+msg+'</div>')
+      .insertAfter($field);
+    $field.addClass('woocommerce-invalid');
+    setTimeout(()=>{$field.removeClass('woocommerce-invalid');},1500);
+  }
+
+  function validatePoints(){
+    const $field = getPointsField();
+    if (!$field.length) return true; // ไม่เจอ field ก็ปล่อยผ่าน
+    const avail = getAvailable($field);
+    const want  = getRequested($field);
+    if (!isNaN(avail) && want > avail){
+      showInlineError($field, 'แต้มไม่พอสำหรับการแลกสิทธิ์');
+      // ตั้ง max กันกรอกเกินในครั้งต่อไป
+      $field.attr('max', avail);
+      return false;
+    }
+    return true;
+  }
+
+  /* ====== ดักทุกกรณี ====== */
+
+  // 1) คลิกปุ่ม Apply Points (ใช้ delegated handler ทนต่อ DOM ถูกแทนที่)
+  $(document).on('click', BTN_SEL, function(e){
+    if (!isApplyPointsBtn(this)) return;
+    if (!validatePoints()){
+      e.preventDefault(); e.stopImmediatePropagation(); return false;
+    }
+  });
+
+  // 2) Submit ฟอร์ม (เช่น ผู้ใช้กด Enter)
+  $(document).on('submit', 'form', function(e){
+    // ตรวจว่า submit นี้เกิดจากปุ่ม Apply Points หรือช่องแต้มโฟกัสอยู่
+    const sub = (e.originalEvent && e.originalEvent.submitter) || document.activeElement || null;
+    if (sub && isApplyPointsBtn(sub)){
+      if (!validatePoints()){ e.preventDefault(); e.stopImmediatePropagation(); return false; }
+    } else {
+      // กรณี Enter บนช่องแต้มโดยไม่มีปุ่ม submitter
+      const $field = getPointsField();
+      if ($field.length && $field.is(':focus') && !validatePoints()){
+        e.preventDefault(); e.stopImmediatePropagation(); return false;
+      }
+    }
+  });
+
+  // 3) กันผู้ใช้พิมพ์เกินแบบ real-time
+  $(document).on('input', FIELD_SEL, function(){
+    if (!isPointsField(this)) return;
+    const $f = $(this);
+    const avail = getAvailable($f);
+    const want  = getRequested($f);
+    if (!isNaN(avail) && want > avail){ $f.val(avail); }
+  });
+
+});
+</script>
+<?php });
+";s:9:"code_type";s:3:"php";s:8:"location";s:10:"everywhere";s:11:"auto_insert";i:1;s:13:"insert_number";i:1;s:9:"use_rules";b:0;s:5:"rules";a:0:{}s:8:"priority";i:10;s:14:"location_extra";s:0:"";s:20:"shortcode_attributes";a:0:{}s:13:"compiled_code";s:0:"";s:8:"modified";s:19:"2025-10-14 22:21:01";}i:1;a:14:{s:2:"id";i:4569;s:5:"title";s:56:"แก้JS ไม่รีเฟรชหน้า cart";s:4:"code";s:3631:"// รีเฟรชยอดหลัง Apply Points/คูปอง แบบกันลูป-กันค้าง
+add_action('wp_footer', function () {
+  if ( ! (is_cart() || is_checkout()) ) return; ?>
+<script>
+jQuery(function($){
+  // ปรับ selector ให้ตรงปุ่ม "Apply Points" ของปลั๊กอินคุณ
+  // สำรองไว้หลายแบบ (MWB/WPS ส่วนใหญ่ใช้ชื่อเหล่านี้)
+  var applyPointsBtns = '#wps_cart_points_apply, .mwb_wpr_apply_points, #mwb_wpr_apply_points';
+
+  var lock = false;          // กันกดซ้ำ/กันลูป
+  var debounceTimer = null;  // เก็บ timer ไว้ debounce
+
+  function refreshOnce(reason){
+    if (lock) return;
+    lock = true;
+
+    // บล็อกปุ่มชั่วคราว กันผู้ใช้กดซ้ำ
+    $(applyPointsBtns+', .apply_coupon, [name="apply_coupon"]').prop('disabled', true).addClass('is-loading');
+
+    // รีเฟรชเฉพาะหน้าที่อยู่
+    if ($('form.woocommerce-cart-form').length){
+      $(document.body).trigger('wc_update_cart');          // รีคำนวณตะกร้า
+      $(document.body).trigger('wc_fragment_refresh');     // รีเฟรช fragments
+    }
+    if ($('form.checkout').length){
+      $(document.body).trigger('update_checkout');         // รีคำนวณเช็กเอาต์
+      $(document.body).trigger('wc_fragment_refresh');
+    }
+
+    // ปลดล็อกหลัง AJAX ของ Woo ทำงานไปช่วงหนึ่ง
+    setTimeout(function(){
+      lock = false;
+      $(applyPointsBtns+', .apply_coupon, [name="apply_coupon"]').prop('disabled', false).removeClass('is-loading');
+    }, 1200);
+  }
+
+  // กดปุ่ม Apply Points → ยิงครั้งเดียวแบบ debounce
+  $(document).on('click', applyPointsBtns, function(){
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function(){ refreshOnce('click-apply-points'); }, 300);
+  });
+
+  // เมื่อปลั๊กอินยิง AJAX apply points เสร็จ → ค่อยรีเฟรช 1 ครั้ง
+  $(document).ajaxComplete(function(e, xhr, settings){
+    try{
+      var url  = (settings && settings.url)  ? settings.url  : '';
+      var data = (settings && settings.data) ? (settings.data+'') : '';
+
+      // จับเฉพาะคำสั่ง apply points ของปลั๊กอิน (กันชนกับ wc-ajax อื่น ๆ)
+      if ( url.indexOf('admin-ajax.php') > -1 && /w(p|m) s?_wpr?_apply_points/i.test(data) ){
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function(){ refreshOnce('ajax-apply-points'); }, 80);
+      }
+    }catch(err){}
+  });
+
+  // เมื่อ Woo ทำงานจบรอบ (คูปอง/ตะกร้า/เช็กเอาต์) → ปลดล็อกไว้
+  $(document.body)
+    .on('updated_wc_div updated_cart_totals wc_fragments_refreshed wc_fragments_loaded updated_checkout applied_coupon removed_coupon applied_coupon_in_checkout removed_coupon_in_checkout', function(){
+      // ปลดล็อก/ปลดปุ่ม เผื่อค้างจากรอบก่อน
+      lock = false;
+      $(applyPointsBtns+', .apply_coupon, [name="apply_coupon"]').prop('disabled', false).removeClass('is-loading');
+    });
+});
+</script>
+<?php });
+";s:9:"code_type";s:3:"php";s:8:"location";s:10:"everywhere";s:11:"auto_insert";i:1;s:13:"insert_number";i:1;s:9:"use_rules";b:0;s:5:"rules";a:0:{}s:8:"priority";i:10;s:14:"location_extra";s:0:"";s:20:"shortcode_attributes";a:0:{}s:13:"compiled_code";s:0:"";s:8:"modified";s:19:"2026-05-19 20:37:02";}i:2;a:14:{s:2:"id";i:4531;s:5:"title";s:63:"Coupon - Woo min/ max for coupon ''xxx'' is xxx฿ + not coupon";s:4:"code";s:5525:"// แปล/ปรับข้อความ error ของคูปอง + เคส "ใช้ได้แค่ X ครั้ง/ผู้ใช้"
+add_filter('woocommerce_coupon_error', function ($message, $code, $coupon) {
+
+    // ให้ $coupon เป็น object เสมอ
+    if ( ! is_object($coupon) && $coupon ) {
+        $coupon = new WC_Coupon($coupon);
+    }
+    $coupon_code = is_object($coupon) ? $coupon->get_code() : '';
+    $min_amount  = is_object($coupon) ? wc_price($coupon->get_minimum_amount()) : '';
+    $max_amount  = is_object($coupon) ? wc_price($coupon->get_maximum_amount()) : '';
+    $per_user    = is_object($coupon) ? (int) $coupon->get_usage_limit_per_user() : 0;
+
+    switch ($code) {
+        case 'coupon_minimum_amount_not_met':
+            return sprintf('คูปอง “%s” ใช้ได้เมื่อยอดสั่งซื้อขั้นต่ำ %s', $coupon_code, $min_amount);
+
+        case 'coupon_exceeds_maximum_amount':
+        case 'coupon_maximum_amount_exceeded':
+            return sprintf('คูปอง “%s” ใช้ได้เมื่อยอดสั่งซื้อไม่เกิน %s', $coupon_code, $max_amount);
+
+        case 'coupon_does_not_exist':
+        case 'invalid_coupon':
+        case 'coupon_code_not_valid':
+            $code_text = $coupon_code;
+            if ( ! $code_text && preg_match('/Coupon\s+"([^"]+)"/i', $message, $m) ) {
+                $code_text = $m[1];
+            }
+            return sprintf('คูปอง “%s” ไม่มีอยู่ในระบบ หรือพิมพ์ไม่ถูกต้อง', esc_html($code_text));
+
+        case 'coupon_already_applied':
+        case 'coupon_already_applied_in_cart':
+        case 'coupon_already_applied_in_checkout':
+            return sprintf('คูปอง “%s” ถูกใช้แล้วในตะกร้านี้', esc_html($coupon_code));
+
+        // ✅ จำกัดจำนวนครั้งต่อผู้ใช้ (จับเคสเฉพาะ user)
+        case 'coupon_usage_limit_reached_for_user':
+            if ($per_user <= 1) {
+                return sprintf('คูปอง “%s” ใช้ได้ 1 ครั้งต่อผู้ใช้ และบัญชีของคุณได้ใช้ไปแล้ว', esc_html($coupon_code));
+            }
+            return sprintf('คูปอง “%s” ใช้ได้ %d ครั้งต่อผู้ใช้ และบัญชีของคุณใช้ครบแล้ว', esc_html($coupon_code), $per_user);
+
+        // รวมกรณีถึงลิมิต (รวมลิมิตรวมทั้งระบบ)
+        case 'coupon_usage_limit_reached':
+            return sprintf('คูปอง “%s” ถูกใช้ครบตามจำนวนที่กำหนดแล้ว', esc_html($coupon_code));
+
+        case 'coupon_expired':
+            return sprintf('คูปอง “%s” หมดอายุแล้ว', esc_html($coupon_code));
+
+        case 'coupon_not_valid':
+        case 'coupon_is_not_valid':
+        case 'coupon_not_applicable':
+        case 'coupon_not_applicable_in_cart':
+        case 'coupon_not_applicable_in_checkout':
+            return sprintf('คูปอง “%s” ใช้ไม่ได้กับคำสั่งซื้อนี้', esc_html($coupon_code));
+    }
+
+    // -------- Fallback เพิ่มเติมสำหรับข้อความอังกฤษของเคส per-user --------
+    if (stripos($message, 'usage limit has been reached for this coupon') !== false
+        || stripos($message, 'usage limit reached for this user') !== false
+        || stripos($message, 'you have already used this coupon') !== false) {
+
+        $c = $coupon_code;
+        if ( ! $c && preg_match('/coupon\s+"([^"]+)"/i', $message, $m) ) {
+            $c = $m[1];
+        }
+        if ($per_user <= 1) {
+            return sprintf('คูปอง “%s” ใช้ได้ 1 ครั้งต่อผู้ใช้ และบัญชีของคุณได้ใช้ไปแล้ว', esc_html($c));
+        }
+        return sprintf('คูปอง “%s” ใช้ได้ %d ครั้งต่อผู้ใช้ และบัญชีของคุณใช้ครบแล้ว', esc_html($c), $per_user ?: 1);
+    }
+
+    // Fallback เดิม
+    if (stripos($message, 'minimum spend for coupon') !== false) {
+        $c = $coupon_code;
+        if ( ! $c && preg_match('/coupon\s+"([^"]+)"/i', $message, $m) ) {
+            $c = $m[1];
+        }
+        $amt = $min_amount;
+        if (preg_match('/is\s+([฿\d\.,]+)/u', $message, $m)) {
+            $amt = $m[1];
+        }
+        return sprintf('คูปอง “%s” ใช้ได้เมื่อยอดสั่งซื้อขั้นต่ำ %s', esc_html($c), $amt);
+    }
+    if (stripos($message, 'does not exist') !== false) {
+        $c = $coupon_code;
+        if ( ! $c && preg_match('/coupon\s+"([^"]+)"/i', $message, $m) ) {
+            $c = $m[1];
+        }
+        return sprintf('คูปอง “%s” ไม่มีอยู่ในระบบ หรือพิมพ์ไม่ถูกต้อง', esc_html($c));
+    }
+
+    return $message;
+}, 999, 3);
+";s:9:"code_type";s:3:"php";s:8:"location";s:10:"everywhere";s:11:"auto_insert";i:1;s:13:"insert_number";i:1;s:9:"use_rules";b:0;s:5:"rules";a:0:{}s:8:"priority";i:10;s:14:"location_extra";s:0:"";s:20:"shortcode_attributes";a:0:{}s:13:"compiled_code";s:0:"";s:8:"modified";s:19:"2025-10-14 22:26:25";}i:3;a:14:{s:2:"id";i:2434;s:5:"title";s:11:"upload font";s:4:"code";s:249:"function enable_font_uploads($mimes) {
+    $mimes['woff']  = 'application/font-woff';
+    $mimes['woff2'] = 'font/woff2';
+    $mimes['ttf']   = 'application/x-font-ttf';
+    return $mimes;
+}
+add_filter('upload_mimes', 'enable_font_uploads');
+";s:9:"code_type";s:3:"php";s:8:"location";s:10:"everywhere";s:11:"auto_insert";i:1;s:13:"insert_number";i:1;s:9:"use_rules";b:0;s:5:"rules";a:0:{}s:8:"priority";i:10;s:14:"location_extra";s:0:"";s:20:"shortcode_attributes";a:0:{}s:13:"compiled_code";s:0:"";s:8:"modified";s:19:"2025-09-09 21:23:34";}}}

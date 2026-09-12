@@ -1,0 +1,60 @@
+/**
+ * amq-article.css
+ *
+ * Styles for single.php — the blog post "Read+" detail page. Loaded only
+ * on singular posts (see the is_singular('post') check in
+ * amouriq-journal.php).
+ */
+
+.amq-article__hero { width: 100%; height: 480px; overflow: hidden; }
+.amq-article__hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.amq-article__inner { max-width: 720px; margin: 0 auto; padding: 64px 24px 100px; }
+
+.amq-article__back {
+	display: inline-block;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: .03em;
+	color: #62665E;
+	text-decoration: none;
+	margin-bottom: 32px;
+}
+.amq-article__back:hover { color: #242622; }
+.amq-article__back--bottom { margin-top: 56px; margin-bottom: 0; }
+
+.amq-article__eyebrow {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .12em;
+	text-transform: uppercase;
+	color: #8a8578;
+	margin-bottom: 16px;
+}
+
+.amq-article__title {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 40px;
+	font-weight: 600;
+	color: #242622;
+	line-height: 1.25;
+	margin: 0 0 40px;
+}
+
+.amq-article__content {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 17px;
+	line-height: 1.9;
+	color: #40453d;
+}
+.amq-article__content p { margin: 0 0 28px; }
+.amq-article__content p:last-child { margin-bottom: 0; }
+
+@media screen and (max-width: 600px) {
+	.amq-article__hero { height: 280px; }
+	.amq-article__inner { padding: 40px 20px 64px; }
+	.amq-article__title { font-size: 28px; margin-bottom: 28px; }
+	.amq-article__content { font-size: 16px; }
+}

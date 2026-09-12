@@ -1,0 +1,50 @@
+/**
+ * amq-lang-font-th.css
+ *
+ * Sitewide AMOURIQ global font when the active Polylang language is
+ * Thai: Prompt.
+ *
+ * Loaded (together with the matching Google Fonts <link>) by
+ * wp-content/mu-plugins/amouriq-lang-font.php, which swaps this file for
+ * amq-lang-font-en.css when pll_current_language() returns 'en'.
+ *
+ * History (2026-07-23, see bugs.md): every heading/button/text widget on
+ * this site had `typography_font_family` hardcoded directly in its own
+ * Elementor settings (rules.md's documented hardcode-per-widget exception)
+ * — mostly all still carrying the OLD sitewide default, "IBM Plex Sans
+ * Thai", from before per-language fonts existed. That forced this file to
+ * fight every one of those hardcoded rules with `!important` + heavy
+ * selectors, which also meant NO widget could ever override the font
+ * through Elementor's own Typography control without a matching CSS
+ * escape-hatch added here by hand — verified broken via computed style
+ * both ways (specificity padding, and dropping !important entirely) before
+ * landing on the real fix: migrated every widget's own
+ * `typography_font_family` from "IBM Plex Sans Thai" directly to the
+ * correct per-language font ('Prompt' here, 'Plus Jakarta Sans' on the EN
+ * pages), preserving each widget's own size/weight/letter-spacing
+ * untouched. 44 widgets fixed on Home TH (post 43), 171 site-wide across
+ * Home EN/TH + Contact + About + Blog.
+ *
+ * With the data itself correct, this file no longer needs to fight
+ * anything — it's just the plain fallback for content Elementor doesn't
+ * style directly (WooCommerce shop/cart output, comments, admin-bar-
+ * adjacent markup, etc.) plus the CSS custom properties Elementor's kit
+ * Global Typography resolves against, for any widget that references
+ * Global instead of a hardcoded custom font. No `!important` needed, and
+ * any widget can now have its font changed via Elementor's own Typography
+ * panel with zero extra CSS work — that's the whole point of this fix.
+ */
+
+:root {
+	--e-global-typography-primary-font-family: 'Prompt';
+	--e-global-typography-secondary-font-family: 'Prompt';
+	--e-global-typography-text-font-family: 'Prompt';
+	--e-global-typography-accent-font-family: 'Prompt';
+}
+
+body,
+h1, h2, h3, h4, h5, h6,
+p, a, li, label, blockquote,
+button, input, textarea, select {
+	font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

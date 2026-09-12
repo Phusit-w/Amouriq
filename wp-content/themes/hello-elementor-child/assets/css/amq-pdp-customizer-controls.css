@@ -1,0 +1,20 @@
+/**
+ * amq-pdp-customizer-controls.css
+ *
+ * Admin-side only: lays out the number input + unit dropdown for the
+ * "AMOURIQ — Product Page" Customizer's font_size/stepper controls
+ * (AMQ_Length_Control in amouriq-single-product.php). Enqueued only
+ * inside the Customizer controls frame via that control's enqueue().
+ */
+.amq-length-control__row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 6px;
+}
+.amq-length-control__number {
+	width: 80px;
+}
+.amq-length-control__unit {
+	width: 84px;
+}

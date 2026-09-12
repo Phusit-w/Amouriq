@@ -1,0 +1,48 @@
+div.wp-toolkit-toast {
+  border-radius: 8px;
+  background-color: var(--mui-palette-inverseSurface-main);
+  color: var(--mui-palette-inverseSurface-contrastText);
+  width: min-content;
+  min-width: 25rem;
+  margin: 0 1.14rem 1.14rem 0;
+}
+@media (max-width: 600px) {
+  div.wp-toolkit-toast {
+    width: calc(100vw - 2.28rem);
+    min-width: unset;
+    margin: 0 1.14rem 1.14rem;
+  }
+}
+div.wp-toolkit-toast .header {
+  font-feature-settings: 'liga' off, 'clig' off;
+  font-family: Roboto, sans-serif;
+  font-size: 1.1429rem;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 150%;
+  letter-spacing: 0.0107rem;
+}
+div.wp-toolkit-toast .content {
+  text-align: justify;
+  padding: 0 1.14rem 1.14rem;
+}
+div.wp-toolkit-toast .content p {
+  font-size: small;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+}
+div.wp-toolkit-toast .content p a {
+  color: var(--mui-palette-inverseSurface-contrastText);
+  text-decoration: underline;
+}
+
+div.wp-toolkit-toaster {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 1400;
+}
+

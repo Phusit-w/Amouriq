@@ -1,0 +1,18 @@
+/**
+ * amq-header-static.css
+ *
+ * Header variant for pages with no dark hero behind the top of the page
+ * (e.g. Contact). Unlike #amq-header (amq-header-hover.css — transparent,
+ * absolute, JS-toggled on scroll), #amq-header-static is solid + sticky
+ * from the start: same "scrolled" look #amq-header ends up in, permanently.
+ */
+#amq-header-static {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+}
+body.admin-bar #amq-header-static { top: 32px; }
+@media screen and (max-width: 782px) {
+	body.admin-bar #amq-header-static { top: 46px; }
+}
+#amq-header-static a:hover { opacity: .65; }

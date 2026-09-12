@@ -1,0 +1,525 @@
+/**
+ * amq-woocommerce.css
+ *
+ * WooCommerce-specific style overrides — the Shop archive page (/shop/),
+ * including its header/footer chrome (header-shop.php / footer-shop.php,
+ * since WooCommerce renders archive-product.php, not the page's own
+ * _elementor_data — see memo/learning.md), the hero banner, the sidebar
+ * filters (template-parts/shop-sidebar.php), and the product grid.
+ *
+ * Loaded last in the AMOURIQ cascade (see functions.php) so it can override
+ * amq-components.css when a WooCommerce-specific exception is needed.
+ */
+
+/* ---------- Shop header (header-shop.php) ---------- */
+.amq-shop-header {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
+	gap: 28px;
+	background: #FAF7F0;
+	border-bottom: 1px solid #E8DED2;
+	padding: 13px 40px;
+}
+.amq-shop-header a { text-decoration: none; color: #242622; }
+.amq-shop-header__nav { display: flex; align-items: center; gap: 28px; }
+.amq-shop-header__nav a {
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: .8px;
+}
+.amq-shop-header__logo {
+	font-size: 21px;
+	font-weight: 600;
+	letter-spacing: 2px;
+	text-align: left;
+}
+.amq-shop-header__actions { display: flex; align-items: center; justify-content: flex-end; gap: 24px; }
+@media screen and (max-width: 782px) {
+	.amq-shop-header {
+		grid-template-columns: 1fr;
+		justify-items: center;
+		padding: 16px 20px;
+		row-gap: 14px;
+	}
+	.amq-shop-header__nav { flex-wrap: wrap; justify-content: center; row-gap: 8px; }
+	.amq-shop-header__actions { flex-wrap: wrap; justify-content: center; }
+}
+
+/* ---------- Shop footer (footer-shop.php) ---------- */
+.amq-shop-footer {
+	background: #242622;
+	padding: 64px 40px 28px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 48px;
+}
+.amq-shop-footer__grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	align-items: start;
+	gap: 48px;
+	max-width: 1200px;
+	width: 100%;
+}
+.amq-shop-footer__col { display: flex; flex-direction: column; gap: 12px; }
+.amq-shop-footer__logo {
+	font-size: 22px;
+	font-weight: 600;
+	letter-spacing: 2px;
+	color: #FFFDF8;
+	text-decoration: none;
+}
+.amq-shop-footer__heading { color: #242622; }
+.amq-shop-footer__heading--lg { font-size: 22px; font-weight: 600; letter-spacing: 1.5px; margin: 0; color: #FFFDF8; }
+.amq-shop-footer__text { font-size: 13px; color: rgba(255,255,255,.85); margin: -6px 0 6px; }
+.amq-shop-footer__label { font-size: 12px; font-weight: 700; letter-spacing: .8px; color: #FFFDF8; margin: 0; }
+.amq-shop-footer__col a {
+	font-size: 13px;
+	color: rgba(255,255,255,.9);
+	text-decoration: none;
+}
+.amq-shop-footer__col a:hover { opacity: .7; }
+.amq-shop-footer__social { display: flex; gap: 14px; }
+.amq-shop-footer__social a {
+	width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+	background: #E8DDCB; color: #242622; font-size: 13px; font-weight: 700;
+}
+.amq-shop-footer__bottom {
+	max-width: 1200px; width: 100%;
+	display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+	border-top: 1px solid rgba(232,221,203,.15);
+	padding-top: 22px;
+}
+.amq-shop-footer__bottom span { font-size: 12px; color: rgba(255,255,255,.65); }
+.amq-shop-footer__dbd-wrap { width: 264px; max-width: 100%; }
+.amq-shop-footer__dbd { height: 44px; width: auto; display: block; }
+
+/* Home/Contact/About/Blog footer's DBD-badge wrapper (Elementor container,
+   see memo/bugs.md "footer alignment" — width control didn't emit CSS via
+   Elementor's own controls, using a plain class hook instead). */
+.amq-dbd-wrap { flex: 0 0 264px !important; width: 264px !important; max-width: 100%; }
+@media screen and (max-width: 900px) {
+	.amq-shop-footer__grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media screen and (max-width: 480px) {
+	.amq-shop-footer { padding: 48px 20px 24px; }
+	.amq-shop-footer__grid { grid-template-columns: 1fr; }
+	.amq-shop-footer__bottom { justify-content: center; text-align: center; }
+}
+
+/* ---------- Newsletter signup band (above the footer) ---------- */
+.amq-newsletter-band {
+	background: #DCE3D2;
+	border-bottom: 1px solid rgba(36, 38, 34, .12);
+	padding: 80px 40px;
+	display: flex;
+	justify-content: center;
+}
+.amq-newsletter-band__inner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 14px;
+	max-width: 560px;
+	text-align: center;
+}
+.amq-newsletter-band__heading {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 36px;
+	font-weight: 700;
+	color: #242622;
+	margin: 0 0 8px;
+}
+.amq-newsletter-band__subtext1,
+.amq-newsletter-band__subtext2 {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 16px;
+	color: #40453d;
+	margin: 0;
+}
+.amq-newsletter-band__subtext2 strong { color: #242622; font-weight: 700; }
+.amq-newsletter-band__form {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	max-width: 420px;
+	margin-top: 14px;
+}
+input[type="email"].amq-newsletter-band__input {
+	flex: 1;
+	min-width: 0;
+	border: 1.5px solid #242622;
+	background: #FFFDF8;
+	outline: none;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 14px;
+	color: #242622;
+	padding: 13px 16px;
+	box-sizing: border-box;
+}
+input[type="email"].amq-newsletter-band__input:focus { border-color: #242622; }
+input.amq-newsletter-band__input::placeholder { color: #8a8578; }
+button.amq-newsletter-band__submit {
+	flex: none;
+	border: none;
+	border-radius: 4px;
+	background: #3b4f36;
+	color: #FFFDF8;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: .03em;
+	text-transform: uppercase;
+	padding: 14px 24px;
+	cursor: pointer;
+	transition: background-color .2s ease;
+}
+button.amq-newsletter-band__submit:hover,
+button.amq-newsletter-band__submit:focus { background: #2e3d2a; color: #FFFDF8; }
+@media screen and (max-width: 600px) {
+	.amq-newsletter-band { padding: 48px 24px; }
+	.amq-newsletter-band__heading { font-size: 26px; }
+}
+
+/* ---------- Newsletter form on the Elementor pages (Home/Contact/About/Blog) -----------
+   Same .amq-newsletter-band__form row above still drives the flex layout;
+   only the input's own box (border/background/padding) moved to a wrapping
+   Elementor container (`amq-newsletter-input-wrap`) so it's editable from the
+   Advanced tab. Deliberately NOT setting font-family here (unlike the
+   .amq-newsletter-band__input rule above, kept for footer-shop.php only) so
+   the input inherits the correct per-language font from the sitewide
+   `button, input, textarea, select` rule in amq-lang-font-en/th.css instead
+   of the stale hardcoded "IBM Plex Sans Thai" that rule elsewhere overrides. */
+/* Two earlier CSS-only attempts at matching the input/button heights
+   (align-items:stretch, then a hardcoded height:50px on both sides) are
+   GONE from here now — both were invisible from the Elementor UI, so the
+   owner had no way to nudge them, and a hardcoded height on the raw
+   `.elementor-button` would have silently blocked the Min Height field
+   below from ever doing anything. Real fix: the input-wrap AND the button
+   are each wrapped in their own Elementor **Container**, and each of those
+   containers has a real `min_height` (50px) set in its Elementor settings —
+   i.e. a normal, visible "Min Height" field under that container's
+   Style/Layout tab, exactly like any other container on this site. The
+   owner (or anyone editing later) can select either box in the Elementor
+   editor and change that one number directly — no code, no theme file. This
+   file only needs to handle the parts Elementor has no control for. */
+/* Scoped with :has() instead of a second class (`amq-el-newsletter-form`)
+   that used to be added to this container's CSS Classes field — that class
+   kept vanishing on its own (found 3 separate times across this session)
+   because the owner's Elementor editor tab was open and actively
+   re-saving the whole document on every edit/autosave cycle, and each
+   round-trip apparently dropped that one field. `:has()` scopes off the
+   presence of `.amq-newsletter-input-wrap` as a descendant instead — a
+   structural fact of this specific form, not a settings field anyone could
+   accidentally clear from the Advanced tab — so it can't silently stop
+   matching the same way. Supported in current Chrome/Edge (105+). */
+.amq-newsletter-band__form:has(.amq-newsletter-input-wrap) {
+	align-items: center;
+}
+/* Root cause of "gap:0 has no effect", found via the owner's own DevTools
+   inspection: this container has `content_width:boxed` (an unwanted leftover
+   from a stale-editor save, see bugs.md), which makes Elementor render it as
+   `.e-con-boxed` — and Elementor's OWN base CSS explicitly resets
+   `.e-con-boxed { gap: initial; }` on that OUTER element. The real flex row
+   (where input-wrap and the button actually sit side by side) is Elementor's
+   own auto-generated `.e-con-inner` CHILD div, not the outer div our classes
+   are on — so a plain `gap: 0` on the outer selector was targeting an
+   element where `gap` does nothing at all. Fixed by targeting `.e-con-inner`
+   directly, with `!important` to beat Elementor's own `var(--row-gap)
+   var(--column-gap)` declaration on that same element regardless of
+   specificity/media-query ordering. `flex-wrap: nowrap` also forced here —
+   without it, this same boxed layout wraps the button onto its own line
+   (with its own gap) once the row gets narrow, which the owner does not
+   want; the input box will just compress instead. */
+.amq-newsletter-band__form:has(.amq-newsletter-input-wrap) > .e-con-inner {
+	gap: 0 !important;
+	flex-wrap: nowrap !important;
+}
+/* Second, separate root cause — verified via real headless-browser renders at
+   several widths, not assumed: even with the real gap correctly at 0, the
+   input box and button still looked visually separated. Cause: Elementor
+   gives every direct child of `.e-con-inner` a default flex-basis of
+   `width: var(--container-widget-width, 100%)` unless something overrides
+   it. `.amq-newsletter-input-wrap` already has its own `flex: 1 1 auto`
+   below, so it's fine, but `.amq-newsletter-button-wrap` had no override —
+   it was rendering as a much WIDER invisible box than the button itself,
+   with the button only centered inside it (`flex_justify_content:center`,
+   set so the button wouldn't hug one edge), leaving real empty space
+   between the input box and the visible button despite zero true `gap`.
+   Forcing it to shrink-wrap to its own content fixes this. */
+.amq-newsletter-band__form:has(.amq-newsletter-input-wrap) .amq-newsletter-button-wrap {
+	width: auto !important;
+	flex: 0 0 auto !important;
+	/* Found via the owner right-clicking the exact empty gap pixels and
+	   inspecting: it selected THIS element, proving its box still reached
+	   into the visible gap even after width/flex were fixed above. Cause:
+	   every Elementor container gets a default ~10px padding on all sides
+	   (`padding: var(--container-default-padding-*, 10px)`) unless a
+	   setting explicitly zeroes it — this container never had one, so an
+	   invisible 10px of padding sat between the input box and the visible
+	   button the whole time, on top of (not fixed by) the width fix. */
+	padding: 0 !important;
+}
+/* The button-wrap's Min Height (editable in Elementor, see component.md)
+   only resizes the invisible wrapper div — the visible colored
+   `.elementor-button` inside it floats at its own natural height (padding +
+   line-height, ~41px), centered by `flex_align_items:center` on the wrap.
+   Two percentage-height attempts were tried and measured (via pixel-scanning
+   real screenshots) to both fail in opposite directions: `height:100%` on
+   just `.elementor-button` did nothing (resolved against an intermediate
+   ~41px ancestor, not the true 50px wrapper); adding `height:100%` to that
+   intermediate ancestor too made the button balloon to 250px+ (it ended up
+   resolving against a much taller, unrelated ancestor further up — this
+   nested e-con/e-con-inner + CSS-custom-property architecture does not
+   reliably expose a "definite height" to percentage children here). Gave up
+   on percentage/inheritance entirely — pinned the button to the exact same
+   explicit pixel height as the two Min Height settings (50px) instead.
+   Trade-off: if the Min Height fields ever get changed in Elementor, this
+   number needs updating to match by hand — but it's the only approach that
+   has actually measured correct in this specific markup. */
+.amq-newsletter-band__form:has(.amq-newsletter-input-wrap) .amq-newsletter-button-wrap .elementor-widget-button,
+.amq-newsletter-band__form:has(.amq-newsletter-input-wrap) .amq-newsletter-button-wrap .elementor-button {
+	height: 50px !important;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.amq-newsletter-input-wrap { flex: 1 1 auto; min-width: 0; }
+.amq-newsletter-input-cell { flex: 1; min-width: 0; align-self: center; }
+input.amq-newsletter-input-field {
+	display: block;
+	width: 100%;
+	/* Found via the owner inspecting the exact rounded corner: the parent
+	   theme's own reset.css (hello-elementor, ships a generic
+	   `input[type=email], input[type=text], ... { border:1px solid #666;
+	   border-radius:3px; padding:.5rem 1rem; }` reset for every text-like
+	   input sitewide) has the EXACT SAME CSS specificity as this rule
+	   (element + one selector each), and its <link> tag happens to print
+	   later in <head> than this file's — so on the tie, it was winning by
+	   cascade order alone, leaving a faint 1px #666 border + 3px radius
+	   showing no matter what was set (or un-set) on the Elementor widget
+	   itself, since the widget's own settings were never the real
+	   opponent. `!important` forces this rule to win regardless of any
+	   future reordering of the two stylesheets. */
+	border: none !important;
+	border-radius: 0 !important;
+	outline: none;
+	background: transparent;
+	font-size: 14px;
+	color: #242622;
+	padding: 0 !important;
+	box-sizing: border-box;
+}
+input.amq-newsletter-input-field::placeholder { color: #8a8578; }
+
+/* ---------- Hero ---------- */
+.amq-shop-hero {
+	background: #E8DED2;
+	padding: 60px 40px;
+	text-align: center;
+}
+.amq-shop-hero h1 {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 36px;
+	font-weight: 600;
+	color: #242622;
+	margin: 0;
+}
+@media screen and (max-width: 600px) {
+	.amq-shop-hero { padding: 40px 20px; }
+	.amq-shop-hero h1 { font-size: 26px; }
+}
+
+/* ---------- Layout: sidebar + product grid ---------- */
+.amq-shop-layout {
+	display: flex;
+	align-items: flex-start;
+	gap: 48px;
+	max-width: 1280px;
+	margin: 0 auto;
+	padding: 48px 40px 80px;
+}
+.amq-shop-sidebar { flex: 0 0 260px; display: flex; flex-direction: column; gap: 40px; }
+.amq-shop-main { flex: 1; min-width: 0; }
+@media screen and (max-width: 900px) {
+	.amq-shop-layout { flex-direction: column; padding: 32px 20px 60px; gap: 32px; }
+	.amq-shop-sidebar { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; gap: 24px; }
+	.amq-shop-filter { flex: 1 1 220px; }
+}
+
+/* ---------- Sidebar filter boxes ---------- */
+.amq-shop-filter__title {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 16px;
+	font-weight: 600;
+	color: #242622;
+	margin: 0 0 16px;
+}
+.amq-shop-filter__form { display: flex; align-items: stretch; gap: 8px; }
+.amq-shop-filter__form select {
+	flex: 1; min-width: 0;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 13px;
+	color: #242622;
+	background: #FFFDF8;
+	border: 1px solid #E8DED2;
+	padding: 10px 12px;
+}
+.amq-shop-filter__form select:disabled { color: #8a8578; }
+.amq-shop-filter__form button {
+	flex: none; width: 40px;
+	display: flex; align-items: center; justify-content: center;
+	background: #FAF7F0;
+	border: 1px solid #E8DED2;
+	color: #242622;
+	cursor: pointer;
+	transition: background-color .2s ease, color .2s ease;
+}
+.amq-shop-filter__form button:hover { background: #242622; color: #FFFDF8; }
+
+/* Price filter widget (WooCommerce core, styled) */
+.amq-shop-filter .price_slider_wrapper .price_slider { position: relative; height: 4px; background: #E8DED2; margin: 10px 4px 26px; border-radius: 2px; }
+.amq-shop-filter .ui-slider-range { position: absolute; top: 0; height: 100%; background: #242622; border-radius: 2px; }
+.amq-shop-filter .ui-slider-handle {
+	position: absolute; top: 50%; width: 14px; height: 14px;
+	margin-top: -7px; margin-left: -7px;
+	background: #242622; border: 2px solid #FFFDF8;
+	box-shadow: 0 0 0 1px #E8DED2;
+	border-radius: 50%; cursor: pointer; outline: none;
+}
+.amq-shop-filter .price_slider_amount { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.amq-shop-filter .price_slider_amount input[type="text"] {
+	width: 84px;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 13px;
+	color: #242622;
+	background: #FFFDF8;
+	border: 1px solid #E8DED2;
+	padding: 9px 10px;
+}
+.amq-shop-filter .price_slider_amount .screen-reader-text {
+	display: block; clip: auto; width: auto; height: auto; margin: 0; overflow: visible; position: static;
+	font-size: 11px; color: #8a8578; margin-bottom: 4px;
+}
+.amq-shop-filter .price_slider_amount button.button {
+	flex: none;
+	background: transparent;
+	border: 1px solid #242622;
+	color: #242622;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	padding: 9px 14px;
+	cursor: pointer;
+	transition: background-color .2s ease, color .2s ease;
+}
+.amq-shop-filter .price_slider_amount button.button:hover { background: #242622; color: #FFFDF8; }
+.amq-shop-filter .price_label,
+.amq-shop-filter .clear { display: none; }
+
+/* ---------- Toolbar: result count + sorting ---------- */
+.amq-shop-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin: 0 0 28px;
+}
+.amq-shop-toolbar .woocommerce-result-count {
+	margin: 0; font-family: "IBM Plex Sans Thai", sans-serif; font-size: 12px;
+	letter-spacing: .04em; text-transform: uppercase; color: #8a8578;
+}
+.amq-shop-toolbar .woocommerce-ordering { margin: 0; }
+.amq-shop-toolbar select.orderby {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 13px;
+	color: #242622;
+	background: #FFFDF8;
+	border: 1px solid #E8DED2;
+	padding: 9px 12px;
+}
+
+/* ---------- Product grid ---------- */
+.amq-shop-main ul.products {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 32px 24px;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.amq-shop-main ul.products li.product { list-style: none; }
+.amq-shop-main ul.products li.product a.woocommerce-LoopProduct-link { text-decoration: none; display: block; }
+.amq-shop-main ul.products li.product img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	object-fit: cover;
+	background: #F3F1EC;
+	margin: 0 0 16px;
+}
+.amq-shop-main ul.products li.product .woocommerce-loop-product__title {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 15px;
+	font-weight: 600;
+	color: #242622;
+	margin: 0 0 6px;
+	line-height: 1.35;
+}
+.amq-shop-main ul.products li.product .price {
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 14px;
+	font-weight: 600;
+	color: #242622;
+}
+.amq-shop-main ul.products li.product .price ins { text-decoration: none; }
+.amq-shop-main ul.products li.product .price del { color: #8a8578; margin-right: 6px; }
+.amq-shop-main ul.products li.product a.button {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	text-align: center;
+	background: transparent !important;
+	color: #242622 !important;
+	border: 1px solid #242622 !important;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: .03em;
+	text-decoration: none;
+	padding: 12px 10px;
+	margin-top: 14px;
+	transition: background-color .2s ease, color .2s ease;
+}
+.amq-shop-main ul.products li.product a.button:hover {
+	background: #242622 !important;
+	color: #FFFDF8 !important;
+}
+.amq-shop-main .woocommerce-pagination { margin-top: 48px; }
+.amq-shop-main .woocommerce-pagination ul.page-numbers {
+	display: flex; list-style: none; gap: 8px; margin: 0; padding: 0; justify-content: center;
+}
+.amq-shop-main .woocommerce-pagination .page-numbers {
+	display: flex; align-items: center; justify-content: center;
+	min-width: 36px; height: 36px; padding: 0 6px;
+	border: 1px solid #E8DED2; color: #242622;
+	font-family: "IBM Plex Sans Thai", sans-serif; font-size: 13px;
+	text-decoration: none;
+}
+.amq-shop-main .woocommerce-pagination .page-numbers.current,
+.amq-shop-main .woocommerce-pagination .page-numbers:hover { background: #242622; color: #FFFDF8; border-color: #242622; }
+
+@media screen and (max-width: 1024px) {
+	.amq-shop-main ul.products { grid-template-columns: repeat(2, 1fr); }
+}
+@media screen and (max-width: 560px) {
+	.amq-shop-main ul.products { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,44 @@
+/**
+ * amq-category-browse.css
+ *
+ * Styles for the [amq_browse_categories] "Browse by category" carousel.
+ *
+ * Layout math: side margins equal one block's width. With N visible blocks
+ * and a fixed gap g, block width b solves (N+2)*b + (N-1)*g = 100%.
+ *
+ * Migrated from wp-content/mu-plugins/amouriq-category-browse.php.
+ * Loaded conditionally by that mu-plugin only when [amq_browse_categories]
+ * renders — see amq_browse_categories_assets_needed().
+ */
+
+:root{
+	--amq-cat-gap: 20px;
+	--amq-cat-n: 5;
+	--amq-cat-margin: calc((100% - (var(--amq-cat-n) - 1) * var(--amq-cat-gap)) / (var(--amq-cat-n) + 2));
+	--amq-cat-tile-w: calc((100% - (var(--amq-cat-n) - 1) * var(--amq-cat-gap)) / var(--amq-cat-n));
+}
+.amq-cat-carousel{position:relative;padding:0 var(--amq-cat-margin);}
+.amq-cat-carousel__viewport{overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none;}
+.amq-cat-carousel__viewport::-webkit-scrollbar{display:none;}
+.amq-cat-carousel__track{display:flex;gap:var(--amq-cat-gap);}
+.amq-cat-tile{flex:0 0 var(--amq-cat-tile-w);min-width:0;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;}
+.amq-cat-tile__media{display:block;width:100%;aspect-ratio:1/1;overflow:hidden;background:#F3F1EC;}
+.amq-cat-tile__media img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s ease;}
+.amq-cat-tile__media:hover img{transform:scale(1.05);}
+.amq-cat-tile__label{margin-top:14px;text-align:center;font-size:15px;font-weight:500;color:#242622;text-decoration:none;}
+.amq-cat-tile__label:hover{text-decoration:underline;}
+
+@media screen and (max-width:1024px){
+	:root{--amq-cat-n:3;}
+}
+@media screen and (max-width:640px){
+	:root{--amq-cat-n:2;--amq-cat-gap:14px;}
+}
+
+.amq-cat-carousel .amq-carousel__arrow{position:absolute;top:38%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:1px solid #E8DED2;background:#FFFDF8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;color:#242622;padding:0;transition:background-color .2s ease,border-color .2s ease;}
+.amq-cat-carousel .amq-carousel__arrow:hover{background-color:#242622;border-color:#242622;color:#FFFDF8;}
+.amq-cat-carousel .amq-carousel__arrow svg{width:16px;height:16px;}
+.amq-cat-carousel .amq-carousel__arrow--prev{left:4px;}
+.amq-cat-carousel .amq-carousel__arrow--next{right:4px;}
+.amq-cat-carousel .amq-carousel__arrow:disabled{opacity:.35;cursor:default;}
+.amq-cat-carousel .amq-carousel__arrow:disabled:hover{background-color:#FFFDF8;border-color:#E8DED2;color:#242622;}

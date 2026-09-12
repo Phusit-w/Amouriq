@@ -1,0 +1,56 @@
+/**
+ * amq-header-hover.css
+ *
+ * Sitewide AMOURIQ header states: transparent-over-hero at rest, solid
+ * porcelain background on hover or after scrolling past the threshold.
+ *
+ * Migrated from wp-content/mu-plugins/amouriq-header-hover.php.
+ * Loaded sitewide (unconditional) by that mu-plugin — see the wp_head
+ * hook in amouriq-header-hover.php.
+ */
+
+#amq-header {
+	position: absolute !important;
+	top: 0; left: 0; width: 100%;
+	transition: background-color .3s ease, border-color .3s ease, box-shadow .3s ease;
+}
+#amq-header.is-scrolled {
+	position: fixed !important;
+	top: 0;
+	background-color: #FAF7F0 !important;
+	border-color: #E8DED2 !important;
+	box-shadow: 0 2px 14px rgba(36,38,34,0.08);
+}
+body.admin-bar #amq-header.is-scrolled { top: 32px; }
+@media screen and (max-width: 782px) {
+	body.admin-bar #amq-header.is-scrolled { top: 46px; }
+}
+#amq-header .elementor-heading-title,
+#amq-header .elementor-heading-title a { transition: color .3s ease; }
+/* Each heading widget also has its own Elementor "Hover" tab set
+ * (title_hover_color = #242622, matches) — but that ONLY fires when the
+ * cursor is literally over that widget's own text/link. The header's
+ * background swap is a CONTAINER-level hover (fires anywhere inside
+ * #amq-header), so this rule is still required: without it, hovering
+ * anywhere else in the header (an icon, empty space) flips the
+ * background to solid porcelain while the logo/nav text stays white,
+ * becoming invisible against it. No per-widget Elementor control can
+ * react to a sibling/parent being hovered — this has to stay CSS. */
+#amq-header:hover .elementor-heading-title,
+#amq-header:hover .elementor-heading-title a,
+#amq-header.is-scrolled .elementor-heading-title,
+#amq-header.is-scrolled .elementor-heading-title a { color: #242622 !important; }
+#amq-header .amq-lang-switch { color: #FFFDF8 !important; transition: color .3s ease; }
+#amq-header:hover .amq-lang-switch,
+#amq-header.is-scrolled .amq-lang-switch { color: #242622 !important; }
+/* Rest-state color now comes from an inline style="color:..." written
+ * directly into each icon's HTML widget content (Elementor-editable) —
+ * this rule only needs to still force the hover/scrolled swap, since
+ * html widgets have no native Hover-tab control to drive it instead. */
+#amq-header .amq-header-icon { transition: color .3s ease, border-color .3s ease; }
+#amq-header:hover .amq-header-icon,
+#amq-header.is-scrolled .amq-header-icon { color: #242622 !important; }
+
+/* ---------- user/cart/search-toggle icons (shared by every header variant) ---------- */
+.amq-header-icon { color: #242622; display: flex; align-items: center; transition: opacity .2s ease; }
+.amq-header-icon:hover { opacity: .65; }

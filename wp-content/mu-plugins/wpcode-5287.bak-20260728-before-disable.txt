@@ -1,0 +1,55 @@
+document.addEventListener('DOMContentLoaded', function() {
+    var offcanvas = document.getElementById('offcanvas');
+    if (!offcanvas) return;
+
+    function openDrawer(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        offcanvas.removeAttribute('inert');
+        offcanvas.style.cssText = [
+            'position:fixed!important',
+            'right:0!important',
+            'left:auto!important',
+            'top:0!important',
+            'width:500px!important',
+            'max-width:100vw!important',
+            'height:100vh!important',
+            'z-index:999999!important',
+            'background:#fff!important',
+            'overflow-y:auto!important',
+            'transform:none!important',
+            'opacity:1!important',
+            'visibility:visible!important',
+            'display:flex!important',
+            'flex-direction:column!important',
+            'box-shadow:-5px 0 30px rgba(0,0,0,0.25)!important'
+        ].join(';');
+        var cart = offcanvas.querySelector('.ct-cart-content');
+        if (cart) cart.style.cssText = 'display:block!important';
+        document.body.style.overflow = 'hidden';
+        if (!document.querySelector('.ct-cart-overlay-custom')) {
+            var ov = document.createElement('div');
+            ov.className = 'ct-cart-overlay-custom';
+            ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:99998;cursor:pointer;';
+            ov.addEventListener('click', closeDrawer);
+            document.body.appendChild(ov);
+        }
+    }
+
+    function closeDrawer() {
+        offcanvas.removeAttribute('style');
+        offcanvas.setAttribute('inert', '');
+        document.body.style.overflow = '';
+        var ov = document.querySelector('.ct-cart-overlay-custom');
+        if (ov) ov.remove();
+    }
+
+    var cartLink = document.querySelector('.ct-sticky-container .ct-header-cart[data-id="cart"] > a.ct-cart-item');
+    if (!cartLink) cartLink = document.querySelector('.ct-header-cart[data-id="cart"] > a.ct-cart-item');
+    if (cartLink) cartLink.addEventListener('click', openDrawer, true);
+
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('#offcanvas [class*="toggle-close"]')) closeDrawer();
+    });
+});

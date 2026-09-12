@@ -1,0 +1,17 @@
+/**
+ * amq-layout.css
+ *
+ * Purpose: structural / layout rules — carousel viewport & track mechanics,
+ * the header's 2-state (transparent/solid) positioning, and the "Browse by
+ * category" margin/tile-width calc() math. Things that decide WHERE and
+ * HOW BIG elements are, as opposed to their visual skin.
+ *
+ * Currently empty. Candidate rules to migrate here later (from
+ * wp-content/mu-plugins/*.php inline <style> blocks) include:
+ *   - #amq-header positioning/transition rules (amouriq-header-hover.php)
+ *   - .amq-carousel__viewport / .amq-carousel__track (amouriq-bestsellers-carousel.php)
+ *   - .amq-cat-carousel layout + --amq-cat-* custom properties (amouriq-category-browse.php)
+ *   - .amq-hero-slider track/slide flex layout (amouriq-hero-slider.php)
+ *
+ * Loaded after amq-tokens.css, before amq-components.css.
+ */

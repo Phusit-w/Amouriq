@@ -1,0 +1,44 @@
+# WordPress core (regenerable from wordpress.org, not our code)
+/wp-admin/
+/wp-includes/
+/wp-*.php
+/index.php
+/license.txt
+/readme.html
+/xmlrpc.php
+
+# Third-party plugins (managed via WP admin / composer, not hand-edited here)
+/wp-content/plugins/
+
+# Leftover migration/restore artifacts (all empty, kept out on principle)
+/wp-content/*-old/
+/wp-content/*-old-old/
+
+# User-uploaded media (huge, regenerable from backups, not code)
+/wp-content/uploads/
+/wp-content/uploads-old/
+
+# Backups — contain full DB dumps (customer/order PII), never commit
+/wp-content/updraft/
+/wp-content/ai1wm-backups/
+
+# Caches and temp
+/wp-content/cache/
+/wp-content/temp/
+/wp-content/upgrade/
+/wp-content/upgrade-temp-backup/
+/wp-content/upgrade-temp-backup-old/
+/wp-content/litespeed/
+/wp-content/maintenance/
+/.tmb/
+
+# Other installed themes we are not editing (hello-elementor-child IS tracked —
+# that's the live AMOURIQ child theme this project edits)
+/wp-content/themes/blocksy/
+/wp-content/themes/hello-elementor/
+/wp-content/themes/pcoursewebbs/
+/wp-content/themes/twentytwenty*/
+/wp-content/themes-old/
+
+# Local dev noise
+local-xdebuginfo.php

@@ -1,0 +1,16 @@
+/**
+ * amq-tokens.css
+ *
+ * Purpose: design tokens (CSS custom properties) for the AMOURIQ brand —
+ * colors, font stacks, spacing scale. Intended to be the single source of
+ * truth that amq-layout.css / amq-components.css / amq-woocommerce.css
+ * reference, instead of each file repeating hardcoded hex values.
+ *
+ * Currently empty. Candidate values to migrate here later (from
+ * wp-content/mu-plugins/*.php inline <style> blocks) include colors such as
+ * #242622 (ink), #FFFDF8 (porcelain), #E8DDCB / #E8DED2 (sand), #8a8578
+ * (muted text), and the "IBM Plex Sans Thai" font stack.
+ *
+ * Loaded first in the cascade (see functions.php) so later files can use
+ * whatever custom properties get defined here.
+ */

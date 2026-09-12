@@ -1,0 +1,66 @@
+// รีเฟรชยอดหลัง Apply Points/คูปอง แบบกันลูป-กันค้าง
+add_action('wp_footer', function () {
+  if ( ! (is_cart() || is_checkout()) ) return; ?>
+<script>
+jQuery(function($){
+  // ปรับ selector ให้ตรงปุ่ม "Apply Points" ของปลั๊กอินคุณ
+  // สำรองไว้หลายแบบ (MWB/WPS ส่วนใหญ่ใช้ชื่อเหล่านี้)
+  var applyPointsBtns = '#wps_cart_points_apply, .mwb_wpr_apply_points, #mwb_wpr_apply_points';
+
+  var lock = false;          // กันกดซ้ำ/กันลูป
+  var debounceTimer = null;  // เก็บ timer ไว้ debounce
+
+  function refreshOnce(reason){
+    if (lock) return;
+    lock = true;
+
+    // บล็อกปุ่มชั่วคราว กันผู้ใช้กดซ้ำ
+    $(applyPointsBtns+', .apply_coupon, [name="apply_coupon"]').prop('disabled', true).addClass('is-loading');
+
+    // รีเฟรชเฉพาะหน้าที่อยู่
+    if ($('form.woocommerce-cart-form').length){
+      $(document.body).trigger('wc_update_cart');          // รีคำนวณตะกร้า
+      $(document.body).trigger('wc_fragment_refresh');     // รีเฟรช fragments
+    }
+    if ($('form.checkout').length){
+      $(document.body).trigger('update_checkout');         // รีคำนวณเช็กเอาต์
+      $(document.body).trigger('wc_fragment_refresh');
+    }
+
+    // ปลดล็อกหลัง AJAX ของ Woo ทำงานไปช่วงหนึ่ง
+    setTimeout(function(){
+      lock = false;
+      $(applyPointsBtns+', .apply_coupon, [name="apply_coupon"]').prop('disabled', false).removeClass('is-loading');
+    }, 1200);
+  }
+
+  // กดปุ่ม Apply Points → ยิงครั้งเดียวแบบ debounce
+  $(document).on('click', applyPointsBtns, function(){
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(function(){ refreshOnce('click-apply-points'); }, 300);
+  });
+
+  // เมื่อปลั๊กอินยิง AJAX apply points เสร็จ → ค่อยรีเฟรช 1 ครั้ง
+  $(document).ajaxComplete(function(e, xhr, settings){
+    try{
+      var url  = (settings && settings.url)  ? settings.url  : '';
+      var data = (settings && settings.data) ? (settings.data+'') : '';
+
+      // จับเฉพาะคำสั่ง apply points ของปลั๊กอิน (กันชนกับ wc-ajax อื่น ๆ)
+      if ( url.indexOf('admin-ajax.php') > -1 && /w(p|m) s?_wpr?_apply_points/i.test(data) ){
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function(){ refreshOnce('ajax-apply-points'); }, 80);
+      }
+    }catch(err){}
+  });
+
+  // เมื่อ Woo ทำงานจบรอบ (คูปอง/ตะกร้า/เช็กเอาต์) → ปลดล็อกไว้
+  $(document.body)
+    .on('updated_wc_div updated_cart_totals wc_fragments_refreshed wc_fragments_loaded updated_checkout applied_coupon removed_coupon applied_coupon_in_checkout removed_coupon_in_checkout', function(){
+      // ปลดล็อก/ปลดปุ่ม เผื่อค้างจากรอบก่อน
+      lock = false;
+      $(applyPointsBtns+', .apply_coupon, [name="apply_coupon"]').prop('disabled', false).removeClass('is-loading');
+    });
+});
+</script>
+<?php });

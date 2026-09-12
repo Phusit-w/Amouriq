@@ -1,0 +1,75 @@
+/**
+ * amq-bestsellers-carousel.css
+ *
+ * Styles for the [amq_bestsellers] "Our Most Loved" product carousel.
+ * Loaded conditionally by wp-content/mu-plugins/amouriq-bestsellers-carousel.php
+ * only when [amq_bestsellers] renders — see amq_bestsellers_assets_needed().
+ */
+
+.amq-carousel{position:relative;padding:0 52px;}
+.amq-carousel__viewport{overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none;}
+.amq-carousel__viewport::-webkit-scrollbar{display:none;}
+.amq-carousel__track{display:flex;align-items:flex-start;gap:24px;}
+.amq-carousel__slide{flex:0 0 calc(25% - 18px);min-width:0;scroll-snap-align:start;}
+@media screen and (max-width:1024px){.amq-carousel__slide{flex-basis:calc(50% - 12px);}}
+@media screen and (max-width:600px){.amq-carousel__slide{flex-basis:80%;}.amq-carousel{padding:0 44px;}}
+
+.amq-carousel__arrow{position:absolute;top:38%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;border:1px solid #E8DED2;background:#FFFDF8;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;color:#242622;padding:0;transition:background-color .2s ease,border-color .2s ease;}
+.amq-carousel__arrow:hover{background-color:#242622;border-color:#242622;color:#FFFDF8;}
+.amq-carousel__arrow svg{width:16px;height:16px;}
+.amq-carousel__arrow--prev{left:0;}
+.amq-carousel__arrow--next{right:0;}
+.amq-carousel__arrow:disabled{opacity:.35;cursor:default;}
+.amq-carousel__arrow:disabled:hover{background-color:#FFFDF8;border-color:#E8DED2;color:#242622;}
+
+.amq-product-card{display:flex;flex-direction:column;}
+.amq-product-card__media{position:relative;display:block;aspect-ratio:1/1;overflow:hidden;background:#F3F1EC;}
+.amq-product-card__badge{position:absolute;top:12px;left:12px;z-index:3;background:transparent;color:#D8A94E;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:5px 10px;text-shadow:0 1px 3px rgba(0,0,0,.35);}
+.amq-product-card__badge:empty{display:none;}
+
+/* Hidden "template" widgets (Elementor Text Editor + Button) that supply
+   the shared badge text and ADD TO BAG label for every card — see
+   amouriq-bestsellers-carousel.php and amq-bestsellers-carousel.js. Kept
+   in the DOM (not removed) so Elementor's Navigator can still find and
+   edit them; only visually hidden. */
+.amq-bestsellers-badge-template,.amq-bestsellers-cta-template{display:none;}
+.amq-product-card__image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:opacity .35s ease;}
+.amq-product-card__image--hover{opacity:0;}
+.amq-product-card__media:hover .amq-product-card__image--primary{opacity:0;}
+.amq-product-card__media:hover .amq-product-card__image--hover{opacity:1;}
+
+/* Decorative bookmark toggle, top-right corner of the image. No wishlist
+   system exists on this site yet — this only flips its own pressed state
+   for visual feedback, nothing is persisted. */
+.amq-product-card__bookmark{position:absolute;top:12px;right:12px;z-index:3;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:rgba(255,253,248,.85);border:none;border-radius:50%;cursor:pointer;color:#242622;padding:0;transition:background-color .2s ease;}
+.amq-product-card__bookmark svg{width:16px;height:16px;}
+.amq-product-card__bookmark:hover{background:#FFFDF8;}
+.amq-product-card__bookmark[aria-pressed="true"] svg{fill:#242622;}
+
+.amq-product-card__body{padding-top:16px;display:flex;flex-direction:column;}
+.amq-product-card__name{font-weight:600;color:#242622;text-decoration:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.35;min-height:calc(1.35em * 2);}
+.amq-product-card__name:hover{text-decoration:underline;}
+.amq-product-card__desc{font-size:13px;line-height:1.5;color:#62665E;margin:8px 0 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;min-height:calc(1.5em * 2);}
+
+.amq-product-card__divider{border-top:1px solid #E8DED2;margin:14px 0;}
+
+.amq-product-card__size-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.amq-product-card__size-row--fixed{justify-content:flex-start;}
+.amq-product-card__size-label{font-size:12px;color:#8a8578;}
+.amq-product-card__size-select{font-size:13px;color:#242622;border:1px solid #E8DED2;background:#FFFDF8;padding:6px 10px;min-width:0;cursor:pointer;}
+
+.amq-product-card__price{font-weight:600;color:#242622;margin-top:12px;font-size:15px;}
+.amq-product-card__price ins{text-decoration:none;}
+
+.amq-product-card__actions{display:flex;align-items:center;gap:16px;margin-top:14px;}
+.amq-product-card__add-to-bag{flex:1;box-sizing:border-box;text-align:center;background:#2D3536;color:#FFFDF8;border:none;border-radius:0;font-weight:700;font-size:13px;letter-spacing:.03em;text-decoration:none;padding:14px 10px;cursor:pointer;transition:background-color .2s ease;}
+.amq-product-card__add-to-bag:hover{background:#40453d;}
+.amq-product-card__add-to-bag[disabled]{opacity:.6;cursor:default;}
+.amq-product-card__add-to-bag.is-added{background:#5D5F4B;}
+.amq-product-card__details-link{flex:none;font-size:12px;color:#242622;text-decoration:underline;white-space:nowrap;}
+.amq-product-card__details-link:hover{color:#62665E;}
+
+@media screen and (max-width:600px){
+	.amq-product-card__actions{flex-direction:column;align-items:stretch;gap:10px;}
+	.amq-product-card__details-link{text-align:center;}
+}

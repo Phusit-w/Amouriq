@@ -1,0 +1,29 @@
+/**
+ * amq-contact-form.css
+ *
+ * Styles for [amq_contact_form] (wp-content/mu-plugins/amouriq-contact-form.php),
+ * used on the Contact page. Matches the site's minimal, outlined-field
+ * aesthetic (see amq-footer-signup.css) but inverted for a light background.
+ */
+
+.amq-contact-form{display:flex;flex-direction:column;gap:28px;width:100%;}
+.amq-contact-form__row{display:flex;gap:28px;}
+.amq-contact-form__field{flex:1 1 0;display:flex;flex-direction:column;gap:8px;}
+.amq-contact-form__field--full{width:100%;}
+.amq-contact-form__field label{font-family:"IBM Plex Sans Thai",sans-serif;font-size:14px;color:#242622;}
+.amq-contact-form__field input,
+.amq-contact-form__field textarea{background:transparent;border:1px solid #d8d3c6;color:#242622;padding:12px 14px;font-family:"IBM Plex Sans Thai",sans-serif;font-size:15px;outline:none;box-sizing:border-box;width:100%;resize:vertical;transition:border-color .2s ease;}
+.amq-contact-form__field input:focus,
+.amq-contact-form__field textarea:focus{border-color:#242622;}
+.amq-contact-form__field textarea{min-height:140px;}
+.amq-contact-form__honeypot{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
+.amq-contact-form__submit{background:#4c4f45;border:1px solid #4c4f45;color:#FFFDF8;padding:14px 24px;font-family:"IBM Plex Sans Thai",sans-serif;font-size:15px;font-weight:500;letter-spacing:.01em;cursor:pointer;transition:background-color .2s ease,opacity .2s ease;width:100%;}
+.amq-contact-form__submit:hover{background:#3a3d35;}
+.amq-contact-form__submit:disabled{opacity:.6;cursor:default;}
+.amq-contact-form__notice{font-family:"IBM Plex Sans Thai",sans-serif;font-size:14px;margin:0;min-height:1.2em;}
+.amq-contact-form__notice[data-state="success"]{color:#4c4f45;}
+.amq-contact-form__notice[data-state="error"]{color:#b3261e;}
+
+@media(max-width:767px){
+	.amq-contact-form__row{flex-direction:column;gap:28px;}
+}

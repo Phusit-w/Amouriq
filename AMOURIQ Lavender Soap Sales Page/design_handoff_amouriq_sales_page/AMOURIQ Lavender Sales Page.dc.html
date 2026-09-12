@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/amouriq-ae6baf96-edac-408b-ae0c-1c2006fd1f14/styles.css">
+<script src="_ds/amouriq-ae6baf96-edac-408b-ae0c-1c2006fd1f14/_ds_bundle.js"></script>
+<script src="./image-slot.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&amp;family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&amp;display=swap">
+<style>
+  html { scroll-behavior: smooth; }
+  body { -webkit-font-smoothing: antialiased; }
+  summary::-webkit-details-marker { display: none; }
+  summary { list-style: none; }
+  /* Thai in Prompt needs room the DS heading metrics (tuned for DM Sans) take away:
+     negative tracking crowds sara-u/sara-uu, and 1.14 leading collides above/below. */
+  /* Prompt stacks mai-tho hard onto mai-han-akat ("ตั้ง" reads as an overlap at body
+     sizes) — glyph geometry no CSS can loosen. IBM Plex Sans Thai is loopless and geometric like Prompt
+     with more room above the base for the mark stack, so Thai resolves to it first; DM Sans
+     has no Thai glyphs, so Latin is unaffected. Prompt stays as the fallback. */
+  :root {
+    --font-body: "DM Sans", "IBM Plex Sans Thai", Prompt, system-ui, sans-serif;
+    --font-heading: "DM Sans", "IBM Plex Sans Thai", Prompt, system-ui, sans-serif;
+    --font-body-th: "IBM Plex Sans Thai", Prompt, sans-serif;
+    --font-heading-th: "IBM Plex Sans Thai", Prompt, sans-serif;
+  }
+  /* Tracking is still inserted after each zero-width mark, so tracked Thai runs
+     (uppercase labels, kickers) get it reset at runtime — see fixThaiTracking. */
+  [data-thai-run] { letter-spacing: normal; }
+  h1, h2, h3, h4, h5, h6 { letter-spacing: 0; line-height: 1.5; }
+  h1 { line-height: 1.42; }
+  p, li, summary, dd, dt { line-height: 1.85; }
+  sup { font-size: .62em; line-height: 0; vertical-align: super; font-weight: 500; letter-spacing: 0; }
+  a { color: var(--color-accent); }
+  a:hover { color: var(--color-accent-700); }
+</style>
+</helmet>
+
+<div style="background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);min-height:100vh">
+
+  <section data-screen-label="00 Trust bar" style="background:var(--color-bg);border-bottom:1px solid var(--color-divider);padding:9px clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:center;gap:6px 22px;white-space:nowrap;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 78%, transparent)">
+      <span style="font-weight:500">100% Real Soap<sup><a href="#fn-dagger" style="color:inherit;text-decoration:none;padding:0 1px">†</a></sup></span>
+      <span>DermX Tested</span>
+      <span>Thai FDA Notified</span>
+      <span>Thoughtfully Made for Skin</span>
+    </div>
+  </section>
+
+  <sc-if value="{{ standaloneChrome }}" hint-placeholder-val="{{ false }}">
+    <header style="position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--color-bg) 92%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--color-divider);padding:12px clamp(16px,4vw,48px)">
+      <div style="max-width:1120px;margin:0 auto;display:flex;align-items:center;gap:clamp(12px,3vw,28px)">
+        <img class="logo" src="assets/logo-dark.png" alt="AMOURIQ" style="height:20px">
+        <nav style="margin-left:auto;display:flex;align-items:center;gap:clamp(10px,2.2vw,22px);font-size:13.5px;white-space:nowrap">
+          <a href="#results" style="color:inherit;text-decoration:none">ผลบนผิว</a>
+          <a href="#evidence" style="color:inherit;text-decoration:none">หลักฐาน</a>
+          <a href="#faq" style="color:inherit;text-decoration:none">คำถาม</a>
+          <a href="#buy" class="btn btn-primary" style="color:var(--color-bg);min-height:38px;padding:9px 16px;white-space:nowrap">เลือกขนาด</a>
+        </nav>
+      </div>
+    </header>
+  </sc-if>
+
+  <section id="hero" data-screen-label="01 Hero" style="padding:clamp(32px,5vw,72px) clamp(16px,4vw,48px) clamp(40px,6vw,88px)">
+    <div style="max-width:1120px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:clamp(24px,4vw,56px);align-items:center">
+      <figure style="order:0">
+        <div style="position:relative;border-radius:var(--radius-lg);overflow:hidden;background:var(--color-surface);aspect-ratio:4/5">
+          <img class="washed" src="assets/lifestyle.png" alt="Organic Olive Castile Soap Lavender บนจานเซรามิก แสงธรรมชาติ" style="width:100%;height:100%;object-fit:cover">
+        </div>
+        <figcaption>ภาพชั่วคราวจากคลังภาพแบรนด์ — รอภาพ hero จริง (มือ/แขนใช้สินค้าในห้องน้ำแสงธรรมชาติ)</figcaption>
+      </figure>
+      <div>
+        <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:14px">AMOURIQ Organic Olive Castile Soap — Lavender</div>
+        <div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:18px"><span class="tag tag-accent-2" style="font-weight:500">100% REAL SOAP<sup><a href="#fn-dagger" style="color:inherit;text-decoration:none;padding:0 1px">†</a></sup></span><span style="font-size:12.5px;opacity:.7">สบู่เหลวแท้ ตามนิยาม มอก. เอส 14-2562</span></div>
+        <h1 style="font-size:clamp(30px,4.4vw,50px);margin:0 0 18px;max-width:16em;text-wrap:pretty">สบู่เหลวแท้ ที่ไม่ได้คิดถึงแค่ความสะอาด</h1>
+        <p style="font-size: clamp(15px,1.4vw,17px); max-width: 36em; opacity: .85; margin-bottom: 26px; text-wrap: pretty; text-transform: none">Organic Olive Castile Soap ที่ AMOURIQ พัฒนาขึ้นโดยมุ่งการดูแลผิว<br>โดยเฉพาะ พร้อมผลการประเมินในอาสาสมัคร* เพื่อดูว่า <strong style="font-weight: 500;">หลังล้างแล้ว เกิดอะไรขึ้นกับความชุ่มชื้นและการสูญเสียน้ำของผิว</strong></p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:28px">
+          <div class="card" style="gap:6px;padding:var(--space-3)">
+            <div style="display:flex;align-items:center;gap:7px;color:var(--color-accent-signature)">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-4-3-6.5S12.5 3 12 2c-.5 1-2 3.5-4 6.5S5 13 5 15a7 7 0 0 0 7 7Z"></path></svg>
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:500">Moisture ↑</span>
+            </div>
+            <div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(22px,2.6vw,28px);color:var(--color-accent-signature)" data-countup="13.37" data-prefix="+" data-suffix="%">+13.37%</div>
+            <div style="font-size:12.5px;opacity:.75">ความชุ่มชื้นเพิ่มขึ้นสูงสุด หลังใช้ 4 ชั่วโมง<sup></sup></div>
+          </div>
+          <div class="card" style="gap:6px;padding:var(--space-3)">
+            <div style="display:flex;align-items:center;gap:7px;color:var(--color-accent-signature)">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 3v13"></path><path d="m7 12 5 5 5-5"></path><path d="M4 21h16"></path></svg>
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:500">Water Loss ↓</span>
+            </div>
+            <div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(22px,2.6vw,28px);color:var(--color-accent-signature)" data-countup="10.67" data-prefix="−" data-suffix="%">−10.67%</div>
+            <div style="font-size:12.5px;opacity:.75">ค่าการสูญเสียน้ำจากผิว (TEWL) หลังใช้ 8 ชั่วโมง<sup></sup></div>
+          </div>
+          <div class="card" style="gap:6px;padding:var(--space-3)">
+            <div style="display:flex;align-items:center;gap:7px;color:var(--color-accent-signature)">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path></svg>
+              <span style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:500">Barrier-friendly</span>
+            </div><div style="font-size:12.5px;opacity:.85;margin-top:4px">ผลการทดสอบสรุปว่า "<strong style="font-weight: 500;">ไม่พบ" ผลทำลายเกราะป้องกันผิว</strong></div>
+            
+          </div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px">
+          <a href="#buy" class="btn btn-primary" style="color:var(--color-bg);min-height:50px;padding:14px 26px;font-size:15.5px;white-space:nowrap">เลือกขนาดและสั่งซื้อ</a>
+          
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="02 Memory lock" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <h2 style="font-size:clamp(24px,3.4vw,40px);max-width:22em;margin-bottom:clamp(28px,4vw,48px);text-wrap:pretty">"หลังล้าง" สิ่งที่เกิดขึ้นกับผิว<br>สำคัญไม่แพ้ความสะอาด</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:clamp(20px,3vw,40px);border-top:1px solid var(--color-divider);padding-top:clamp(20px,3vw,36px)">
+        <div>
+          <div style="display:flex;align-items:center;gap:9px;color:var(--color-accent-signature);margin-bottom:8px"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-4-3-6.5S12.5 3 12 2c-.5 1-2 3.5-4 6.5S5 13 5 15a7 7 0 0 0 7 7Z"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(20px,2.4vw,26px)">MOISTURE ↑</div></div>
+          <div style="font-size:15px;opacity:.85">ผิวชุ่มชื้นเพิ่มขึ้น</div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:9px;color:var(--color-accent-signature);margin-bottom:8px"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M12 3v13"></path><path d="m7 12 5 5 5-5"></path><path d="M4 21h16"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(20px,2.4vw,26px)">WATER LOSS ↓</div></div>
+          <div style="font-size:15px;opacity:.85">การสูญเสียน้ำจากผิวลดลง</div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:9px;color:var(--color-accent-signature);margin-bottom:8px"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(20px,2.4vw,26px)">BARRIER-FRIENDLY</div></div>
+          <div style="font-size:15px;opacity:.85">เป็นมิตรต่อเกราะป้องกันผิว</div>
+        </div>
+      </div>
+      <p style="margin:clamp(28px,4vw,44px) 0 0;font-size:clamp(15px,1.6vw,18px);max-width:34em;opacity:.75;border-left:2px solid var(--color-accent);padding-left:18px">เพราะผลิตภัณฑ์ทำความสะอาดที่ใช้ทุกวัน ไม่ควรจบหน้าที่เพียงตอนที่ล้างออก</p>
+    </div>
+  </section>
+
+  <section data-screen-label="03 Why real soap" style="background:var(--color-accent-2);color:var(--color-bg);padding:clamp(48px,7vw,100px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-2-300);font-weight:500;margin-bottom:16px">100% REAL SOAP<sup><a href="#fn-dagger" style="color:inherit;text-decoration:none;padding:0 1px">†</a></sup></div>
+      <h2 style="font-size:clamp(25px,3.6vw,42px);max-width:24em;margin-bottom:22px;text-wrap:pretty">สิ่งที่เรียกว่า “สบู่เหลว” ไม่ได้เป็น "สบู่เหลวแท้"<br>เหมือนกันทั้งหมด</h2>
+      <p style="max-width:40em;font-size:clamp(14.5px,1.4vw,16.5px);opacity:.88;text-wrap:pretty">มาตรฐานอุตสาหกรรมเอส <strong style="font-weight:500">มอก. เอส 14-2562</strong> แยกคำว่า <strong style="font-weight:500">“สบู่เหลวแท้”</strong> และ <strong style="font-weight:500">“สบู่เหลวผสม”</strong> ออกจากกันอย่างชัดเจน — สบู่เหลวแท้มีเกลือของกรดไขมันจากน้ำมันหรือไขมันเป็นองค์ประกอบสำคัญ ส่วนสบู่เหลวผสมมีสารลดแรงตึงผิวสังเคราะห์ร่วมด้วย (ข้อ 3.3.1: สบู่เหลวแท้ต้องไม่พบสารลดแรงตึงผิวสังเคราะห์)</p>
+      <div style="height:1px;background:color-mix(in srgb, var(--color-bg) 24%, transparent);margin:clamp(30px,4vw,52px) 0"></div>
+      <h3 style="font-size:clamp(20px,2.6vw,30px);max-width:26em;margin-bottom:16px;text-wrap:pretty">สำหรับ AMOURIQ คำว่า Real Soap ไม่ใช่คำที่ใช้เพื่อให้สินค้าฟังดูเป็นธรรมชาติขึ้น</h3>
+      <p style="max-width:46em;font-size:clamp(14.5px,1.4vw,16.5px);opacity:.88;text-wrap:pretty">แต่เป็น product identity ที่มีนิยามให้ตรวจสอบได้ — เราหยิบนิยามทางเคมีของคำว่า <span style="white-space:nowrap">“สบู่เหลวแท้”</span> จาก มอก. เอส 14-2562 มาใช้เป็นเกณฑ์วัดคุณภาพของเราเอง เพราะตรงกับสิ่งที่เราอยากพิสูจน์ให้เห็นมากที่สุด</p>
+      <a href="#evidence" class="btn" style="margin-top:26px;color:var(--color-bg);border-color:color-mix(in srgb, var(--color-bg) 45%, transparent);min-height:46px;padding:12px 20px">ดูนิยามที่เราอ้างอิง</a>
+    </div>
+  </section>
+
+  <section data-screen-label="04 Not enough" style="background:var(--color-accent-2-900);color:var(--color-bg);padding:clamp(48px,7vw,100px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <h2 style="font-size:clamp(26px,3.8vw,46px);max-width:22em;margin-bottom:18px;text-wrap:pretty">แต่สำหรับเรา การเป็น “สบู่เหลวแท้” ยังไม่พอ</h2>
+      <h3 style="font-size:clamp(18px,2.2vw,26px);color:var(--color-accent-2-300);margin-bottom:24px">แล้วหลังล้าง ผิวเป็นอย่างไร?</h3>
+      <p style="max-width:38em;font-size:clamp(14.5px,1.4vw,16.5px);opacity:.88">AMOURIQ ไม่ได้หยุดอยู่ที่วัตถุดิบ สูตร หรือคำว่า Castile เราเลือกทดสอบ <strong style="font-weight:500"><br>ผลิตภัณฑ์สำเร็จรูปบนผิวจริง</strong></p>
+      <div style="margin-top:clamp(28px,4vw,44px);font-size:26px;color:var(--color-accent-2-300)">↓</div>
+    </div>
+  </section>
+
+  <section id="results" data-screen-label="05 Moisture" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div data-seq="" style="max-width:1000px;margin:0 auto">
+      <div data-seq-rise="0" style="overflow:hidden">
+        <div data-seq-inner="" style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:14px">Skin result 01 — Moisture ↑</div>
+      </div>
+      <div data-seq-rise="120" style="overflow:hidden;padding-bottom:.08em;margin-bottom:clamp(24px,3vw,40px)">
+        <h2 data-seq-inner="" style="font-size:clamp(24px,3.2vw,38px);max-width:24em;margin:0;text-wrap:pretty">ผิวชุ่มชื้น “เพิ่มขึ้น” — วัดด้วยเครื่อง Corneometer<sup>®</sup></h2>
+      </div>
+      <div data-seq-fade="420" style="display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;padding-bottom:8px;border-bottom:1px solid var(--color-divider)"><span>ช่วงเวลา</span><span>การเปลี่ยนแปลงความชุ่มชื้น</span></div>
+      <sc-for list="{{ moisture }}" as="r" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:minmax(96px,1.1fr) 2fr auto;align-items:center;gap:clamp(10px,2vw,20px);padding:14px 0;border-bottom:1px solid var(--color-divider)">
+          <div data-seq-lift="{{ r.d }}" style="font-size:13.5px;opacity:.8">{{ r.t }}</div>
+          <div style="height:10px;background:var(--color-signature-100);border-radius:2px;overflow:hidden"><div data-seq-bar="{{ r.d }}" data-seq-bar-dur="{{ r.dur }}" style="height:100%;border-radius:2px;width:{{ r.w }};background:{{ r.c }}"></div></div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(16px,2.2vw,22px);text-align:right;color:{{ r.tc }}"><span data-countup="{{ r.n }}" data-decimals="2" data-prefix="{{ r.p }}" data-suffix="%" data-dur="740" data-delay="{{ r.d }}" data-countup-seq="">{{ r.v }}</span></div>
+        </div>
+      </sc-for>
+      <div data-seq-rise="1820" style="overflow:hidden;padding-bottom:.08em;margin:clamp(28px,4vw,44px) 0 14px">
+        <h3 data-seq-inner="" style="font-size:clamp(22px,3vw,34px);margin:0;color:var(--color-accent-signature)">สูงสุด +13.37% หลังใช้ 4 ชั่วโมง<sup></sup></h3>
+      </div>
+      <p data-seq-fade="2140" style="max-width:36em;font-size:15px;opacity:.8">หลัง 8 ชั่วโมง ความชุ่มชื้นยังสูงกว่าก่อนใช้ +9.27%</p>
+      <p data-seq-fade="2420" style="max-width:36em;font-size:13.5px;opacity:.7;margin-top:10px">ผลหลัง 1, 4 และ 8 ชั่วโมงแตกต่างจากก่อนใช้อย่างมีนัยสำคัญทางสถิติที่ระดับความเชื่อมั่น 95%</p>
+      <p style="margin:26px 0 0;font-size:clamp(15px,1.5vw,17px);opacity:.75;border-left:2px solid var(--color-accent);padding-left:18px;max-width:32em">สบู่ที่ดีสำหรับ AMOURIQ จึงไม่ควรจบหน้าที่แค่ตอนที่ล้างออก</p>
+    </div>
+  </section>
+
+  <section data-screen-label="06 Water loss" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div data-seq="" style="max-width:1000px;margin:0 auto">
+      <div data-seq-rise="0" style="overflow:hidden">
+        <div data-seq-inner="" style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:14px">Skin result 02 — Water loss ↓</div>
+      </div>
+      <div data-seq-rise="120" style="overflow:hidden;padding-bottom:.08em;margin-bottom:clamp(24px,3vw,40px)">
+        <h2 data-seq-inner="" style="font-size:clamp(24px,3.2vw,38px);max-width:24em;margin:0;text-wrap:pretty">ผิวสูญเสียน้ำน้อยลง (TEWL) — วัดด้วยเครื่อง Tewameter<sup>®</sup></h2>
+      </div>
+      <div data-seq-fade="420" style="display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;padding-bottom:8px;border-bottom:1px solid var(--color-divider)"><span>ช่วงเวลา</span><span>การเปลี่ยนแปลง TEWL</span></div>
+      <sc-for list="{{ tewl }}" as="r" hint-placeholder-count="4">
+        <div style="display:grid;grid-template-columns:minmax(96px,1.1fr) 2fr auto;align-items:center;gap:clamp(10px,2vw,20px);padding:14px 0;border-bottom:1px solid var(--color-divider)">
+          <div data-seq-lift="{{ r.d }}" style="font-size:13.5px;opacity:.8">{{ r.t }}</div>
+          <div style="height:10px;background:color-mix(in srgb, var(--color-text) 8%, transparent);border-radius:2px;overflow:hidden"><div data-seq-bar="{{ r.d }}" data-seq-bar-dur="{{ r.dur }}" style="height:100%;border-radius:2px;width:{{ r.w }};background:{{ r.c }}"></div></div>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(16px,2.2vw,22px);text-align:right;color:{{ r.tc }}"><span data-countup="{{ r.n }}" data-decimals="2" data-prefix="{{ r.p }}" data-suffix="%" data-dur="740" data-delay="{{ r.d }}" data-countup-seq="">{{ r.v }}</span></div>
+        </div>
+      </sc-for>
+      <div data-seq-rise="1900" style="overflow:hidden;padding-bottom:.08em;margin:clamp(28px,4vw,44px) 0 20px">
+        <div data-seq-inner="">
+          <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:12px">Key takeaway</div>
+          <h3 style="font-size:clamp(22px,3vw,34px);margin:0;color:var(--color-accent-signature);max-width:24em">หลัง 8 ชั่วโมง การสูญเสียน้ำจากผิว (TEWL)<br>ต่ำกว่าก่อนใช้ 10.67%</h3>
+        </div>
+      </div>
+      <div data-seq-fade="2200" class="card" style="max-width:44em;background:var(--color-bg)">
+        <div class="card-kicker">Evidence note</div>
+        <p style="margin:0;font-size:14px;opacity:.85;text-wrap:pretty">ค่า TEWL หลัง 1, 4 และ 8 ชั่วโมงต่ำกว่าก่อนใช้ อย่างไรก็ตาม ความแตกต่างเมื่อเทียบกับก่อนใช้ไม่ถึงนัยสำคัญทางสถิติในการศึกษานี้ และรายงานสรุปว่าไม่พบผลที่แสดงว่าผลิตภัณฑ์ทำลายเกราะป้องกันผิว</p>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="07 Barrier" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:14px">Skin result 03 — Barrier-friendly</div>
+      <h2 style="font-size:clamp(26px,3.6vw,42px);margin-bottom:24px">เป็นมิตรต่อเกราะป้องกันผิว</h2>
+      <p style="max-width:40em;font-size:clamp(15px,1.5vw,17px);opacity:.85;text-wrap:pretty">ค่า TEWL หลังใช้ <strong style="font-weight:500">ไม่แตกต่างจากก่อนใช้อย่างมีนัยสำคัญทางสถิติ</strong> → รายงานสรุปว่า <strong style="font-weight:500">ผลิตภัณฑ์<br>ไม่พบผลทำลายเกราะป้องกันผิว</strong> และช่วยรักษาความชุ่มชื้นไว้ได้จนถึงช่วงประเมิน 8 ชั่วโมง</p>
+      <p style="max-width:40em;font-size:clamp(15px,1.5vw,17px);opacity:.85;text-wrap:pretty">เราจึงเลือกใช้คำว่า <strong style="font-weight: 500;">BARRIER-FRIENDLY</strong> ไม่ใช่ “Repair / Restore / Rebuild Skin Barrier” <br>เพราะผลที่มีไม่ได้ทดสอบ claims เหล่านั้น</p>
+    </div>
+  </section>
+
+  <section data-screen-label="08 Memory lock 2" style="background:var(--color-accent-2);color:var(--color-bg);padding:clamp(44px,6vw,84px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <h2 style="font-size:clamp(24px,3.4vw,40px);max-width:22em;margin-bottom:clamp(24px,3vw,36px);text-wrap:pretty">100% REAL SOAP<sup><a href="#fn-dagger" style="color:inherit;text-decoration:none;padding:0 1px">†</a></sup> ที่คิดถึงสิ่งที่เกิดขึ้นกับผิวหลังล้าง</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:clamp(18px,3vw,36px)">
+        <div style="border-top:1px solid color-mix(in srgb, var(--color-bg) 30%, transparent);padding-top:14px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-4-3-6.5S12.5 3 12 2c-.5 1-2 3.5-4 6.5S5 13 5 15a7 7 0 0 0 7 7Z"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,22px)">MOISTURE ↑</div></div><div style="font-size:14.5px;opacity:.8">ชุ่มชื้นเพิ่มขึ้น</div></div>
+        <div style="border-top:1px solid color-mix(in srgb, var(--color-bg) 30%, transparent);padding-top:14px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M12 3v13"></path><path d="m7 12 5 5 5-5"></path><path d="M4 21h16"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,22px)">WATER LOSS ↓</div></div><div style="font-size:14.5px;opacity:.8">สูญเสียน้ำน้อยลง</div></div>
+        <div style="border-top:1px solid color-mix(in srgb, var(--color-bg) 30%, transparent);padding-top:14px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:6px"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,22px)">BARRIER-FRIENDLY</div></div><div style="font-size:14.5px;opacity:.8">เป็นมิตรต่อเกราะป้องกันผิว</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="09 Free alkali" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:14px">Real soap quality<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div>
+      <h2 style="font-size:clamp(24px,3.2vw,38px);max-width:24em;margin-bottom:20px;text-wrap:pretty">มี KOH ในกระบวนการทำสบู่ แต่ผลตรวจ<br>"ไม่พบด่างอิสระ" ในสบู่สำเร็จรูป</h2>
+      <p style="max-width:40em;font-size:clamp(15px,1.5vw,17px);opacity:.85;text-wrap:pretty">Potassium Hydroxide (KOH) เป็นส่วนหนึ่งของสูตรที่ใช้ในการทำสบู่ AMOURIQ <br>แต่คำถามที่สำคัญกว่าคือ <strong style="font-weight: 500;">หลังผลิตเสร็จ มีด่างอิสระเหลืออยู่หรือไม่?</strong></p>
+      <div style="margin:clamp(30px,4vw,48px) 0;padding:clamp(24px,4vw,44px);background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg)">
+        <div data-reveal="0" style="overflow:hidden">
+          <div data-reveal-inner="" style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;margin-bottom:10px">Free alkali</div>
+        </div>
+        <div data-reveal="180" style="overflow:hidden;padding-bottom:.06em">
+          <div data-reveal-inner="" style="font-family:var(--font-heading);font-weight:700;font-size:clamp(34px,7vw,76px);line-height:1;letter-spacing:-.03em;color:var(--color-accent-2)">NOT DETECTED</div>
+        </div>
+        <div data-reveal="510" style="overflow:hidden">
+        <p data-reveal-inner="" style="margin:18px 0 0;max-width:38em;font-size:14.5px;opacity:.8">เทียบกับเกณฑ์สบู่เหลวแท้ตาม มอก. เอส 14-2562 (ด่างอิสระไม่เกิน 0.05% โดยมวล)<br>ผลของ AMOURIQ ระบุว่า <strong style="font-weight: 500;">Not Detect</strong></p>
+        </div>
+      </div>
+      <p style="font-size:clamp(15px,1.5vw,17px);opacity:.75;border-left:2px solid var(--color-accent);padding-left:18px;max-width:32em">คุณภาพของกระบวนการ ควรมีสิ่งที่ตรวจสอบได้ในผลิตภัณฑ์สำเร็จรูป</p>
+      <p style="margin-top:24px;font-size:12.5px;opacity:.6;max-width:44em"><strong style="font-weight:500"><sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></strong> ผลทดสอบเคมีพื้นฐานของเนื้อสบู่ (ด่างอิสระ) ทดสอบจากสูตรเนื้อสบู่พื้นฐานเดียวกันที่ใช้ผลิต Organic Olive Castile Soap ทุกกลิ่น (สุ่มตัวอย่างจากแบทช์กลิ่น Rosemary) ก่อนแบ่งเติมน้ำมันหอมระเหยแยกตามกลิ่นในขั้นตอนสุดท้าย</p>
+    </div>
+  </section>
+
+  <section data-screen-label="10 Finished-soap proof" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent);font-weight:500;margin-bottom:14px">Finished-soap analysis</div>
+      <h2 style="font-size:clamp(24px,3.2vw,38px);max-width:24em;margin-bottom:14px;text-wrap:pretty">เราไม่ได้หยุดตรวจแค่วัตถุดิบ แต่ตรวจสิ่งที่อยู่ในสบู่<br>หลังผลิตเสร็จจริง</h2>
+      <h3 style="font-size:clamp(17px,2vw,22px);opacity:.7;font-weight:500;margin-bottom:clamp(26px,4vw,40px)">เมื่อผ่านกระบวนการทำสบู่แล้ว ผลิตภัณฑ์สำเร็จรูปตรวจพบอะไรบ้าง?</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+        <div class="card" style="background:var(--color-bg)"><div class="card-kicker" style="color:var(--color-accent-2)">Detected</div><div class="card-title">NATURAL SQUALENE</div><p class="card-body">ตรวจพบในผลิตภัณฑ์สำเร็จรูป กลิ่น Lavender</p></div>
+        <div class="card" style="background:var(--color-bg)"><div class="card-kicker" style="color:var(--color-accent-2)">Detected</div><div class="card-title">BETA-CAROTENE</div><p class="card-body">ตรวจพบในผลิตภัณฑ์สำเร็จรูป กลิ่น Lavender</p></div>
+        <div class="card" style="background:var(--color-bg)"><div class="card-kicker" style="color:var(--color-accent-2)">Detected</div><div class="card-title">GLYCERINE<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div><p class="card-body">ตรวจพบในผลิตภัณฑ์สำเร็จรูป</p></div>
+        <div class="card" style="background:var(--color-bg)"><div class="card-kicker" style="color:var(--color-accent-2)">Detected</div><div class="card-title">ALPHA-TOCOPHEROL<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div><p class="card-body">ตรวจพบในผลิตภัณฑ์สำเร็จรูป</p></div>
+      </div>
+      <p style="margin-top:24px;font-size:13px;opacity:.7;max-width:46em">Squalene และ Beta-carotene ทดสอบจากตัวอย่างกลิ่น Lavender โดยตรง ส่วน Glycerine และ Alpha-tocopherol<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup> ทดสอบจากสูตรเนื้อสบู่พื้นฐานร่วม (ดูหมายเหตุ <sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup> ด้านบน)</p>
+    </div>
+  </section>
+
+  <section data-screen-label="11 Proof bridge" style="padding:clamp(52px,8vw,110px) clamp(16px,4vw,48px)">
+    <div style="max-width:1080px;margin:0 auto">
+      <h2 style="font-size:clamp(26px,4vw,48px);max-width:20em;margin-bottom:clamp(30px,4vw,54px);text-wrap:pretty">แต่การตรวจพบสิ่งที่อยู่ในสบู่ <br>ยังไม่ใช่คำตอบสุดท้าย</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:clamp(16px,2.5vw,28px);align-items:stretch">
+        <div style="flex:1 1 280px;padding:clamp(20px,3vw,32px);border:1px solid var(--color-divider);border-radius:var(--radius-lg)">
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-2);margin-bottom:16px">What's in the finished soap?</div>
+          <div style="display:flex;flex-direction:column;gap:10px;font-family:var(--font-heading);font-weight:700;font-size:clamp(16px,1.8vw,20px)">
+            <div>Squalene</div><div>Beta-carotene</div><div>Glycerine<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div><div>Alpha-tocopherol<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto;width:100%;max-width:44px;display:grid;place-items:center;font-size:26px;color:var(--color-accent)">{{ bridgeArrow }}</div>
+        <div style="flex:1 1 280px;padding:clamp(20px,3vw,32px);border:1px solid var(--color-divider);border-radius:var(--radius-lg);background:var(--color-signature-100)">
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-signature);margin-bottom:16px">What happens on skin?</div>
+          <div style="display:flex;flex-direction:column;gap:10px;font-family:var(--font-heading);font-weight:700;font-size:clamp(16px,1.8vw,20px);color:var(--color-signature-800)">
+            <div>Moisture ↑</div><div>Water Loss ↓</div><div>Barrier-Friendly</div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:clamp(28px,4vw,44px) 0 0;font-size:clamp(16px,1.8vw,20px);max-width:34em;border-left:2px solid var(--color-accent);padding-left:20px;text-wrap:pretty">เราไม่จำเป็นต้องเดาว่าสารตัวไหนทำให้เกิดผลลัพธ์ใด เพราะเราทดสอบผลิตภัณฑ์สำเร็จรูปทั้งสูตรกับผิวจริง</p>
+    </div>
+  </section>
+
+  <section data-screen-label="12 Oils to soap" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <h2 style="font-size:clamp(24px,3.2vw,38px);max-width:22em;margin-bottom:clamp(28px,4vw,48px);text-wrap:pretty">เริ่มจากน้ำมันที่คัดสรร แล้วตรวจสิ่งที่เรา<br>ทำออกมาจริง</h2>
+      <div style="display:flex;flex-direction:column;gap:0">
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:clamp(20px,3vw,30px)">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><span style="font-family:var(--font-heading);font-weight:700;font-size:13px;color:var(--color-accent)">01</span><span style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:500;white-space:nowrap">What we start with</span></div>
+          <div style="font-size:clamp(15px,1.6vw,17.5px);font-weight:500;margin-bottom:10px;text-wrap:pretty">Organic Olive Oil · Coconut Oil · Castor Oil · Jojoba Oil · Red Palm / Palm Kernel Oil · Cocoa Butter (+ Lavender / Lavandin Oils)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <span class="tag tag-accent-2">COSMOS ECOCERT — Olive, สเปน</span><span class="tag tag-accent-2">IFOAM — Coconut</span><span class="tag tag-accent-2">USDA — Castor, Jojoba</span><span class="tag tag-accent-2">RSPO — Palm-derived</span>
+          </div>
+        </div>
+        <div style="justify-self:start;padding:10px 0 10px 26px;color:var(--color-accent);font-size:20px">↓</div>
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:clamp(20px,3vw,30px)">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><span style="font-family:var(--font-heading);font-weight:700;font-size:13px;color:var(--color-accent)">02</span><span style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:500;white-space:nowrap">Soap-making process</span></div>
+          <div style="font-size:clamp(15px,1.6vw,17.5px);font-weight:500;text-wrap:pretty">เกือบ 3 ปีในการพัฒนาสูตร · ควบคุมกระบวนการอย่างพิถีพิถัน · บ่มไม่น้อยกว่า 72 ชั่วโมง</div>
+        </div>
+        <div style="justify-self:start;padding:10px 0 10px 26px;color:var(--color-accent);font-size:20px">↓</div>
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:clamp(20px,3vw,30px)">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><span style="font-family:var(--font-heading);font-weight:700;font-size:13px;color:var(--color-accent)">03</span><span style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:500;white-space:nowrap">What we verify afterward</span></div>
+          <div style="font-size:clamp(15px,1.6vw,17.5px);font-weight:500;text-wrap:pretty">Free Alkali<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup> — NOT DETECTED · Squalene · Beta-carotene (กลิ่น Lavender) · Glycerine<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup> · Alpha-tocopherol<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div>
+        </div>
+        <div style="justify-self:start;padding:10px 0 10px 26px;color:var(--color-accent);font-size:20px">↓</div>
+        <div style="background:var(--color-signature-100);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:clamp(20px,3vw,30px)">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px"><span style="font-family:var(--font-heading);font-weight:700;font-size:13px;color:var(--color-accent-signature)">04</span><span style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:500;white-space:nowrap;color:var(--color-signature-800)">What we test on skin</span></div>
+          <div style="font-size:clamp(15px,1.6vw,17.5px);font-weight:500;color:var(--color-signature-800)">Moisture ↑ · Water Loss ↓ · Barrier-Friendly</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="13 Why we made it" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <h2 style="font-size:clamp(28px,4.2vw,52px);margin-bottom:22px">หนึ่งเป้าหมาย: ผิวของคุณ</h2>
+      <p style="font-size:clamp(16px,1.8vw,20px);max-width:34em;border-left:2px solid var(--color-accent);padding-left:20px;text-wrap:pretty">เราไม่ได้ต้องการสร้างสบู่ที่พยายามทำทุกอย่าง แต่ต้องการพัฒนา Castile Soap สำหรับการดูแลผิวโดยเฉพาะ</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:clamp(18px,3vw,32px);margin:clamp(32px,4vw,52px) 0">
+        <div style="border-top:1px solid var(--color-divider);padding-top:16px"><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(22px,2.8vw,30px);color:var(--color-accent-2)">เกือบ <span data-countup="3" data-decimals="0">3</span> ปี</div><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-top:6px">Development</div></div>
+        <div style="border-top:1px solid var(--color-divider);padding-top:16px"><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(22px,2.8vw,30px);color:var(--color-accent-2)">≥ <span data-countup="72" data-decimals="0">72</span> ชั่วโมง</div><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-top:6px">Maturation</div></div>
+        <div style="border-top:1px solid var(--color-divider);padding-top:16px"><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(22px,2.8vw,30px);color:var(--color-accent-2)"><span data-countup="10" data-decimals="0" data-suffix="+">10</span> ปี</div><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.65;margin-top:6px">Natural &amp; Essential Oil Expertise</div></div>
+      </div>
+      <p style="font-size:clamp(15px,1.6vw,18px);opacity:.75;max-width:32em">Thoughtful Care สำหรับเรา เริ่มตั้งแต่ก่อนผลิตภัณฑ์จะมาถึงมือคุณ</p>
+    </div>
+  </section>
+
+  <section id="ingredients" data-screen-label="14 Not added" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <h2 style="font-size:clamp(24px,3.2vw,38px);max-width:22em;margin-bottom:clamp(26px,4vw,42px);text-wrap:pretty">สิ่งที่เราเลือกไม่ใส่ ก็เป็นส่วนหนึ่งของการคิดสูตร</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:clamp(26px,4vw,40px)">
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:20px;display:flex;flex-direction:column;gap:12px">
+          <svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M18.715 13.186C18.29 11.858 17.384 10.607 16 9.5c-2-1.6-3.5-4-4-6.5a10.7 10.7 0 0 1-.884 2.586"></path><path d="M8.795 8.797A11 11 0 0 1 8 9.5C6 11.1 5 13 5 15a7 7 0 0 0 13.222 3.208"></path><path d="m2 2 20 20"></path></svg>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15.5px;line-height:1.35">SULFATE-FREE</div>
+          <div style="font-size:13px;line-height:1.7;color:color-mix(in srgb, var(--color-text) 72%, transparent)">ไม่มี SLS/SLES — ฟองมาจากสบู่จริง ไม่ใช่สารลดแรงตึงผิวสังเคราะห์</div>
+        </div>
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:20px;display:flex;flex-direction:column;gap:12px">
+          <svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M10 2v2.343"></path><path d="M14 2v6.343"></path><path d="M8.5 2h7"></path><path d="M7 16H4"></path><path d="M20 20a2 2 0 0 1-2 2H6a2 2 0 0 1-1.755-2.96l5.227-9.42"></path><path d="M6.453 15H15"></path><path d="m2 2 20 20"></path></svg>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15.5px;line-height:1.35">NO SYNTHETIC FRAGRANCE</div>
+          <div style="font-size:13px;line-height:1.7;color:color-mix(in srgb, var(--color-text) 72%, transparent)">กลิ่นมาจากน้ำมันหอมระเหยบริสุทธิ์ แท้ 100% จากพืชเท่านั้น</div>
+        </div>
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:20px;display:flex;flex-direction:column;gap:12px">
+          <svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M12 2a10 10 0 0 0 0 20 2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h2a4 4 0 0 0 4-4 10 10 0 0 0-9.5-9"></path><circle cx="13.5" cy="6.5" r=".9"></circle><circle cx="8" cy="8" r=".9"></circle><circle cx="6.5" cy="12.5" r=".9"></circle><path d="m2 2 20 20"></path></svg>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15.5px;line-height:1.35">NO ADDED SYNTHETIC COLOR</div>
+          <div style="font-size:13px;line-height:1.7;color:color-mix(in srgb, var(--color-text) 72%, transparent)">สีที่เห็นคือสีจริงของน้ำมันมะกอกและน้ำมันธรรมชาติอื่นๆ รวม 7 ชนิด</div>
+        </div>
+        <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:20px;display:flex;flex-direction:column;gap:12px">
+          <svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><path d="M12 6v6l3 2"></path><circle cx="12" cy="12" r="9"></circle><path d="m2 2 20 20"></path></svg>
+          <div style="font-family:var(--font-heading);font-weight:700;font-size:15.5px;line-height:1.35">NO PRESERVATIVES</div>
+          <div style="font-size:13px;line-height:1.7;color:color-mix(in srgb, var(--color-text) 72%, transparent)">ด้วยคุณสมบัติเฉพาะตัวของสบู่เหลวแท้ จึงไม่ต้องพึ่งพาสารกันเสีย</div>
+        </div>
+      </div>
+      <p style="max-width:38em;font-size:clamp(15px,1.5vw,17px);opacity:.85">กลิ่นลาเวนเดอร์มาจากน้ำมันหอมระเหยสองตัวตามสูตรจดแจ้ง — Lavandula Angustifolia Oil ให้กลิ่นดอกลาเวนเดอร์ที่นุ่มและกลม และ Lavandula Hybrida Oil ให้ปลายกลิ่นสดแบบสมุนไพร ไม่มีน้ำหอมสังเคราะห์เพิ่ม</p>
+      <p style="font-size:clamp(16px,1.8vw,20px);max-width:30em;border-left:2px solid var(--color-accent);padding-left:20px;margin:26px 0">From nature, without needing to make it louder than it is.</p>
+      <p style="font-size:13px;opacity:.65;max-width:40em"><strong style="font-weight:500">หมายเหตุ:</strong> ไม่ใช้คำว่า “Fragrance-Free” เพราะ Lavender SKU มี essential oils ที่ให้กลิ่นจริง</p>
+    </div>
+  </section>
+
+  <section data-screen-label="15 The ritual" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+    <div style="position:relative;min-height:clamp(320px,46vh,540px)">
+      <image-slot id="ritual-lifestyle" shape="rect" fit="cover" placeholder="ภาพ lifestyle — ห้องน้ำแสงธรรมชาติ"></image-slot>
+    </div>
+    <div style="background:var(--color-accent-2);color:#fbf8f2;padding:clamp(28px,5vw,64px);display:flex;flex-direction:column;justify-content:center">
+      <h2 style="font-size:clamp(23px,3.2vw,40px);margin-bottom:22px;max-width:20em;text-wrap:pretty">ช่วงเวลาอาบน้ำธรรมดา ที่ให้ผิวได้รับมากกว่าความสะอาด</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:14px 32px;margin-bottom:22px">
+        <div><div style="font-family:var(--font-heading);font-weight:700;font-size:15px">REAL SOAP</div><div style="font-size:13.5px;opacity:.85">สูตรเพื่อผิวโดยเฉพาะ</div></div>
+        <div><div style="font-family:var(--font-heading);font-weight:700;font-size:15px">MOISTURE CARE</div><div style="font-size:13.5px;opacity:.85">ที่คิดถึงสิ่งที่เกิดขึ้นหลังล้าง</div></div>
+      </div>
+      <p style="margin:0;font-size:clamp(14px,1.5vw,16px);opacity:.9">ชุ่มชื้นเพิ่มขึ้น · สูญเสียน้ำน้อยลง · เป็นมิตรต่อเกราะป้องกันผิว</p>
+    </div>
+  </section>
+
+  <section id="evidence" data-screen-label="16 Evidence" style="background:var(--color-accent-2);color:var(--color-bg);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-accent-2-300);font-weight:500;margin-bottom:14px">Evidence, not just promises</div>
+      <h2 style="font-size:clamp(24px,3.4vw,40px);max-width:22em;margin-bottom:clamp(28px,4vw,46px);text-wrap:pretty">สิ่งที่เราบอกว่าดี ควรมีสิ่งที่ให้คุณเชื่อถือได้</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));gap:14px">
+        <div class="card" style="background:color-mix(in srgb, #fbf8f2 8%, transparent);border-color:color-mix(in srgb, #fbf8f2 26%, transparent);color:var(--color-bg)">
+          <div class="card-kicker" style="color:var(--color-accent-2-300)">01</div>
+          <div class="card-title">REAL SOAP DEFINITION</div>
+          <p class="card-body" style="opacity:.85">มอก. เอส 14-2562 นิยาม + Chemical Criteria (เกณฑ์อ้างอิงภายใน ไม่ใช่การรับรอง)</p>
+          
+        </div>
+        <div class="card" style="background:color-mix(in srgb, #fbf8f2 8%, transparent);border-color:color-mix(in srgb, #fbf8f2 26%, transparent);color:var(--color-bg)">
+          <div class="card-kicker" style="color:var(--color-accent-2-300)">02</div>
+          <div class="card-title">FINISHED-SOAP QUALITY<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></div>
+          <p class="card-body" style="opacity:.85">Free Alkali — Not Detected</p>
+          
+        </div>
+        <div class="card" style="background:color-mix(in srgb, #fbf8f2 8%, transparent);border-color:color-mix(in srgb, #fbf8f2 26%, transparent);color:var(--color-bg)">
+          <div class="card-kicker" style="color:var(--color-accent-2-300)">03</div>
+          <div class="card-title">FINISHED-SOAP ANALYSIS</div>
+          <p class="card-body" style="opacity:.85">Squalene · Beta-carotene / Glycerine · Alpha-tocopherol<sup><a href="#fn-ddagger" style="color: inherit; text-decoration: none; padding: 0px 1px;">‡</a></sup>&nbsp;</p>
+          
+        </div>
+        <div class="card" style="background:color-mix(in srgb, #fbf8f2 8%, transparent);border-color:color-mix(in srgb, #fbf8f2 26%, transparent);color:var(--color-bg)">
+          <div class="card-kicker" style="color:var(--color-accent-2-300)">04</div>
+          <div class="card-title">HUMAN EFFICACY TEST</div>
+          <p class="card-body" style="opacity:.85">ผลทดสอบความชุ่มชื้นผิว โดยเครื่อง Corneometer<sup>®</sup> + ผลทดสอบการสูญเสียน้ำของผิวโดยเครื่อง Tewameter<sup>®</sup></p>
+          
+        </div>
+        <div class="card" style="background:color-mix(in srgb, #fbf8f2 8%, transparent);border-color:color-mix(in srgb, #fbf8f2 26%, transparent);color:var(--color-bg)">
+          <div class="card-kicker" style="color:var(--color-accent-2-300)">05</div>
+          <div class="card-title">THAI FDA NOTIFICATION</div>
+          <p class="card-body" style="opacity:.85;margin-bottom:6px">เลขที่ใบรับแจ้ง 3 รายการ</p>
+          <div style="display:grid;gap:3px;font-size:13px;line-height:1.7;opacity:.85;font-variant-numeric:tabular-nums">
+            <div>10-1-6800022354</div>
+            <div>10-1-6800023739</div>
+            <div>10-1-6800023133</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="17 Why trust" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <h2 style="font-size:clamp(26px,3.6vw,44px);margin-bottom:24px">ความใส่ใจที่มีความรู้รองรับ</h2>
+      <p style="max-width:38em;font-size:clamp(15px,1.6vw,18px);opacity:.85;text-wrap:pretty">AMOURIQ เติบโตจากองค์ความรู้ด้าน Natural Oils และ Essential Oils ทีมเบื้องหลัง<br>เชื่อมมุมมองจากภูมิปัญญาแพทย์แผนไทยและเภสัชศาสตร์เครื่องสำอางสมัยใหม่</p>
+      <p style="font-size:clamp(16px,1.8vw,20px);max-width:32em;border-left:2px solid var(--color-accent);padding-left:20px;margin-top:28px;text-wrap:pretty">สิ่งเหล่านั้นบอกว่าความใส่ใจของเรามาจากไหน ส่วนคุณภาพของผลิตภัณฑ์ควรให้ผลทดสอบพูดแทน</p>
+    </div>
+  </section>
+
+  <section data-screen-label="18 Customer voice" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <h2 style="font-size:clamp(22px,3vw,36px);max-width:26em;margin-bottom:clamp(28px,4vw,46px);text-wrap:pretty">มาตรฐานบอกว่าเราเป็นอะไร เครื่องมือบอกว่าเกิดอะไรกับผิว คนใช้จริงบอกว่า "รู้สึกอย่างไร"</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px">
+        <div class="card" style="background:var(--color-bg)">
+          <div class="card-kicker">เนื้อสัมผัสและกลิ่น — Lavender</div>
+          <div style="color:var(--color-accent);font-size:15px;letter-spacing:.12em">★★★★★</div>
+          <p class="card-body" style="font-size:14px">เนื้อสัมผัส: ดี · ประสิทธิภาพ: ดี · กลิ่น: หอมอ่อน</p>
+          <div class="card-meta">รีวิวลูกค้าจริง Shopee · 30 mL Lavender · พฤษภาคม 2024</div>
+        </div>
+        <div class="card" style="background:var(--color-bg)">
+          <div class="card-kicker">ผิวหลังล้าง</div>
+          <div style="color:var(--color-accent);font-size:15px;letter-spacing:.12em">★★★★★</div>
+          <p class="card-body" style="font-size:14px">“ชอบมากค่ะ อาบละผิวไม่แห้งเอี้ยด ปกติเป็นคนผิวแห้งมาก ใช้แล้วชอบเลยค่ะ กลิ่นก็ดี”</p>
+          <div class="card-meta">รีวิวลูกค้าจริง Shopee · 30 mL Rosemary (สูตรเนื้อสบู่พื้นฐานเดียวกับ Lavender) · เมษายน 2026</div>
+        </div>
+        <div class="card" style="background:var(--color-bg)">
+          <div class="card-kicker">เหตุผลที่ซื้อซ้ำ</div>
+          <div style="color:var(--color-accent);font-size:15px;letter-spacing:.12em">★★★★★</div>
+          <p class="card-body" style="font-size:14px">“ได้ทดลองใช้จากขวดขนาดทดลองที่ทางร้านแถมมาให้ รู้สึกประทับใจในสัมผัส ความหอม อาบสะอาด สดชื่น เลยสั่งขวดใหญ่มาใช้เลย ทางร้านบริการดีมากๆ จัดส่งรวดเร็ว”</p>
+          <div class="card-meta">รีวิวลูกค้าจริง Shopee · Rose Geranium / Rosemary / Lavender · สิงหาคม 2024</div>
+        </div>
+      </div>
+      <div style="margin-top:26px;display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 16px">
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,22px)">★ 4.9 จากรีวิวจริงบนร้าน Shopee</div>
+        <div style="font-size:12px;opacity:.6">(ตรวจสอบตัวเลขล่าสุดก่อนเผยแพร่จริง — คะแนน/จำนวนรีวิวเปลี่ยนทุกวัน)</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="buy" data-screen-label="19 Buying block" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1120px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:clamp(24px,4vw,56px);align-items:start">
+      <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);overflow:hidden">
+        <img class="washed" src="{{ packshot }}" alt="{{ packshotAlt }}" style="width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--color-bg)">
+      </div>
+      <div>
+        <img class="logo" src="assets/logo-dark.png" alt="AMOURIQ" style="height:18px;margin-bottom:16px">
+        <h2 style="font-size:clamp(24px,3vw,36px);margin-bottom:14px">Organic Olive Castile Soap — <span>{{ scentName }}</span></h2>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px">
+          <span class="tag tag-accent-2" style="font-weight:500">100% REAL SOAP<sup><a href="#fn-dagger" style="color:inherit;text-decoration:none;padding:0 1px">†</a></sup></span>
+          <span class="tag tag-signature">{{ oilsLabel }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:16px 0;border-top:1px solid var(--color-divider);border-bottom:1px solid var(--color-divider);margin-bottom:22px">
+          <div><div style="display:flex;align-items:center;gap:7px;color:var(--color-accent-signature);font-family:var(--font-heading);font-weight:700;font-size:14px"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-4-3-6.5S12.5 3 12 2c-.5 1-2 3.5-4 6.5S5 13 5 15a7 7 0 0 0 7 7Z"></path></svg><span>MOISTURE ↑</span></div><div style="font-size:13px;opacity:.75">ผิวชุ่มชื้นเพิ่มขึ้น</div></div>
+          <div><div style="display:flex;align-items:center;gap:7px;color:var(--color-accent-signature);font-family:var(--font-heading);font-weight:700;font-size:14px"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13"></path><path d="m7 12 5 5 5-5"></path><path d="M4 21h16"></path></svg><span>WATER LOSS ↓</span></div><div style="font-size:13px;opacity:.75">การสูญเสียน้ำลดลง</div></div>
+          <div><div style="display:flex;align-items:center;gap:7px;color:var(--color-accent-signature);font-family:var(--font-heading);font-weight:700;font-size:14px"><svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path></svg><span>BARRIER-FRIENDLY</span></div><div style="font-size:13px;opacity:.75">เป็นมิตรต่อเกราะป้องกันผิว</div></div>
+        </div>
+
+        <div style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;opacity:.6;margin-bottom:10px">กลิ่น</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:24px">
+          <sc-for list="{{ scents }}" as="c" hint-placeholder-count="3">
+            <button type="button" onClick="{{ c.onSelect }}" style="{{ c.style }}">
+              <span style="font-family:var(--font-heading);font-weight:700;font-size:14.5px">{{ c.name }}</span>
+              <span style="font-size:12.5px;opacity:.75">{{ c.note }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;opacity:.6;margin-bottom:10px">ขนาด &amp; ราคา</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">
+          <sc-for list="{{ sizes }}" as="s" hint-placeholder-count="3">
+            <button type="button" onClick="{{ s.onSelect }}" style="{{ s.style }}">
+              <span style="font-family:var(--font-heading);font-weight:700;font-size:15.5px">{{ s.label }}</span>
+              <span style="font-size:14px;opacity:.8">{{ s.priceLabel }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="font-size:12px;opacity:.6;margin-top:10px">ราคาเท่ากันทุกกลิ่นในไซส์เดียวกัน — Lavender / Rosemary / Rose Geranium</div>
+        <div style="font-size:12px;opacity:.6;margin-top:6px">ภาพขนาด 100 ML และ 250 ML ใช้ภาพขวด 500 ML แทนชั่วคราว รอภาพจริง</div>
+
+        <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;margin-top:26px">
+          <div>
+            <div style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;opacity:.6;margin-bottom:8px">จำนวน</div>
+            <div style="display:inline-flex;align-items:center;border:1px solid var(--color-divider);border-radius:var(--radius-sm);overflow:hidden">
+              <button type="button" onClick="{{ dec }}" aria-label="ลดจำนวน" style="width:46px;height:48px;border:0;background:transparent;cursor:pointer;font-size:19px;color:var(--color-text);font-family:var(--font-heading)">−</button>
+              <div style="min-width:46px;text-align:center;font-family:var(--font-heading);font-weight:700;font-size:16px">{{ qty }}</div>
+              <button type="button" onClick="{{ inc }}" aria-label="เพิ่มจำนวน" style="width:46px;height:48px;border:0;background:transparent;cursor:pointer;font-size:19px;color:var(--color-text);font-family:var(--font-heading)">+</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;opacity:.6;margin-bottom:8px">รวม</div>
+            <div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(22px,2.6vw,28px);line-height:1.1">{{ total }}</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-block" onClick="{{ onAdd }}" style="color:var(--color-bg);min-height:54px;font-size:16px;margin-top:20px">เพิ่มลงตะกร้า</button>
+        <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-top:14px;text-align:center">DermX Tested · Thai FDA Notified · Evidence Available</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:20px;font-size:13.5px">
+          <a href="#ingredients">ดูส่วนประกอบทั้งหมด</a><a href="#results">ดูผลการทดสอบ</a><a href="#faq">ข้อมูลการจัดส่ง</a>
+        </div>
+        <div style="font-size:12px;opacity:.55;margin-top:14px">SKU: {{ sku }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="20 How to use" style="background:var(--color-surface);padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:1000px;margin:0 auto">
+      <h2 style="font-size:clamp(26px,3.6vw,42px);margin-bottom:clamp(28px,4vw,44px)">เรียบง่ายสำหรับทุกวัน</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:clamp(18px,3vw,32px)">
+        <div style="border-top:1px solid var(--color-divider);padding-top:18px"><svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-bottom:14px;display:block"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 4.8 7 3.51c-.29 1.28-1.15 3.62-2.29 4.55S3 10.4 3 11.5c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,21px);margin-bottom:8px">1 — WET</div><div style="font-size:14.5px;opacity:.8">ทำให้ผิวเปียกด้วยน้ำ</div></div>
+        <div style="border-top:1px solid var(--color-divider);padding-top:18px"><svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-bottom:14px;display:block"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"></path><path d="M20 3v4"></path><path d="M22 5h-4"></path><path d="M4 17v2"></path><path d="M5 18H3"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,21px);margin-bottom:8px">2 — CLEANSE</div><div style="font-size:14.5px;opacity:.8">ใช้ผลิตภัณฑ์ในปริมาณพอเหมาะ ทำความสะอาดผิว</div></div>
+        <div style="border-top:1px solid var(--color-divider);padding-top:18px"><svg class="icon icon-lg icon-accent-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-bottom:14px;display:block"><path d="m4 4 2.5 2.5"></path><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7"></path><path d="M15 5 5 15"></path><path d="M14 17v.01"></path><path d="M10 16v.01"></path><path d="M13 13v.01"></path><path d="M16 10v.01"></path><path d="M11 20v.01"></path><path d="M17 14v.01"></path><path d="M20 11v.01"></path></svg><div style="font-family:var(--font-heading);font-weight:700;font-size:clamp(17px,2vw,21px);margin-bottom:8px">3 — RINSE</div><div style="font-size:14.5px;opacity:.8">ล้างออกด้วยน้ำสะอาด</div></div>
+      </div>
+      <p style="margin-top:28px;font-size:12.5px;opacity:.6">วิธีใช้ final ควรตรวจให้ตรงฉลากที่ได้รับอนุมัติก่อนนำขึ้นเว็บไซต์จริง</p>
+    </div>
+  </section>
+
+  <section id="faq" data-screen-label="21 FAQ" style="padding:clamp(48px,7vw,96px) clamp(16px,4vw,48px)">
+    <div style="max-width:840px;margin:0 auto">
+      <h2 style="font-size:clamp(26px,3.6vw,42px);margin-bottom:clamp(24px,3vw,36px)">คำถามที่พบบ่อย</h2>
+      <div style="border-top:1px solid var(--color-divider)">
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>“100% Real Soap” หมายความว่าอย่างไร?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0;text-wrap:pretty">สบู่เหลวทั่วไปส่วนใหญ่ผสมสารลดแรงตึงผิวสังเคราะห์ แต่สูตรของเรามีเกลือของกรดไขมัน ของน้ำมันจากพืช เป็นองค์ประกอบสำคัญ<br>ไม่ผสมสารลดแรงตึงผิวสังเคราะห์ (สารชำระล้าง) จึงเป็สบู่เหลวแท้ — อ้างอิงนิยาม "สบู่เหลวแท้" จาก มอก. เอส 14-2562</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>ในสูตรมี Potassium Hydroxide แล้วมีด่างตกค้างหรือไม่?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0;text-wrap:pretty">มั่นใจได้ว่า "ไม่มีด่างตกค้างระคายผิว" สบู่สำเร็จรูปผ่านการตรวจวัดด่างอิสระแล้ว: Not Detected</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>ความชุ่มชื้นเพิ่มขึ้นจริงหรือไม่?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">เพิ่มขึ้นจริง ยืนยันด้วยผลการทดสอบที่พบว่าความชุ่มชื้นผิวเพิ่มขึ้น 8.48%, 13.37% และ 9.27% <br>หลังใช้ 1, 4 และ 8 ชั่วโมงตามลำดับ มีนัยสำคัญทางสถิติสูงถึง 95%</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>“การสูญเสียน้ำลดลง” หมายความว่าอย่างไร?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">หมายถึงผิวไม่แห้งตึงหลังอาบน้ำเหมือนสบู่ทั่วไป ค่า TEWL วัดได้ต่ำกว่าก่อนใช้ทุกช่วงเวลา <br>ค่า TEWL ต่ำกว่าก่อนใช้ 5.34%, 3.60% และ 10.67% ตามลำดับ&nbsp;</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>ทำไมจึงสื่อว่า Barrier-Friendly?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">เพราะ TEWL หลังใช้ไม่ต่างจากก่อนใช้อย่างมีนัยสำคัญ และรายงานสรุปว่าไม่พบผลทำลายเกราะป้องกันผิว</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>Squalene, Beta-carotene, Glycerine, Alpha-tocopherol คือส่วนผสมที่เติมเข้าไปหรือไม่?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">เป็นสารสำคัญตามธรรมชาติที่ “ตรวจพบ” ในผลิตภัณฑ์สำเร็จรูป ไม่ใช่ส่วนผสมที่เติมเข้าไป</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>Organic Olive Castile Soap มีกี่กลิ่น และ Lavender ได้กลิ่นจากอะไร?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">กลิ่น Lavender ได้จาก Lavandula Angustifolia Oil และ Lavandula Hybrida Oil ตามสูตรจดแจ้ง โดย Organic Olive Castile Soap<br>มี 3 กลิ่น คือ — Lavender, Rosemary และ Rose Geranium ทุกกลิ่นได้กลิ่นจากน้ำมันหอมระเหยจากพืชเท่านั้น</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>Organic ในชื่อผลิตภัณฑ์หมายถึงอะไร?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">เป็นผลิตภัณฑ์ที่มีส่วนผสมที่มีเอกสารรับรองออร์แกนิก (Organic Certificate) ซึ่งออกโดยหน่วยงานที่เชื่อถือได้และเป็นที่ยอมรับระดับสากล<br>เช่น USDA, ECOCERT, IFOAM ในการจดแจ้งกับ อย.&nbsp;โดยใช้คำว่า "Organic" ในชื่อผลิตภัณฑ์</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>เหมาะกับผิวแพ้ง่ายหรือไม่?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">ยังไม่มีข้อมูลทดสอบเฉพาะกลุ่มผิวแพ้ง่าย หากมีประวัติผิวระคายเคืองง่าย, แพ้ง่าย แนะนำทดสอบบนผิวเล็ก ๆ หรือปรึกษาแพทย์ผิวหนัง<br>ก่อนใช้จริง</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>ราคาแพงกว่าสบู่เหลวทั่วไปหรือไม่?</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0;text-wrap:pretty">AMOURIQ เป็นราคาที่เข้าถึงได้ ไม่ใช่ระดับหรูหรา — แต่ต่างจากสบู่เหลวทั่วไปเพราะเป็นสบู่เหลวแท้ที่พัฒนาสูตร "เพื่อผิวโดยเฉพาะ" <br>และมีผลทดสอบยืนยันประสิทธิภาพ ให้คุณได้รับความมั่นใจที่พิสูจน์ได้ ไม่ใช่แค่ภาพลักษณ์</p>
+        </details>
+        <details style="border-bottom:1px solid var(--color-divider)">
+          <summary style="cursor:pointer;padding:18px 0;display:flex;gap:16px;justify-content:space-between;font-family:var(--font-heading);font-weight:700;font-size:clamp(15.5px,1.7vw,18px)"><span>ข้อมูลการจัดส่ง</span><span style="color:var(--color-accent)">+</span></summary>
+          <p style="font-size:14.5px;opacity:.85;padding-bottom:18px;margin:0">จัดส่งภายใน 1-2 วันทำการ หลังจากได้รับชำระเงินค่าสินค้าเรียบร้อยแล้ว</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section data-screen-label="22 Final close" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+    <div style="position:relative;min-height:clamp(320px,50vh,560px)">
+      <image-slot id="final-close-lifestyle" shape="rect" fit="cover" placeholder="ภาพห้องน้ำโทนสงบ แสงธรรมชาติ"></image-slot>
+    </div>
+    <div style="background:var(--color-text);padding:clamp(28px,5vw,64px);display:flex;align-items:center">
+        <div style="max-width:640px;color:#fbf8f2">
+          <h2 style="font-size:clamp(26px,4vw,48px);margin-bottom:24px;text-wrap:pretty">เพราะการอาบน้ำที่ดี<br>ไม่ควรจบแค่คำว่า “ผิวสะอาด”</h2>
+          <p style="font-size:clamp(14.5px,1.5vw,17px);opacity:.9;margin-bottom:8px"><strong style="font-weight: 500;">100% REAL SOAP<sup><a href="#fn-dagger" style="color: inherit; text-decoration: none; padding: 0px 1px;">†</a></sup></strong> ที่ตั้งใจพัฒนาขึ้นเพื่อผิวโดยเฉพาะ</p>
+          <p style="font-size:clamp(14.5px,1.5vw,17px);opacity:.9;margin-bottom:8px">MOISTURE ↑ ผิวชุ่มชื้นเพิ่มขึ้น · WATER LOSS ↓ การสูญเสียน้ำลดลง · BARRIER-FRIENDLY เป็นมิตรต่อเกราะป้องกันผิว</p>
+          <p style="font-size:clamp(14.5px,1.5vw,17px);opacity:.9;margin-bottom:26px">FREE ALKALI<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup> NOT DETECTED และการตรวจผลิตภัณฑ์สำเร็จรูปที่พบ Squalene · Beta-carotene · Glycerine<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup> · Alpha-tocopherol<sup><a href="#fn-ddagger" style="color:inherit;text-decoration:none;padding:0 1px">‡</a></sup></p>
+          <h3 style="font-size:clamp(18px,2.2vw,26px);margin-bottom:20px">AMOURIQ Organic Olive Castile Soap — Lavender</h3>
+          <a href="#buy" class="btn btn-primary" style="pointer-events:auto;color:var(--color-bg);min-height:52px;padding:15px 26px;font-size:15.5px;line-height:1.4;text-align:center;max-width:20em">เลือกการดูแลที่คิดถึงผิวหลังล้าง</a>
+          <div style="margin-top:28px;font-size:13.5px;opacity:.85"><div style="font-weight:500">AMOURIQ Thoughtful Botanical Care</div><div>อมอริค ใส่ใจ ด้วยธรรมชาติที่คัดสรร</div></div>
+        </div>
+    </div>
+  </section>
+
+  <section data-screen-label="23 Footnotes" style="background:var(--color-bg);color:var(--color-text);padding:clamp(32px,4.5vw,56px) clamp(16px,4vw,48px) clamp(84px,10vw,56px)">
+    <div style="max-width:1120px;margin:0 auto">
+      <div style="font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:500;margin-bottom:16px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">หมายเหตุและข้อมูลอ้างอิง</div>
+      <div style="display:grid;gap:12px;max-width:60em;font-size:11.5px;line-height:1.7;color:color-mix(in srgb, var(--color-text) 72%, transparent);border-top:1px solid var(--color-divider);padding-top:24px">
+        <div id="fn-star" style="scroll-margin-top:96px">*&nbsp;<span style="color: color(srgb 0.227451 0.196078 0.164706 / 0.72);">ทดสอบในอาสาสมัครสุขภาพดี 20 คน ทดสอบโดย DermX คณะเภสัชศาสตร์ มหาวิทยาลัยเชียงใหม่&nbsp;</span></div>
+        
+        <div id="fn-dagger" style="scroll-margin-top:96px">† จัดตามเกณฑ์เคมีของนิยาม “สบู่เหลวแท้” ในมาตรฐานอุตสาหกรรมเอส มอก. เอส 14-2562 ซึ่ง AMOURIQ เลือกใช้เป็นเกณฑ์อ้างอิงคุณภาพภายในของเราเอง ไม่ใช่การรับรองหรือขึ้นทะเบียนตามมาตรฐานดังกล่าว</div>
+        <div id="fn-ddagger" style="scroll-margin-top:96px">‡ ผลทดสอบเคมีพื้นฐานของเนื้อสบู่ (ด่างอิสระ) ทดสอบจากสูตรเนื้อสบู่พื้นฐานเดียวกันที่ใช้ผลิต Organic Olive Castile Soap ทุกกลิ่น (สุ่มตัวอย่างจากแบทช์กลิ่น Rosemary) ก่อนแบ่งเติมน้ำมันหอมระเหยแยกตามกลิ่นในขั้นตอนสุดท้าย</div>
+        <div>Thai FDA Notification เลขที่ใบรับแจ้ง 10-1-6800022354, 10-1-6800023739 และ 10-1-6800023133</div>
+      </div>
+    </div>
+  </section>
+
+  <sc-if value="{{ showSticky }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:color-mix(in srgb, var(--color-bg) 96%, transparent);backdrop-filter:blur(10px);border-top:1px solid var(--color-divider);padding:10px clamp(12px,4vw,20px);display:flex;align-items:center;gap:12px">
+      <div style="min-width:0">
+        <div style="font-size:11.5px;opacity:.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Castile Soap — Lavender · {{ sizeLabel }}</div>
+        <div style="font-family:var(--font-heading);font-weight:700;font-size:16px">{{ total }}</div>
+      </div>
+      <button type="button" class="btn btn-primary" onClick="{{ onAdd }}" style="margin-left:auto;color:var(--color-bg);min-height:48px;padding:13px 20px;font-size:15px;white-space:nowrap">เพิ่มลงตะกร้า</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ added }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:50%;transform:translateX(-50%);bottom:88px;z-index:70;background:var(--color-accent-2);color:var(--color-bg);padding:12px 20px;border-radius:var(--radius-md);font-size:14px;font-family:var(--font-heading);font-weight:700">เพิ่มลงตะกร้าแล้ว · {{ cartLine }}</div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;standaloneChrome&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Embedding&quot;,&quot;label&quot;:&quot;แสดง header ของหน้านี้ (ใช้เมื่อดูแบบเดี่ยว)&quot;}}">
+class Component extends DCLogic {
+  state = { scent: 0, size: 1, qty: 1, mobile: false, pastHero: false, added: false };
+
+  scents = [
+    { name: 'Lavender', note: 'ดอกลาเวนเดอร์ นุ่ม สงบ', code: 'LV', oils: 'Lavender + Lavandin Essential Oils', img: 'assets/packshot-lavender-500.png' },
+    { name: 'Rosemary', note: 'สมุนไพร สดชื่น ปลอดโปร่ง', code: 'RM', oils: 'Rosemary Essential Oil', img: 'assets/packshot-rosemary-500.png' },
+    { name: 'Rose Geranium', note: 'ดอกกุหลาบ อบอุ่น กลมกล่อม', code: 'RG', oils: 'Rose Geranium Essential Oil', img: 'assets/packshot-rose-geranium-500.png' }
+  ];
+
+  // Prices are identical across scents; the SKU differs only by the scent code.
+  variants = [
+    { label: '100 ML', price: 459, sku: '0100-1' },
+    { label: '250 ML', price: 779, sku: '0150-1 (รอยืนยัน)' },
+    { label: '500 ML', price: 1199, sku: '0500-1' }
+  ];
+
+  componentDidMount() {
+    // Visibility of the mobile bar is driven by an observer on the hero and a
+    // media query — never by cached scroll offsets, which can be measured
+    // before layout settles and then go stale if scrolling happens in a
+    // container rather than on window.
+    this.mq = window.matchMedia('(max-width: 859px)');
+    this.onMq = () => this.setState({ mobile: this.mq.matches });
+    this.mq.addEventListener('change', this.onMq);
+
+    const hero = document.getElementById('hero');
+    if (hero && 'IntersectionObserver' in window) {
+      this.io = new IntersectionObserver(entries => {
+        const e = entries[0];
+        this.setState({ pastHero: !e.isIntersecting && e.boundingClientRect.top < 0 });
+      }, { threshold: 0 });
+      this.io.observe(hero);
+    }
+    this.setState({ mobile: this.mq.matches, pastHero: false });
+    this.initCountUps();
+    this.initReveals();
+    this.initSeq();
+    this.fixThaiTracking();
+  }
+
+  // Scroll-triggered mask reveal: each [data-reveal] is an overflow-hidden mask,
+  // its [data-reveal-inner] slides up 20px and fades in. data-reveal = delay ms.
+  initReveals() {
+    const els = Array.from(document.querySelectorAll('[data-reveal]'));
+    if (!els.length) return;
+    this.revealDone = this.revealDone || new WeakSet();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const inner = el => el.querySelector('[data-reveal-inner]') || el.firstElementChild;
+    els.forEach(el => {
+      const i = inner(el);
+      if (!i || this.revealDone.has(el)) return;
+      if (reduce) { i.style.opacity = '1'; i.style.transform = 'none'; return; }
+      i.style.opacity = '0';
+      i.style.transform = 'translateY(20px)';
+      i.style.transition = 'opacity 800ms cubic-bezier(.22,1,.36,1), transform 800ms cubic-bezier(.22,1,.36,1)';
+      i.style.transitionDelay = (parseInt(el.dataset.reveal, 10) || 0) + 'ms';
+      i.style.willChange = 'opacity, transform';
+    });
+    if (reduce) return;
+    const show = el => {
+      const i = inner(el);
+      if (!i) return;
+      this.revealDone.add(el);
+      i.style.opacity = '1';
+      i.style.transform = 'translateY(0)';
+    };
+    if (!('IntersectionObserver' in window)) { els.forEach(show); return; }
+    if (this.rio) this.rio.disconnect();
+    this.rio = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) { obs.unobserve(en.target); show(en.target); }
+      });
+    }, { threshold: 0.25 });
+    els.forEach(el => (this.revealDone.has(el) ? show(el) : this.rio.observe(el)));
+  }
+
+  // Chart sequencer: one trigger per [data-seq] block fires masked rises,
+  // left-origin bar growth and the row count-ups on an authored timeline.
+  initSeq() {
+    const roots = Array.from(document.querySelectorAll('[data-seq]'));
+    if (!roots.length) return;
+    this.seqDone = this.seqDone || new WeakSet();
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const EASE = 'cubic-bezier(.22,1,.36,1)';
+
+    const prep = root => {
+      root.querySelectorAll('[data-seq-rise]').forEach(m => {
+        const i = m.querySelector('[data-seq-inner]');
+        if (!i) return;
+        if (reduce) { i.style.opacity = '1'; i.style.transform = 'none'; return; }
+        i.style.opacity = '0';
+        i.style.transform = 'translateY(20px)';
+        i.style.transition = 'opacity 800ms ' + EASE + ', transform 800ms ' + EASE;
+        i.style.transitionDelay = (+m.dataset.seqRise || 0) + 'ms';
+      });
+      root.querySelectorAll('[data-seq-fade]').forEach(el => {
+        if (reduce) { el.style.opacity = ''; return; }
+        el.dataset.seqFadeTo = el.dataset.seqFadeTo || getComputedStyle(el).opacity;
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 700ms ' + EASE;
+        el.style.transitionDelay = (+el.dataset.seqFade || 0) + 'ms';
+      });
+      root.querySelectorAll('[data-seq-lift]').forEach(el => {
+        if (reduce) { el.style.opacity = ''; el.style.transform = 'none'; return; }
+        el.dataset.seqLiftTo = el.dataset.seqLiftTo || getComputedStyle(el).opacity;
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(6px)';
+        el.style.transition = 'opacity 450ms ' + EASE + ', transform 450ms ' + EASE;
+        el.style.transitionDelay = (+el.dataset.seqLift || 0) + 'ms';
+      });
+      root.querySelectorAll('[data-seq-bar]').forEach(b => {
+        if (reduce) { b.style.transform = 'none'; return; }
+        b.style.transformOrigin = 'left center';
+        b.style.transform = 'scaleX(0)';
+        b.style.transition = 'transform ' + (+b.dataset.seqBarDur || 880) + 'ms ' + EASE;
+        b.style.transitionDelay = (+b.dataset.seqBar || 0) + 'ms';
+        b.style.willChange = 'transform';
+      });
+      root.querySelectorAll('[data-countup-seq]').forEach(el => this.fmtCount(el, 0));
+    };
+
+    const play = root => {
+      this.seqDone.add(root);
+      root.querySelectorAll('[data-seq-rise] > [data-seq-inner]').forEach(i => {
+        i.style.opacity = '1';
+        i.style.transform = 'translateY(0)';
+      });
+      root.querySelectorAll('[data-seq-fade]').forEach(el => {
+        el.style.opacity = el.dataset.seqFadeTo || '1';
+      });
+      root.querySelectorAll('[data-seq-lift]').forEach(el => {
+        el.style.opacity = el.dataset.seqLiftTo || '1';
+        el.style.transform = 'translateY(0)';
+      });
+      root.querySelectorAll('[data-seq-bar]').forEach(b => (b.style.transform = 'scaleX(1)'));
+      root.querySelectorAll('[data-countup-seq]').forEach(el => {
+        setTimeout(() => this.runCount(el), +el.dataset.delay || 0);
+      });
+    };
+
+    roots.forEach(r => { if (!this.seqDone.has(r)) prep(r); });
+    if (reduce) return;
+    if (this.sio) this.sio.disconnect();
+    this.sio = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) { obs.unobserve(en.target); play(en.target); }
+      });
+    }, { threshold: 0, rootMargin: '-32% 0px -32% 0px' });
+    roots.forEach(r => (this.seqDone.has(r) ? play(r) : this.sio.observe(r)));
+  }
+
+  // Scroll-triggered count-up: runs once per element, ~1.4s ease-out, no bounce.
+  // Displayed text is kept in this.countText so React re-renders can't reset it.
+  fmtCount(el, n) {
+    const d = el.dataset.decimals === undefined ? 2 : parseInt(el.dataset.decimals, 10);
+    const s = (el.dataset.prefix || '') + n.toFixed(d) + (el.dataset.suffix || '');
+    this.countText.set(el, s);
+    el.textContent = s;
+  }
+
+  runCount(el) {
+    const target = parseFloat(el.dataset.countup);
+    const dur = +el.dataset.dur || 1400, t0 = performance.now();
+    const step = now => {
+      const p = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      this.fmtCount(el, target * e);
+      if (p < 1) requestAnimationFrame(step);
+      else this.fmtCount(el, target);
+    };
+    requestAnimationFrame(step);
+  }
+
+  initCountUps() {
+    this.countText = this.countText || new Map();
+    const els = Array.from(document.querySelectorAll('[data-countup]'));
+    if (!els.length) return;
+    this.countEls = els;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    els.forEach(el => this.fmtCount(el, 0));
+    const own = els.filter(el => el.dataset.countupSeq === undefined); // sequencer owns the rest
+    if (!('IntersectionObserver' in window)) { els.forEach(el => this.runCount(el)); return; }
+    if (this.cio) this.cio.disconnect();
+    this.cio = new IntersectionObserver((entries, obs) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) { obs.unobserve(en.target); this.runCount(en.target); }
+      });
+    }, { threshold: 0.4 });
+    own.forEach(el => this.cio.observe(el));
+    // Manual re-trigger for testing: window.replayCountUp() in the console.
+    window.replayCountUp = () => this.initCountUps();
+  }
+
+  // Two things crowd the Thai mark stack (mai-han-akat with mai-tho above it, as in
+  // "ตั้ง"): letter-spacing, which is inserted AFTER each zero-width mark and drags the
+  // tone mark off its base; and Prompt's 700 weight, whose thick marks nearly touch at
+  // display sizes. Both are element-level, so wrap the Thai runs and relax them there —
+  // Latin keeps the tracking and the 700 the design system asks for.
+  fixThaiTracking() {
+    const THAI = /[\u0E00-\u0E7F]/;
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => (THAI.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT)
+    });
+    const nodes = [];
+    while (w.nextNode()) nodes.push(w.currentNode);
+    nodes.forEach(n => {
+      const p = n.parentElement;
+      if (!p || p.dataset.thaiRun !== undefined) return;
+      const cs = getComputedStyle(p);
+      if (!parseFloat(cs.letterSpacing)) return;
+      const parts = n.nodeValue.split(/([\u0E00-\u0E7F][\u0E00-\u0E7F\s]*)/).filter(Boolean);
+      const frag = document.createDocumentFragment();
+      parts.forEach(t => {
+        if (THAI.test(t)) {
+          const s = document.createElement('span');
+          s.dataset.thaiRun = '';
+          s.textContent = t;
+          frag.appendChild(s);
+        } else frag.appendChild(document.createTextNode(t));
+      });
+      n.replaceWith(frag);
+    });
+  }
+
+  componentDidUpdate() {
+    // Re-apply the animated text after any re-render, and pick up nodes that
+    // were remounted (React restores the literal template text otherwise).
+    const els = Array.from(document.querySelectorAll('[data-countup]'));
+    if (!this.countText) return;
+    let fresh = false;
+    els.forEach(el => {
+      const t = this.countText.get(el);
+      if (t === undefined) fresh = true;
+      else if (el.textContent !== t) el.textContent = t;
+    });
+    if (fresh) this.initCountUps();
+    this.initReveals();
+    this.initSeq();
+    this.fixThaiTracking();
+  }
+
+  componentWillUnmount() {
+    if (this.mq) this.mq.removeEventListener('change', this.onMq);
+    if (this.io) this.io.disconnect();
+    if (this.cio) this.cio.disconnect();
+    if (this.rio) this.rio.disconnect();
+    if (this.sio) this.sio.disconnect();
+    clearTimeout(this.t);
+  }
+
+  baht(n) { return '฿' + n.toLocaleString('en-US'); }
+
+  bar(items, max) {
+    // Mobile keeps the same choreography on a tighter clock (never longer than desktop).
+    const m = this.state.mobile;
+    const stagger = m ? 120 : 160, base = m ? 340 : 380;
+    const dur = m ? 760 : 860, durHi = m ? 850 : 960;
+    return items.map((it, i) => ({
+      t: it.t,
+      v: it.v,
+      n: Math.abs(it.n),
+      p: it.v.trim().charAt(0),
+      d: base + i * stagger,
+      dv: base + i * stagger + Math.round((Math.abs(it.n) === max ? durHi : dur) * 0.74),
+      dur: Math.abs(it.n) === max ? durHi : dur,
+      w: Math.round(Math.abs(it.n) / max * 100) + '%',
+      c: it.hi ? 'var(--color-accent-signature)' : 'var(--color-signature-300)',
+      tc: it.hi ? 'var(--color-accent-signature)' : 'inherit'
+    }));
+  }
+
+  renderVals() {
+    const st = this.state;
+    const v = this.variants[st.size];
+    const sc = this.scents[st.scent];
+    const total = v.price * st.qty;
+    const mobile = st.mobile === true;
+
+    const scents = this.scents.map((c, i) => {
+      const on = i === st.scent;
+      return {
+        name: c.name,
+        note: c.note,
+        onSelect: () => this.setState({ scent: i }),
+        style: 'display:flex;flex-direction:column;align-items:flex-start;gap:3px;cursor:pointer;text-align:left;'
+          + 'padding:13px 14px;min-height:62px;border-radius:var(--radius-sm);font-family:var(--font-body);color:var(--color-text);'
+          + (on
+            ? 'border:1.5px solid var(--color-accent);background:var(--color-accent-100);'
+            : 'border:1px solid var(--color-divider);background:transparent;')
+      };
+    });
+
+    const sizes = this.variants.map((s, i) => {
+      const on = i === st.size;
+      return {
+        label: s.label,
+        priceLabel: this.baht(s.price),
+        onSelect: () => this.setState({ size: i }),
+        style: 'display:flex;flex-direction:column;align-items:flex-start;gap:3px;cursor:pointer;text-align:left;'
+          + 'padding:13px 14px;min-height:62px;border-radius:var(--radius-sm);font-family:var(--font-body);color:var(--color-text);'
+          + (on
+            ? 'border:1.5px solid var(--color-accent);background:var(--color-accent-100);'
+            : 'border:1px solid var(--color-divider);background:transparent;')
+      };
+    });
+
+    return {
+      sizes,
+      scents,
+      scentName: sc.name,
+      oilsLabel: sc.oils,
+      packshot: sc.img,
+      packshotAlt: 'AMOURIQ Organic Olive Castile Soap ' + sc.name + ' 500 mL',
+      standaloneChrome: this.props.standaloneChrome ?? false,
+      bridgeArrow: mobile ? '↓' : '→',
+      qty: st.qty,
+      sku: 'SL-CT-OR-' + sc.code + v.sku,
+      sizeLabel: v.label,
+      total: this.baht(total),
+      cartLine: sc.name + ' · ' + v.label + ' × ' + st.qty,
+      added: st.added,
+      showSticky: mobile && st.pastHero === true,
+      inc: () => this.setState(s => ({ qty: Math.min(9, s.qty + 1) })),
+      dec: () => this.setState(s => ({ qty: Math.max(1, s.qty - 1) })),
+      onAdd: () => {
+        this.setState({ added: true });
+        clearTimeout(this.t);
+        this.t = setTimeout(() => this.setState({ added: false }), 2200);
+      },
+      moisture: this.bar([
+        { t: 'หลังใช้ทันที', v: '+7.42%', n: 7.42 },
+        { t: 'หลัง 1 ชั่วโมง', v: '+8.48%', n: 8.48 },
+        { t: 'หลัง 4 ชั่วโมง', v: '+13.37%', n: 13.37, hi: true },
+        { t: 'หลัง 8 ชั่วโมง', v: '+9.27%', n: 9.27 }
+      ], 13.37),
+      tewl: this.bar([
+        { t: 'หลังใช้ทันที', v: '+0.81%', n: 0.81 },
+        { t: 'หลัง 1 ชั่วโมง', v: '−5.34%', n: 5.34 },
+        { t: 'หลัง 4 ชั่วโมง', v: '−3.60%', n: 3.60 },
+        { t: 'หลัง 8 ชั่วโมง', v: '−10.67%', n: 10.67, hi: true }
+      ], 10.67)
+    };
+  }
+}
+
+</script>
+</body>
+</html>

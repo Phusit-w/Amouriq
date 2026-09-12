@@ -1,0 +1,23 @@
+/**
+ * amq-components.css
+ *
+ * Purpose: visual styling of reusable UI components — carousel arrows,
+ * product cards, category tiles, hero slider slides, the footer signup
+ * form. Things that decide what elements LOOK LIKE (color, border,
+ * hover states, typography), as opposed to their layout/positioning.
+ *
+ * Currently empty. Candidate rules to migrate here later (from
+ * wp-content/mu-plugins/*.php inline <style> blocks) include:
+ *   - .amq-carousel__arrow (shared by bestsellers + category carousels)
+ *   - .amq-product-card__* incl. hover image-swap and Quick View reveal
+ *     (amouriq-bestsellers-carousel.php)
+ *   - .amq-cat-tile__* (amouriq-category-browse.php)
+ *   - .amq-hero-slide__* incl. arrow styling (amouriq-hero-slider.php)
+ *   - .amq-footer-signup__* (amouriq-footer-signup.php)
+ *
+ * Loaded after amq-layout.css, before amq-woocommerce.css.
+ */
+
+/* Header search field styling now lives in amq-header-search.css — the
+ * search icon expands into a full-width panel instead of an inline
+ * bordered box, see memo/component.md. */

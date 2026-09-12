@@ -1,0 +1,36 @@
+/**
+ * amq-hero-slider.css
+ *
+ * Styles for the [amq_ingredient_slider] hero/ingredient banner.
+ *
+ * Migrated from wp-content/mu-plugins/amouriq-hero-slider.php.
+ * Loaded conditionally by that mu-plugin only when [amq_ingredient_slider]
+ * renders — see amq_hero_slider_assets_needed().
+ */
+
+.amq-hero-slider{position:relative;width:100%;height:544px;overflow:hidden;}
+.amq-hero-slider__track{display:flex;height:100%;transition:transform .6s ease;}
+.amq-hero-slide{flex:0 0 100%;width:100%;height:100%;display:flex;box-sizing:border-box;}
+.amq-hero-slide__text{flex:0 0 50%;max-width:50%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:16px;padding:0 64px;box-sizing:border-box;}
+.amq-hero-slide__headline{margin:0;font-family:"IBM Plex Sans Thai",sans-serif;font-weight:600;font-size:42px;line-height:1.2;color:#242622;}
+.amq-hero-slide__body{margin:0;max-width:460px;font-family:"IBM Plex Sans Thai",sans-serif;font-size:16px;line-height:1.6;color:#4a473f;}
+.amq-hero-slide__button{display:inline-block;background:#242622;color:#FFFDF8;font-family:"IBM Plex Sans Thai",sans-serif;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase;text-decoration:none;padding:15px 32px;transition:background-color .2s ease;}
+.amq-hero-slide__button:hover{background:#40453d;color:#FFFDF8;}
+.amq-hero-slide__media{flex:0 0 50%;max-width:50%;height:100%;display:flex;align-items:center;justify-content:center;padding:32px;box-sizing:border-box;overflow:hidden;}
+.amq-hero-slide__media img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;display:block;}
+
+.amq-hero-slider__arrow,
+.amq-hero-slider__arrow:hover,
+.amq-hero-slider__arrow:focus,
+.amq-hero-slider__arrow:active{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border:none;outline:none;background:transparent;box-shadow:none;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;color:#8a8578;padding:0;}
+.amq-hero-slider__arrow svg{width:28px;height:28px;stroke-width:1.2;}
+.amq-hero-slider__arrow--prev{left:12px;}
+.amq-hero-slider__arrow--next{right:12px;}
+
+@media screen and (max-width:900px){
+	.amq-hero-slider{height:auto;}
+	.amq-hero-slide{flex-direction:column;}
+	.amq-hero-slide__text{max-width:100%;padding:48px 28px;gap:12px;}
+	.amq-hero-slide__headline{font-size:30px;}
+	.amq-hero-slide__media{max-width:100%;height:320px;}
+}

@@ -1,0 +1,313 @@
+/**
+ * amq-single-product.css
+ *
+ * Single Product page (woocommerce/single-product.php). Loaded only on
+ * is_product() — see amouriq-single-product.php. Brand tokens hardcoded
+ * per-file (amq-tokens.css is still empty sitewide — see its own header
+ * comment and memo/learning.md "Design tokens are hardcoded, not read from
+ * kit Global Colors/Fonts"): ink #242622, porcelain #FFFDF8, sand #FAF7F0 /
+ * #E8DDCB / #E8DED2, muted text #62665E / #8a8578, accent gold #D8A94E.
+ *
+ * Every value an owner can adjust from wp-admin → Customize → "AMOURIQ —
+ * Product Page" is read here via a CSS custom property (--amq-pdp-*), with
+ * the original hardcoded value kept as the var() fallback. The Customizer
+ * settings themselves + the <style id="amq-pdp-custom-style"> override they
+ * print in wp_head live in amouriq-single-product.php — see that file
+ * before changing any of these variable names.
+ */
+
+/* ---------- Product hero (gallery + info) ---------- */
+.amq-pdp {
+	display: flex;
+	gap: var(--amq-pdp-gap, 56px);
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: var(--amq-pdp-padding-y, 48px) var(--amq-pdp-padding-x, 40px);
+	align-items: flex-start;
+	background: var(--amq-pdp-hero-bg, transparent);
+}
+.amq-pdp__gallery {
+	flex: 0 0 50%;
+	max-width: 50%;
+	position: sticky;
+	top: 24px;
+}
+.amq-pdp__main-image {
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	background: var(--amq-pdp-image-bg, #FAF7F0);
+	overflow: hidden;
+}
+.amq-pdp__main-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.amq-pdp__thumbs { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.amq-pdp__thumb {
+	width: var(--amq-pdp-thumb-size, 72px);
+	height: var(--amq-pdp-thumb-size, 72px);
+	padding: 0;
+	border: 1.5px solid var(--amq-pdp-thumb-border, #E8DED2);
+	background: var(--amq-pdp-thumb-bg, #FAF7F0);
+	cursor: pointer;
+	overflow: hidden;
+}
+.amq-pdp__thumb.is-active { border-color: var(--amq-pdp-thumb-active-border, #242622); }
+.amq-pdp__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.amq-pdp__info { flex: 1; min-width: 0; }
+.amq-pdp__name {
+	/* !important: beats Elementor's kit Global Typography rule
+	   (.elementor-kit-5 h1 { font-size:74px; font-weight:500; color:#242622 })
+	   which the "elementor-kit-5" body class applies sitewide, even on this
+	   plain-PHP page — a class selector alone (0,1,0) loses to that
+	   descendant selector (0,1,1) regardless of source order. Same fix
+	   pattern already used for the newsletter input's border, see
+	   memo/bugs.md 2026-07-25. */
+	font-size: var(--amq-pdp-name-size, 32px) !important;
+	font-weight: var(--amq-pdp-name-weight, 600) !important;
+	color: var(--amq-pdp-name-color, #242622) !important;
+	font-style: var(--amq-pdp-name-font-style, normal);
+	line-height: var(--amq-pdp-name-line-height, 1.2);
+	letter-spacing: var(--amq-pdp-name-letter-spacing, 0em);
+	word-spacing: var(--amq-pdp-name-word-spacing, 0em);
+	padding: var(--amq-pdp-name-padding-top, 0px) var(--amq-pdp-name-padding-right, 0px) var(--amq-pdp-name-padding-bottom, 0px) var(--amq-pdp-name-padding-left, 0px);
+	margin: var(--amq-pdp-name-margin-top, 0px) var(--amq-pdp-name-margin-right, 0px) var(--amq-pdp-name-margin-bottom, 12px) var(--amq-pdp-name-margin-left, 0px);
+}
+.amq-pdp__price {
+	font-size: var(--amq-pdp-price-size, 22px);
+	font-weight: var(--amq-pdp-price-weight, 600);
+	color: var(--amq-pdp-price-color, #242622);
+	font-style: var(--amq-pdp-price-font-style, normal);
+	line-height: var(--amq-pdp-price-line-height, 1.2);
+	letter-spacing: var(--amq-pdp-price-letter-spacing, 0em);
+	word-spacing: var(--amq-pdp-price-word-spacing, 0em);
+	padding: var(--amq-pdp-price-padding-top, 0px) var(--amq-pdp-price-padding-right, 0px) var(--amq-pdp-price-padding-bottom, 0px) var(--amq-pdp-price-padding-left, 0px);
+	margin: var(--amq-pdp-price-margin-top, 0px) var(--amq-pdp-price-margin-right, 0px) var(--amq-pdp-price-margin-bottom, 24px) var(--amq-pdp-price-margin-left, 0px);
+}
+.amq-pdp__price ins { text-decoration: none; }
+
+.amq-pdp__short-description {
+	font-size: var(--amq-pdp-short-desc-size, 16px);
+	color: var(--amq-pdp-short-desc-color, #62665E);
+	font-style: var(--amq-pdp-short-desc-font-style, normal);
+	line-height: var(--amq-pdp-short-desc-line-height, 1.6);
+	letter-spacing: var(--amq-pdp-short-desc-letter-spacing, 0em);
+	word-spacing: var(--amq-pdp-short-desc-word-spacing, 0em);
+	padding: var(--amq-pdp-short-desc-padding-top, 0px) var(--amq-pdp-short-desc-padding-right, 0px) var(--amq-pdp-short-desc-padding-bottom, 0px) var(--amq-pdp-short-desc-padding-left, 0px);
+	margin: var(--amq-pdp-short-desc-margin-top, 0px) var(--amq-pdp-short-desc-margin-right, 0px) var(--amq-pdp-short-desc-margin-bottom, 28px) var(--amq-pdp-short-desc-margin-left, 0px);
+}
+.amq-pdp__short-description p:last-child { margin-bottom: 0; }
+
+.amq-pdp__section-heading {
+	/* !important: same Elementor kit-typography conflict as .amq-pdp__name
+	   above, but for <h2> (.elementor-kit-5 h2 { font-size:40px;
+	   font-weight:600; color:#242622 }) — this class is used on every
+	   "Key Ingredients" / "Size" / "Description" / "You Might Also Like"
+	   label, all real <h2> tags. */
+	font-size: var(--amq-pdp-heading-size, 13px) !important;
+	font-weight: var(--amq-pdp-heading-weight, 700) !important;
+	letter-spacing: var(--amq-pdp-heading-letter-spacing, .08em);
+	word-spacing: var(--amq-pdp-heading-word-spacing, 0em);
+	text-transform: uppercase;
+	color: var(--amq-pdp-heading-color, #242622) !important;
+	margin: 0 0 12px;
+}
+
+/* ---------- Key Ingredients ---------- */
+.amq-pdp__key-ingredients { margin-bottom: 28px; }
+.amq-pdp__ingredient-pills {
+	list-style: none;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+}
+.amq-pdp__ingredient-pill {
+	font-size: var(--amq-pdp-pill-size, 13px);
+	font-style: var(--amq-pdp-pill-font-style, normal);
+	line-height: var(--amq-pdp-pill-line-height, 1.4);
+	letter-spacing: var(--amq-pdp-pill-letter-spacing, 0em);
+	word-spacing: var(--amq-pdp-pill-word-spacing, 0em);
+	color: var(--amq-pdp-pill-color, #242622);
+	background: var(--amq-pdp-pill-bg, #FAF7F0);
+	border: 1px solid var(--amq-pdp-pill-border, #E8DED2);
+	padding: var(--amq-pdp-pill-padding-top, 7px) var(--amq-pdp-pill-padding-right, 14px) var(--amq-pdp-pill-padding-bottom, 7px) var(--amq-pdp-pill-padding-left, 14px);
+	margin: var(--amq-pdp-pill-margin-top, 0px) var(--amq-pdp-pill-margin-right, 0px) var(--amq-pdp-pill-margin-bottom, 0px) var(--amq-pdp-pill-margin-left, 0px);
+}
+.amq-pdp__ingredients-placeholder { font-size: 14px; color: #8a8578; font-style: italic; margin: 0; }
+
+/* ---------- Size selector: equal square boxes, small → large left → right ---------- */
+.amq-pdp__size { margin-bottom: 28px; }
+.amq-size-box-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.amq-size-box {
+	width: var(--amq-pdp-sizebox-size, 64px);
+	height: var(--amq-pdp-sizebox-size, 64px);
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	font-size: 12px;
+	line-height: 1.3em;
+	color: var(--amq-pdp-sizebox-color, #242622);
+	background: var(--amq-pdp-sizebox-bg, #FFFDF8);
+	border: 1.5px solid var(--amq-pdp-sizebox-border, #E8DED2);
+	cursor: pointer;
+	padding: 4px;
+}
+.amq-size-box:hover { border-color: var(--amq-pdp-sizebox-selected-border, #242622); }
+.amq-size-box.is-selected {
+	border-color: var(--amq-pdp-sizebox-selected-border, #D8A94E);
+	background: var(--amq-pdp-sizebox-selected-bg, #FAF7F0);
+	font-weight: 600;
+}
+
+/* ---------- Quantity + Add to Bag ---------- */
+.amq-pdp__purchase-row { display: flex; align-items: stretch; gap: 16px; }
+.amq-pdp__qty {
+	display: flex;
+	align-items: center;
+	border: 1.5px solid var(--amq-pdp-qty-border, #E8DED2);
+	background: var(--amq-pdp-qty-bg, #FFFDF8);
+}
+.amq-pdp__qty-btn {
+	width: 40px;
+	height: 100%;
+	min-height: 50px;
+	border: none;
+	background: transparent;
+	font-size: 18px;
+	color: var(--amq-pdp-qty-color, #242622);
+	cursor: pointer;
+}
+.amq-pdp__qty-btn:hover { background: #FAF7F0; }
+.amq-pdp__qty-input {
+	width: 40px;
+	min-height: 50px;
+	border: none;
+	border-left: 1px solid var(--amq-pdp-qty-border, #E8DED2);
+	border-right: 1px solid var(--amq-pdp-qty-border, #E8DED2);
+	text-align: center;
+	font-size: 14px;
+	color: var(--amq-pdp-qty-color, #242622);
+	-moz-appearance: textfield;
+}
+.amq-pdp__qty-input::-webkit-outer-spin-button,
+.amq-pdp__qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.amq-pdp__add-to-bag {
+	flex: 1;
+	min-height: var(--amq-pdp-btn-min-height, 50px);
+	background: var(--amq-pdp-btn-bg, #2D3536);
+	color: var(--amq-pdp-btn-color, #FFFDF8);
+	border: none;
+	border-radius: var(--amq-pdp-btn-radius, 0px);
+	font-weight: 700;
+	font-size: var(--amq-pdp-btn-font-size, 13px);
+	letter-spacing: .03em;
+	cursor: pointer;
+	transition: background-color .2s ease;
+}
+.amq-pdp__add-to-bag:hover { background: var(--amq-pdp-btn-hover-bg, #40453d); }
+.amq-pdp__add-to-bag[disabled] { opacity: .6; cursor: default; }
+.amq-pdp__add-to-bag.is-added { background: var(--amq-pdp-btn-added-bg, #5D5F4B); }
+
+/* ---------- Lower section: full description, How to store, Ingredients/How to use accordions ---------- */
+.amq-pdp__lower {
+	max-width: var(--amq-pdp-lower-max-width, 800px);
+	margin: 8px auto 64px;
+	padding: 0 40px;
+	background: var(--amq-pdp-lower-bg, transparent);
+}
+.amq-pdp__full-description { margin-bottom: 28px; }
+.amq-pdp__full-description-content {
+	font-size: var(--amq-pdp-fulldesc-size, 16px);
+	line-height: 1.7em;
+	color: var(--amq-pdp-fulldesc-color, #62665E);
+}
+.amq-pdp__full-description-content ul { padding-left: 20px; }
+
+.amq-pdp__how-to-store { margin-bottom: 28px; }
+.amq-pdp__inline-heading {
+	/* !important: same Elementor kit conflict as above, this time <h3>
+	   (.elementor-kit-5 h3 { font-size:32px; font-weight:600 }) — without
+	   this the "How to store:" label silently renders at the kit's 32px/600
+	   instead of the intended 16px/700, same as .amq-pdp__name/
+	   .amq-pdp__section-heading did before this fix. */
+	font-size: 16px !important;
+	font-weight: 700 !important;
+	color: var(--amq-pdp-inline-heading-color, #242622) !important;
+	margin: 0 0 6px;
+}
+.amq-pdp__how-to-store p {
+	font-size: var(--amq-pdp-lowerbody-size, 15px);
+	line-height: 1.6em;
+	color: var(--amq-pdp-lowerbody-color, #62665E);
+	margin: 0;
+}
+
+.amq-pdp__divider { border-top: 1px solid var(--amq-pdp-divider-color, #E8DED2); margin: 0 0 20px; }
+
+.amq-pdp__accordion { margin-bottom: 20px; }
+.amq-pdp__accordion-toggle {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: none;
+	border: none;
+	padding: 0;
+	font-size: var(--amq-pdp-accordion-toggle-size, 18px);
+	font-weight: var(--amq-pdp-accordion-toggle-weight, 600);
+	color: var(--amq-pdp-accordion-toggle-color, #242622);
+	cursor: pointer;
+	text-align: left;
+}
+.amq-pdp__accordion-icon { font-size: 20px; line-height: 1; transition: transform .2s ease; }
+.amq-pdp__accordion.is-open .amq-pdp__accordion-icon { transform: rotate(45deg); }
+.amq-pdp__accordion-panel {
+	max-height: 0;
+	overflow: hidden;
+	transition: max-height .25s ease;
+}
+.amq-pdp__accordion.is-open .amq-pdp__accordion-panel { max-height: 600px; }
+.amq-pdp__accordion-panel p,
+.amq-pdp__ingredients-list {
+	font-size: var(--amq-pdp-lowerbody-size, 15px);
+	line-height: 1.6em;
+	color: var(--amq-pdp-lowerbody-color, #62665E);
+	margin: 14px 0 0;
+	padding: 0;
+}
+.amq-pdp__ingredients-list { list-style: none; }
+.amq-pdp__ingredients-list li { padding: 4px 0; border-bottom: 1px solid #F3F1EC; }
+
+/* ---------- You Might Also Like ---------- */
+.amq-pdp__related {
+	max-width: 1200px;
+	margin: 0 auto 72px;
+	padding: 0 40px;
+	background: var(--amq-pdp-related-bg, transparent);
+}
+.amq-pdp__related-heading {
+	font-size: var(--amq-pdp-related-heading-size, 22px);
+	color: var(--amq-pdp-related-heading-color, #242622);
+	text-transform: none;
+	letter-spacing: 0;
+	margin-bottom: 20px;
+}
+
+/* ---------- Responsive ---------- */
+@media screen and (max-width: 900px) {
+	.amq-pdp { flex-direction: column; gap: 28px; padding: 32px 24px; }
+	.amq-pdp__gallery { flex: 0 0 auto; max-width: 100%; position: static; }
+	.amq-pdp__lower { padding: 0 24px; }
+	.amq-pdp__related { padding: 0 24px; }
+}
+@media screen and (max-width: 480px) {
+	.amq-pdp { padding: 24px 16px; }
+	.amq-pdp__name { font-size: 26px; }
+	.amq-pdp__purchase-row { flex-direction: column; }
+	.amq-pdp__qty { justify-content: center; }
+	.amq-pdp__lower,
+	.amq-pdp__related { padding: 0 16px; }
+}

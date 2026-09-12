@@ -1,0 +1,242 @@
+/**
+ * amq-header-search.css
+ *
+ * Sitewide: the header's search icon -> full-width expandable search panel
+ * (shared by #amq-header, #amq-header-static, and .amq-shop-header), plus
+ * the "current page" nav highlight and a mobile nav-wrap safety net.
+ *
+ * Loaded by wp-content/mu-plugins/amouriq-header-search.php.
+ */
+
+/* ---------- kill the phantom row-gap before the collapsed search-panel row ----------
+ * Confirmed via computed style (getComputedStyle(...).gridTemplateRows):
+ * the header grid actually has TWO rows — row 1 (logo/nav/icons, visible,
+ * height driven by the icons container) and row 2 (the search-panel html
+ * widget, always max-height:0 when closed). Elementor's per-container
+ * default --row-gap (20px, from --widgets-spacing-row) still applies
+ * BETWEEN these two rows even though row 2 renders at 0px — so an owner-set
+ * symmetric padding-top/padding-bottom (13px/13px in the editor) was
+ * rendering as ~13px above the content but ~13+20=33px below it, making the
+ * header look bottom-heavy. Zeroing --row-gap only on the header's own grid
+ * (not `.amq-header-icons`, which keeps its own 24px internal gap between
+ * search/EN-TH/account/bag) restores true symmetric padding. */
+#amq-header, #amq-header-static {
+	--row-gap: 0 !important;
+	row-gap: 0 !important;
+}
+
+/* ---------- bare icon toggle (replaces the old bordered search box) ----------
+ * Hardened with !important: WooCommerce's frontend stylesheet has a bare
+ * `button{...}` reset (padding, background-color, border-radius) that a plain
+ * class-selector rule doesn't reliably beat in every cascade situation — same
+ * class of bug as the footer "SUBSCRIBE" button rendering pink (see bugs.md).
+ * Without this, the search toggle picks up WooCommerce's own button padding/
+ * background and throws off the header icon row's vertical alignment. */
+.amq-search-toggle {
+	cursor: pointer !important;
+	background: none !important;
+	background-color: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	line-height: 1 !important;
+	font-size: inherit !important;
+	box-shadow: none !important;
+}
+
+/* ---------- expandable panel ---------- */
+#amq-header, #amq-header-static, .amq-shop-header { position: relative; }
+
+/* Mirrors each header's own left/right padding (40px desktop; 20px mobile
+ * for #amq-header-static specifically — #amq-header has no mobile padding
+ * override, so it stays 40px at every width). `.amq-search-panel` uses this
+ * to break out of that padding via negative left/right offsets, since its
+ * actual containing block (the search-panel widget's own wrapper, see the
+ * grid-column fix below) sits INSIDE the header's padding, not flush with
+ * the header's true edges. */
+#amq-header, #amq-header-static { --amq-header-pad-x: 40px; }
+@media screen and (max-width: 767px) {
+	#amq-header-static { --amq-header-pad-x: 20px; }
+}
+
+/* The search-panel widget is grid item #4 in the header's 3-column grid
+ * (logo/nav/icons fill row 1, this widget auto-places into row 2, column 1
+ * only) — Elementor gives its wrapper `position:relative`, making it the
+ * containing block for the absolutely-positioned `.amq-search-panel` inside
+ * it, which otherwise caps the panel at column 1's width instead of the
+ * full header width. Forcing the wrapper to span every column fixes this.
+ * Targeted structurally (`:last-child`, it's always appended last) rather
+ * than by `css_classes` — Elementor's `css_classes` control only exists on
+ * Container/Section/Column elements, NOT on regular widgets (checked
+ * Elementor's own source), so setting it on this `html` widget is silently
+ * ignored at render time. */
+#amq-header > div:last-child,
+#amq-header-static > div:last-child {
+	grid-column: 1 / -1 !important;
+}
+
+.amq-search-panel {
+	position: absolute;
+	top: 100%;
+	/* Break out of the search-panel widget's own (padded) containing block —
+	 * see the --amq-header-pad-x comment above — so this band is flush with
+	 * the header's true left/right edges, matching the header's own width
+	 * exactly instead of stopping 40px (20px mobile) short on each side. */
+	left: calc(-1 * var(--amq-header-pad-x));
+	right: calc(-1 * var(--amq-header-pad-x));
+	width: auto;
+	max-height: 0;
+	overflow: hidden;
+	opacity: 0;
+	background: #FAF7F0;
+	border-bottom: 1px solid #E8DED2;
+	transition: max-height .25s ease, opacity .2s ease;
+	z-index: 99;
+}
+/* Band height matches the header's own rendered height (71px, confirmed via
+ * getBoundingClientRect) exactly — margin+border+padding+content below sums
+ * to ~71px. Bumped 3px for a safety buffer against sub-pixel rounding. */
+.amq-search-panel.is-open { max-height: 71px; opacity: 1; }
+/* The search FIELD's visible frame (width, padding, border, background) is
+ * now Elementor-native — set via the Advanced tab on the `html` widget that
+ * wraps this <form> (Width/Custom Width, Padding, Border, Background),
+ * editable per-breakpoint directly in the Elementor editor. This class only
+ * handles the icon/input/close row's internal flex layout now. */
+.amq-search-panel__form {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	box-sizing: border-box;
+	line-height: 1.3;
+}
+.amq-search-panel__icon {
+	flex: none;
+	display: flex;
+	align-items: center;
+	color: #242622;
+	opacity: .7;
+}
+/* Real case as typed, not force-uppercased — user must be able to type/read
+   both lowercase and uppercase in the search field. */
+.amq-search-panel input[type="search"] {
+	flex: 1;
+	min-width: 0;
+	border: none;
+	background: transparent;
+	outline: none;
+	color: #242622;
+	font-family: "IBM Plex Sans Thai", sans-serif;
+	font-size: 15px;
+	font-weight: 400;
+	-webkit-appearance: none;
+	appearance: none;
+}
+.amq-search-panel input[type="search"]::placeholder {
+	color: #242622;
+	opacity: .45;
+}
+/* Chrome/Edge add their own native "clear" (x) button inside a
+   type="search" input once it has text — `appearance:none` on the input
+   itself doesn't reliably suppress it, it needs its own selector. This
+   duplicated our custom `.amq-search-panel__close` X button. */
+.amq-search-panel input[type="search"]::-webkit-search-cancel-button,
+.amq-search-panel input[type="search"]::-webkit-search-decoration {
+	-webkit-appearance: none;
+	appearance: none;
+	display: none;
+}
+.amq-search-panel__close {
+	cursor: pointer;
+	background: none;
+	border: none;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	color: #242622;
+	flex: none;
+	transition: opacity .2s ease;
+}
+.amq-search-panel__close:hover { opacity: .65; }
+
+/* while the search panel is open, force the same solid look #amq-header
+   already uses when scrolled, so the panel reads as one seamless solid
+   block attached to the header (not a floating dropdown) */
+#amq-header.search-open { background-color: #FAF7F0 !important; border-color: #E8DED2 !important; }
+#amq-header.search-open .elementor-heading-title,
+#amq-header.search-open .elementor-heading-title a,
+#amq-header.search-open .amq-lang-switch,
+#amq-header.search-open .amq-search-toggle,
+#amq-header.search-open .amq-header-icon { color: #242622 !important; }
+
+@media screen and (max-width: 782px) {
+	.amq-search-panel__form { gap: 8px; }
+}
+
+/* ---------- current-page nav highlight (all header variants) ----------
+ * #amq-header also has hover/scroll color-swap rules in amq-header-hover.css
+ * scoped by #amq-header + a class (same specificity, id + 2 classes) — this
+ * stylesheet loads after that one (mu-plugin wp_head priority 101 vs 100),
+ * so on an exact specificity tie the later rule here wins the cascade.
+ */
+#amq-header .amq-header-nav a.is-active-nav,
+#amq-header-static .amq-header-nav a.is-active-nav,
+.amq-shop-header__nav a.is-active-nav {
+	color: #D8A94E !important;
+}
+
+/* ---------- mobile: let the nav wrap instead of overflowing ---------- */
+@media screen and (max-width: 782px) {
+	.amq-header-nav,
+	.amq-shop-header__nav {
+		flex-wrap: wrap;
+		justify-content: center;
+		row-gap: 8px;
+	}
+}
+
+/* ---------- mobile: let the icons row (search/EN-TH/account/bag) wrap too ----------
+ * This row doesn't shrink to its grid cell's available width at all — it
+ * holds a fixed content-driven width (confirmed via computed style: ~417px
+ * regardless of viewport), so at a true narrow phone width it overflows
+ * past the right edge instead of wrapping/shrinking — account/bag icons
+ * were rendering completely off-canvas, invisible without horizontal scroll.
+ * `!important` + width:100% on both the outer element AND its `.e-con-inner`
+ * flex wrapper forces it back into its actual available space; Shop's
+ * hand-coded header already wraps its equivalent `.amq-shop-header__
+ * actions` row, this brings the Elementor-driven copies (Home/Contact/
+ * About/Blog) in line with that. */
+@media screen and (max-width: 782px) {
+	.amq-header-icons {
+		width: 100% !important;
+		max-width: 100% !important;
+	}
+	.amq-header-icons > .e-con-inner {
+		width: 100% !important;
+		max-width: 100% !important;
+		flex-wrap: wrap !important;
+		justify-content: center !important;
+		row-gap: 10px !important;
+	}
+}
+
+/* ---------- mobile: fix the stacked-row header grid (#amq-header / #amq-header-static) ----------
+ * Elementor's own generated CSS switches --e-con-grid-template-columns to a
+ * single column at <=767px (logo / nav / icons stacked) but never overrides
+ * --e-con-grid-template-rows away from the desktop value of `repeat(1, 1fr)`
+ * (one row, meant for the 3-column single-row desktop layout). With 3 grid
+ * children now needing 3 rows, that leftover single `1fr` row track badly
+ * miscomputes row heights — observed live: the icons row (search/EN-TH/
+ * account/bag) gets pushed far down, overlapping the hero content below the
+ * header, with account/bag pushed past the right edge entirely. `#amq-header`
+ * is a plain HTML id (Elementor's `_element_id`, shared across every post
+ * that copies this header), so an ID-selector override here always wins over
+ * Elementor's own `.elementor-element-<hash>` class-based rule regardless of
+ * source order (ID specificity beats any number of classes). */
+@media screen and (max-width: 767px) {
+	#amq-header, #amq-header-static {
+		--e-con-grid-template-rows: repeat(3, auto) !important;
+		row-gap: 12px !important;
+	}
+}
