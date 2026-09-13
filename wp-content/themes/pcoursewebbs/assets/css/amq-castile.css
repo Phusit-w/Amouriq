@@ -22,6 +22,17 @@
  * immediately (media query block at the bottom).
  */
 
+/* Mobile safety net: Thai script has no spaces between words, so a long
+   clause with no earlier break opportunity can overflow its container on
+   narrow viewports instead of wrapping. Scoped to this page only — only
+   engages when a run of text genuinely has nowhere else to break, so it's
+   a no-op on desktop widths where everything already fits. */
+body.page-id-5309 .elementor-widget-text-editor p,
+body.page-id-5309 .elementor-widget-heading .elementor-heading-title {
+	overflow-wrap: break-word;
+	word-break: break-word;
+}
+
 .elementor-element-46d6b39, .elementor-element-8565c5d, .elementor-element-178d758,
 .elementor-element-f60a040, .elementor-element-1ae4342, .elementor-element-1922e0e,
 .elementor-element-cb54ad0, .elementor-element-a10e2a5, .elementor-element-a594814,

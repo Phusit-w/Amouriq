@@ -15,3 +15,17 @@
  *
  * Loaded after amq-tokens.css, before amq-components.css.
  */
+
+/* Site-wide mobile horizontal-scroll safety net: neither Blocksy nor any
+   other AMOURIQ asset file sets overflow-x on html/body, so any element
+   that ends up even slightly wider than the viewport (rounding, a hidden/
+   off-canvas panel, a not-yet-fully-responsive component, etc.) makes the
+   ENTIRE page horizontally scrollable — every section then renders shifted
+   relative to the visible viewport, not just the one component that's
+   actually oversized. This does not fix whatever is oversized (still worth
+   finding per-component when reported), but stops that overflow from
+   dragging the whole page along with it. */
+html, body {
+	overflow-x: hidden;
+	max-width: 100%;
+}

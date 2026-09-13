@@ -44,3 +44,20 @@ add_action('wp_enqueue_scripts', function () {
 	if (!file_exists($path)) return;
 	wp_enqueue_script('amq-shop', get_stylesheet_directory_uri() . '/assets/js/amq-shop.js', [], filemtime($path), true);
 });
+
+// amq-woocommerce.css: header-shop.php/footer-shop.php chrome + shop archive
+// hero/sidebar/grid styling. This used to be registered by
+// hello-elementor-child/functions.php, which only runs when that theme is
+// active — it isn't (pcoursewebbs is), so the handle was never registered
+// and every style that depended on it (e.g. amq-single-product.css) silently
+// never loaded either. Registering it here (a normal WooCommerce-scoped page
+// mu-plugin) keeps it working regardless of which theme is active, matching
+// every other AMOURIQ asset on this site. Loaded on any WooCommerce-context
+// page, since header-shop.php/footer-shop.php render on all of them, not
+// just the shop archive.
+add_action('wp_enqueue_scripts', function () {
+	if (!function_exists('is_woocommerce') || !(is_woocommerce() || is_cart() || is_checkout() || is_account_page())) return;
+	$path = get_stylesheet_directory() . '/assets/css/amq-woocommerce.css';
+	if (!file_exists($path)) return;
+	wp_enqueue_style('amq-woocommerce', get_stylesheet_directory_uri() . '/assets/css/amq-woocommerce.css', [], filemtime($path));
+});
