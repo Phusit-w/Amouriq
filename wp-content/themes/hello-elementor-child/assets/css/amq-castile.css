@@ -85,4 +85,56 @@
 		transform: scaleX(1);
 		transition: none;
 	}
+	.elementor-element-4afef18, .elementor-element-c997d8e, .elementor-element-15133a6,
+	.elementor-element-449ac69, .elementor-element-6a94c3a, .elementor-element-17f999d,
+	.elementor-element-91660c3, .elementor-element-733bd3e, .elementor-element-d1bb356,
+	.elementor-element-9420a30 {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}
+
+/**
+ * Ticket 04 (sections 10-18) — mask-reveal headings/key lines. Same mechanism
+ * as ticket 03's block above, kept separate to avoid touching that section's
+ * verified id list.
+ */
+.elementor-element-631c940, .elementor-element-73cc732, .elementor-element-6e57187,
+.elementor-element-ce14e4d, .elementor-element-e45ba4a, .elementor-element-2010b0c,
+.elementor-element-16ee699, .elementor-element-124ac88, .elementor-element-dcca98d,
+.elementor-element-4f6b27a {
+	opacity: 0;
+	transform: translateY(20px);
+	transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.elementor-element-4afef18.is-visible, .elementor-element-c997d8e.is-visible, .elementor-element-15133a6.is-visible,
+.elementor-element-449ac69.is-visible, .elementor-element-6a94c3a.is-visible, .elementor-element-17f999d.is-visible,
+.elementor-element-91660c3.is-visible, .elementor-element-733bd3e.is-visible, .elementor-element-d1bb356.is-visible,
+.elementor-element-9420a30.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/* Ticket 04 count-up numerals (Section 13 stat row: 3 / 72 / 10+). */
+.elementor-element-56cdf52, .elementor-element-89cc922, .elementor-element-2b69f5d {
+	font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Ticket 04, Section 15 (The Ritual): image/text 50/50 split stacks
+ * image-above-text under ~860px, per the design brief's own scripted
+ * breakpoint (859px) — this site's Elementor kit only defines 768/1024
+ * breakpoints (see docs/adr/0003-elementor-css-classes-control-broken-use-element-ids.md
+ * for why this page targets baked-in element ids rather than kit-level
+ * responsive controls), so this is a literal media query on the row's id
+ * rather than Elementor's _tablet/_mobile device settings. Column order
+ * already matches source order (image first, text second), so switching
+ * flex-direction to column alone reproduces "image above text" with no
+ * extra reordering needed.
+ */
+@media (max-width: 860px) {
+	.elementor-element-f9d4d3f {
+		flex-direction: column;
+	}
 }

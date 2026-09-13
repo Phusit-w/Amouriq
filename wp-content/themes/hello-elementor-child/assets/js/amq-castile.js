@@ -27,8 +27,13 @@
 	// elements, its animation silently stops rather than erroring; re-run
 	// the ticket 03 build notes' id-capture step to refresh this list.
 	var IDS = {
-		mask: ['46d6b39', '8565c5d', '178d758', 'f60a040', '1ae4342', '1922e0e', 'cb54ad0', 'a10e2a5', 'a594814', 'd411e14', '49c49a3', '815f34b', 'fd11604'],
-		count: ['f9b9b55', '5fac264', '190f66d', 'b3b4491', '2a05e74', '1ba9d18', 'ef1e6e0', '500a59f', '6357f22', 'a653aba'],
+		mask: ['46d6b39', '8565c5d', '178d758', 'f60a040', '1ae4342', '1922e0e', 'cb54ad0', 'a10e2a5', 'a594814', 'd411e14', '49c49a3', '815f34b', 'fd11604',
+			// Ticket 04 (sections 10-18) — see build notes in
+			// .scratch/castile-sales-page/issues/04-content-proof-to-testimonial.md
+			'4afef18', 'c997d8e', '15133a6', '449ac69', '6a94c3a', '17f999d', '91660c3', '733bd3e', 'd1bb356', '9420a30'],
+		count: ['f9b9b55', '5fac264', '190f66d', 'b3b4491', '2a05e74', '1ba9d18', 'ef1e6e0', '500a59f', '6357f22', 'a653aba',
+			// Ticket 04, Section 13 stat row: 3 / 72 / 10+
+			'56cdf52', '89cc922', '2b69f5d'],
 		fill: ['7466111', 'b0edbed', '9dd8676', '678f1c3', 'cce8ca8', '7a8de10', 'db7213b', '6d0f07f'],
 	};
 
@@ -70,9 +75,11 @@
 	}, 0.4);
 
 	// Count-up — parses the element's own rendered text (e.g. "+13.37%",
-	// "−10.67%") so the widget's text stays the single source of truth;
-	// no separate data-attribute to keep in sync.
-	var COUNT_PATTERN = /^([+\-−])?\s*([\d.]+)(%?)$/;
+	// "−10.67%", "10+") so the widget's text stays the single source of
+	// truth; no separate data-attribute to keep in sync. Suffix accepts
+	// "%" or "+" — ticket 04's Section 13 stat row ("10+") needs the
+	// latter, which ticket 03's sections never used.
+	var COUNT_PATTERN = /^([+\-−])?\s*([\d.]+)(%|\+)?$/;
 
 	revealOnce(elements(IDS.count), function (el) {
 		var raw = el.textContent.trim();
