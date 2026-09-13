@@ -30,7 +30,10 @@
 		mask: ['46d6b39', '8565c5d', '178d758', 'f60a040', '1ae4342', '1922e0e', 'cb54ad0', 'a10e2a5', 'a594814', 'd411e14', '49c49a3', '815f34b', 'fd11604',
 			// Ticket 04 (sections 10-18) — see build notes in
 			// .scratch/castile-sales-page/issues/04-content-proof-to-testimonial.md
-			'4afef18', 'c997d8e', '15133a6', '449ac69', '6a94c3a', '17f999d', '91660c3', '733bd3e', 'd1bb356', '9420a30'],
+			'4afef18', 'c997d8e', '15133a6', '449ac69', '6a94c3a', '17f999d', '91660c3', '733bd3e', 'd1bb356', '9420a30',
+			// Ticket 05 (sections 20-23) — see build notes in
+			// .scratch/castile-sales-page/issues/05-content-how-to-use-to-footnotes.md
+			'c38fcdf', '1d85d6c', 'b4566cc'],
 		count: ['f9b9b55', '5fac264', '190f66d', 'b3b4491', '2a05e74', '1ba9d18', 'ef1e6e0', '500a59f', '6357f22', 'a653aba',
 			// Ticket 04, Section 13 stat row: 3 / 72 / 10+
 			'56cdf52', '89cc922', '2b69f5d'],

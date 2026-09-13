@@ -93,6 +93,11 @@
 		transform: none;
 		transition: none;
 	}
+	.elementor-element-c38fcdf, .elementor-element-1d85d6c, .elementor-element-b4566cc {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
 }
 
 /**
@@ -100,10 +105,10 @@
  * as ticket 03's block above, kept separate to avoid touching that section's
  * verified id list.
  */
-.elementor-element-631c940, .elementor-element-73cc732, .elementor-element-6e57187,
-.elementor-element-ce14e4d, .elementor-element-e45ba4a, .elementor-element-2010b0c,
-.elementor-element-16ee699, .elementor-element-124ac88, .elementor-element-dcca98d,
-.elementor-element-4f6b27a {
+.elementor-element-4afef18, .elementor-element-c997d8e, .elementor-element-15133a6,
+.elementor-element-449ac69, .elementor-element-6a94c3a, .elementor-element-17f999d,
+.elementor-element-91660c3, .elementor-element-733bd3e, .elementor-element-d1bb356,
+.elementor-element-9420a30 {
 	opacity: 0;
 	transform: translateY(20px);
 	transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -137,4 +142,84 @@
 	.elementor-element-f9d4d3f {
 		flex-direction: column;
 	}
+}
+
+/**
+ * Ticket 05 (sections 20-23) mask-reveal headings — same mechanism as the
+ * ticket 03/04 blocks above, kept separate for the same reason ticket 04's
+ * block gave: avoid touching an already-verified id list.
+ */
+.elementor-element-c38fcdf, .elementor-element-1d85d6c, .elementor-element-b4566cc {
+	opacity: 0;
+	transform: translateY(20px);
+	transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 800ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.elementor-element-c38fcdf.is-visible, .elementor-element-1d85d6c.is-visible, .elementor-element-b4566cc.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+/*
+ * Ticket 05, Section 22 (Final Close): same image/text 50/50 split pattern
+ * as Section 15 above — stacks image-above-text under 860px. Same target
+ * choice (baked element id, not Elementor's device settings) for the same
+ * ADR-0003 reason.
+ */
+@media (max-width: 860px) {
+	.elementor-element-e5672e7 {
+		flex-direction: column;
+	}
+}
+
+/*
+ * Ticket 05: smooth in-page anchor scrolling for the page's named anchors
+ * (#results, #evidence, #faq, #buy) and every footnote target (#fn-star,
+ * #fn-dblstar, #fn-dagger, #fn-ddagger). scroll-margin-top keeps the site's
+ * sticky header from covering the target after the jump — retuned to this
+ * theme's actual header height (see amouriq-header-static.php /
+ * header-shop.php for the current chrome; 96px is the README's own
+ * placeholder value, carried over since no more specific measurement was
+ * requested for this ticket).
+ */
+html {
+	scroll-behavior: smooth;
+}
+#results, #evidence, #faq, #buy,
+#fn-star, #fn-dblstar, #fn-dagger, #fn-ddagger {
+	scroll-margin-top: 96px;
+}
+
+/*
+ * Ticket 05, Section 21 (FAQ): native <details>/<summary> accordion, no JS.
+ * Each Q&A pair is one text-editor widget containing raw <details> markup
+ * (wp_kses_post/Elementor's text-editor render path both allow these tags
+ * through unmangled — verified before authoring, see ticket file comments).
+ */
+.amq-faq-item {
+	display: block;
+	border-bottom: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
+	padding: 16px 0;
+}
+.amq-faq-item summary {
+	cursor: pointer;
+	font-weight: 600;
+	color: #3a322a;
+	list-style: none;
+}
+.amq-faq-item summary::-webkit-details-marker {
+	display: none;
+}
+.amq-faq-item summary::after {
+	content: '+';
+	float: right;
+	color: #c1673f;
+	font-weight: 700;
+}
+.amq-faq-item[open] summary::after {
+	content: '−';
+}
+.amq-faq-item p {
+	margin: 12px 0 0 0;
+	color: #3a322ab3;
+	line-height: 1.6;
 }
