@@ -89,9 +89,11 @@
 
 .amq-bb-scent-btn,
 .amq-bb-size-btn {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
 	font-family: inherit;
-	font-size: 14px;
-	font-weight: 600;
 	color: #3a322a;
 	background: #ffffff;
 	border: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
@@ -99,12 +101,46 @@
 	padding: 10px 16px;
 	cursor: pointer;
 	white-space: nowrap;
+	text-align: left;
 }
 .amq-bb-scent-btn.is-selected,
 .amq-bb-size-btn.is-selected {
 	border-color: #c1673f;
 	background: #fbf8f2;
+}
+.amq-bb-scent-btn.is-selected .amq-bb-scent-btn__name,
+.amq-bb-size-btn.is-selected .amq-bb-size-btn__label {
 	color: #c1673f;
+}
+
+.amq-bb-scent-btn__name,
+.amq-bb-size-btn__label {
+	font-size: 14px;
+	font-weight: 600;
+}
+/* Design brief: each scent button shows its own descriptive note
+   ("ดอกลาเวนเดอร์ นุ่ม สงบ" etc.) at all times, not just for the selected
+   scent — this is reference copy, not per-selection state, so it needs no
+   JS to stay in sync. */
+.amq-bb-scent-btn__note {
+	font-size: 12px;
+	font-weight: 400;
+	color: #3a322ab3;
+	white-space: normal;
+}
+/* Design brief: size buttons show their own price inline (all three sizes
+   at once) since price only depends on size, never on the selected scent —
+   same "static reference copy" reasoning as the scent note above. */
+.amq-bb-size-btn__price {
+	font-size: 13px;
+	font-weight: 600;
+	color: #4f6d63;
+}
+
+.amq-buying-block__price-note {
+	font-size: 12px;
+	color: #3a322ab3;
+	margin: 0 0 12px 0;
 }
 
 .amq-buying-block__price {
@@ -121,12 +157,23 @@
 
 .amq-buying-block__purchase-row {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 12px;
-	align-items: stretch;
+	align-items: center;
 	margin-bottom: 12px;
 }
 
 .amq-buying-block__qty {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.amq-buying-block__qty-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #4a5b32;
+}
+.amq-buying-block__qty-controls {
 	display: flex;
 	align-items: center;
 	border: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
@@ -149,8 +196,25 @@
 	-moz-appearance: textfield;
 }
 
+.amq-buying-block__total {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.amq-buying-block__total-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #4a5b32;
+}
+.amq-buying-block__total-value {
+	font-size: 18px;
+	font-weight: 700;
+	color: #3a322a;
+}
+
 .amq-buying-block__add-to-cart {
 	flex: 1;
+	min-width: 160px;
 	background: #c1673f;
 	color: #ffffff;
 	border: none;
@@ -158,8 +222,9 @@
 	font-family: inherit;
 	font-size: 15px;
 	font-weight: 600;
-	padding: 0 24px;
+	padding: 14px 24px;
 	cursor: pointer;
+	align-self: stretch;
 }
 .amq-buying-block__add-to-cart:hover:not(:disabled) {
 	background: #a7512a;

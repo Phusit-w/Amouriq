@@ -30,6 +30,7 @@
 		price: document.getElementById('amq-bb-price'),
 		sku: document.getElementById('amq-bb-sku'),
 		qtyInput: document.getElementById('amq-bb-qty'),
+		total: document.getElementById('amq-bb-total'),
 		addBtn: document.getElementById('amq-bb-add-to-cart'),
 		oosMessage: document.getElementById('amq-bb-oos-message'),
 		successMessage: document.getElementById('amq-bb-success-message'),
@@ -44,6 +45,21 @@
 
 	function currentCombo() {
 		return data.combos[state.scent] && data.combos[state.scent][state.size];
+	}
+
+	// Matches the ฿-symbol, 2-decimal style wc_price() already renders for
+	// el.price/el.stickyPrice (combo.price_html), so "รวม" (Total) reads
+	// consistently with the unit price shown just above it, not a
+	// differently-formatted number.
+	function formatTotal(amount) {
+		return '฿' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	}
+
+	function updateTotal() {
+		var combo = currentCombo();
+		if (!el.total || !combo) return;
+		var qty = (el.qtyInput && parseInt(el.qtyInput.value, 10)) || 1;
+		el.total.textContent = formatTotal(combo.price * qty);
 	}
 
 	function render() {
@@ -65,6 +81,8 @@
 		if (el.addBtn) el.addBtn.disabled = !inStock;
 		if (el.stickyAddBtn) el.stickyAddBtn.disabled = !inStock;
 		if (el.oosMessage) el.oosMessage.hidden = inStock;
+
+		updateTotal();
 	}
 
 	function selectScent(scent) {
@@ -137,8 +155,10 @@
 				var next = (parseInt(el.qtyInput.value, 10) || 1) + step;
 				if (next < 1) next = 1;
 				el.qtyInput.value = next;
+				updateTotal();
 			});
 		});
+		el.qtyInput.addEventListener('input', updateTotal);
 	}
 
 	/**

@@ -38,6 +38,16 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 	 * docs/adr/0001-castile-sales-page-built-in-elementor.md.
 	 */
 
+	/**
+	 * One deliberate omission versus the design brief's own Section 19 copy:
+	 * the brief includes a disclosure line stating the 100/250 ML packshots
+	 * reuse the 500 ML bottle image as an interim stand-in. That's true of
+	 * the design prototype, but not of this build — every combo below uses
+	 * its own real per-variation WooCommerce image (see ticket 06 comments,
+	 * ".scratch/castile-sales-page/issues/06-buying-block-and-add-to-cart.md").
+	 * Adding that sentence here would be a false statement about this page,
+	 * not a faithful copy of the design.
+	 */
 	protected function render() {
 		$scents = amq_castile_buying_block_scents();
 		$sizes = amq_castile_buying_block_sizes();
@@ -87,7 +97,10 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 								type="button"
 								class="amq-bb-scent-btn<?php echo $scent_key === $default_scent ? ' is-selected' : ''; ?>"
 								data-scent="<?php echo esc_attr($scent_key); ?>"
-							><?php echo esc_html($scent['name']); ?></button>
+							>
+								<span class="amq-bb-scent-btn__name"><?php echo esc_html($scent['name']); ?></span>
+								<span class="amq-bb-scent-btn__note"><?php echo esc_html($scent['note']); ?></span>
+							</button>
 						<?php endforeach; ?>
 					</div>
 				</div>
@@ -95,23 +108,46 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 				<div class="amq-buying-block__size">
 					<h3 class="amq-buying-block__section-heading">ขนาด &amp; ราคา</h3>
 					<div class="amq-buying-block__size-row">
-						<?php foreach ($sizes as $size_key => $label) : ?>
+						<?php foreach ($sizes as $size_key => $label) :
+							// Price is identical across scents (only SKU/image differ by
+							// scent) — showing the default scent's combo price per size
+							// button is accurate regardless of which scent ends up
+							// selected, so this line never needs a JS update. This is a
+							// documented catalog convention, not code-enforced: the three
+							// scents are three independent WooCommerce products (2278,
+							// 2285, 2293 — see amouriq-castile-resolver.php), each with
+							// its own price in wp-admin. If a scent is ever repriced
+							// on its own, this button would silently show the wrong
+							// price for the other two scents' combos.
+							$size_price = $combos[$default_scent][$size_key];
+							?>
 							<button
 								type="button"
 								class="amq-bb-size-btn<?php echo $size_key === $default_size ? ' is-selected' : ''; ?>"
 								data-size="<?php echo esc_attr($size_key); ?>"
-							><?php echo esc_html($label); ?></button>
+							>
+								<span class="amq-bb-size-btn__label"><?php echo esc_html($label); ?></span>
+								<span class="amq-bb-size-btn__price"><?php echo $size_price ? wp_kses_post($size_price['price_html']) : ''; ?></span>
+							</button>
 						<?php endforeach; ?>
 					</div>
+					<p class="amq-buying-block__price-note">ราคาเท่ากันทุกกลิ่นในไซส์เดียวกัน — Lavender / Rosemary / Rose Geranium</p>
 					<div class="amq-buying-block__price" id="amq-bb-price"><?php echo $default ? wp_kses_post($default['price_html']) : ''; ?></div>
 					<p class="amq-buying-block__sku">SKU: <span id="amq-bb-sku"><?php echo esc_html($default ? $default['sku'] : ''); ?></span></p>
 				</div>
 
 				<div class="amq-buying-block__purchase-row">
 					<div class="amq-buying-block__qty">
-						<button type="button" class="amq-buying-block__qty-btn" data-step="-1" aria-label="<?php esc_attr_e('Decrease quantity', 'amouriq'); ?>">&minus;</button>
-						<input type="number" class="amq-buying-block__qty-input" id="amq-bb-qty" value="1" min="1" step="1" aria-label="<?php esc_attr_e('Quantity', 'amouriq'); ?>">
-						<button type="button" class="amq-buying-block__qty-btn" data-step="1" aria-label="<?php esc_attr_e('Increase quantity', 'amouriq'); ?>">+</button>
+						<span class="amq-buying-block__qty-label">จำนวน</span>
+						<div class="amq-buying-block__qty-controls">
+							<button type="button" class="amq-buying-block__qty-btn" data-step="-1" aria-label="<?php esc_attr_e('Decrease quantity', 'amouriq'); ?>">&minus;</button>
+							<input type="number" class="amq-buying-block__qty-input" id="amq-bb-qty" value="1" min="1" step="1" aria-label="<?php esc_attr_e('Quantity', 'amouriq'); ?>">
+							<button type="button" class="amq-buying-block__qty-btn" data-step="1" aria-label="<?php esc_attr_e('Increase quantity', 'amouriq'); ?>">+</button>
+						</div>
+					</div>
+					<div class="amq-buying-block__total">
+						<span class="amq-buying-block__total-label">รวม</span>
+						<span class="amq-buying-block__total-value" id="amq-bb-total"><?php echo $default ? wp_kses_post(wc_price($default['price'])) : ''; ?></span>
 					</div>
 					<button type="button" class="amq-buying-block__add-to-cart" id="amq-bb-add-to-cart">เพิ่มลงตะกร้า</button>
 				</div>
