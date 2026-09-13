@@ -62,6 +62,10 @@ add_action('elementor/widgets/register', function ($widgets_manager) {
  * kept as a separate enqueue here (rather than folded into that file) since
  * this pair of assets belongs to one widget, not the page's content
  * sections generally.
+ *
+ * Asset location and the dropped 'amq-woocommerce' dependency: same reasons
+ * as amouriq-castile-page-assets.php — see
+ * docs/adr/0005-castile-assets-live-under-the-active-theme.md.
  */
 add_action('wp_enqueue_scripts', function () {
 	if (!is_page('castile')) return;
@@ -71,7 +75,7 @@ add_action('wp_enqueue_scripts', function () {
 		wp_enqueue_style(
 			'amq-castile-buying-block',
 			get_stylesheet_directory_uri() . '/assets/css/amq-castile-buying-block.css',
-			['amq-woocommerce'],
+			[],
 			filemtime($css_path)
 		);
 	}

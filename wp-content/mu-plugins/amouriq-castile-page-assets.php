@@ -15,6 +15,19 @@
  *
  * Modeled on amouriq-single-product.php's is_product()-gated conditional
  * enqueue.
+ *
+ * Asset location: amq-castile.css/js live under wp-content/themes/pcoursewebbs/
+ * (not hello-elementor-child), because get_stylesheet_directory() resolves to
+ * whichever theme is *actually active*, and pcoursewebbs (display name
+ * "Premium Course Web BS") is the real production theme — see
+ * docs/adr/0005-castile-assets-live-under-the-active-theme.md. The CSS used
+ * to declare 'amq-woocommerce' as a dependency (a base stylesheet handle
+ * hello-elementor-child's functions.php registers); dropped, since
+ * pcoursewebbs never registers that handle at all — an unmet dependency
+ * silently prevents the whole depending stylesheet from being printed, which
+ * is how this went unnoticed for multiple tickets (every verification round
+ * temporarily switched to hello-elementor-child first, where the dependency
+ * *was* met).
  */
 
 if (!defined('ABSPATH')) exit;
@@ -34,7 +47,7 @@ add_action('wp_enqueue_scripts', function () {
 		wp_enqueue_style(
 			'amq-castile',
 			get_stylesheet_directory_uri() . '/assets/css/amq-castile.css',
-			['amq-woocommerce'],
+			[],
 			filemtime($css_path)
 		);
 	}
