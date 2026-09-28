@@ -81,6 +81,13 @@
 		content.setAttribute('data-placement', computePlacement(item, content));
 	}
 
+	function realCarts() {
+		return Array.prototype.filter.call(
+			document.querySelectorAll('.ct-header-cart'),
+			function (cart) { return !cart.closest('#offcanvas'); }
+		);
+	}
+
 	function handle(e) {
 		var cart = e.target.closest && e.target.closest('.ct-header-cart');
 		if (!cart || cart.closest('#offcanvas')) return;
@@ -91,4 +98,101 @@
 	// `:focus-within` fallback for keyboard/touch (see interactions.scss).
 	document.addEventListener('mouseover', handle);
 	document.addEventListener('focusin', handle);
+
+	function forceVisible(cartEl) {
+		var content = cartEl.querySelector(':scope > .ct-cart-content');
+		if (!content) return;
+		content.style.setProperty('opacity', '1', 'important');
+		content.style.setProperty('visibility', 'visible', 'important');
+	}
+	function releaseForcedVisible(cartEl) {
+		var content = cartEl.querySelector(':scope > .ct-cart-content');
+		if (!content) return;
+		content.style.removeProperty('opacity');
+		content.style.removeProperty('visibility');
+	}
+
+	realCarts().forEach(function (cart) {
+		cart.addEventListener('mouseenter', function () { cart.__amqHovering = true; });
+		cart.addEventListener('mouseleave', function () {
+			cart.__amqHovering = false;
+			if (!cart.__amqHoldOpen) releaseForcedVisible(cart);
+		});
+	});
+
+	// Clicking "remove" on an item INSIDE the open mini-cart dropdown swaps
+	// `.ct-cart-content` for a brand-new node (WooCommerce's add-to-cart.js
+	// AddToCartHandler.updateFragments does `$(key).replaceWith(value)`),
+	// which breaks the dropdown two ways at once (each verified live, real
+	// headed Chrome and real synthetic mouse input, not just JS-dispatched
+	// events or headless-only quirks - a first attempt here that only
+	// re-stamped data-placement and relied on the user's mouse naturally
+	// twitching afterwards turned out not to be enough: reported as still
+	// broken on the live site, where a real click often leaves the pointer
+	// perfectly still):
+	//
+	// - The new node has no data-placement yet - `handle()` above never
+	//   reruns for it, since the swap fires no native mouseover/focusin (the
+	//   pointer never "enters" anything new from the browser's point of
+	//   view).
+	// - Chrome also synthesizes a mouseleave for the removed element - even
+	//   though the pointer itself never moves - and won't re-fire
+	//   mouseenter for whatever ends up under the pointer until an actual
+	//   subsequent mousemove happens. There is no way from page JS to force
+	//   a real :hover match back onto the new node without that.
+	//
+	// So: hold the dropdown open with an explicit inline-style override for
+	// a short window after the click (long enough to survive both that and
+	// any chained fragment-refresh cycles other plugins on this site trigger
+	// off the same add/remove events), then hand control back to plain CSS
+	// :hover. `mouseleave` stands down (doesn't release) while a hold is
+	// running, since the leave it's reacting to is the spurious one from the
+	// removal, not a genuine "user moved away" - and multiple clicks in a
+	// row (removing several items back to back) just keep extending the one
+	// running hold rather than starting overlapping ones.
+	var HOLD_OPEN_MS = 1200;
+	var HOLD_POLL_MS = 50;
+
+	document.addEventListener('click', function (e) {
+		var btn = e.target.closest && e.target.closest('.remove_from_cart_button');
+		var cart = btn && btn.closest('.ct-header-cart');
+		if (!cart || cart.closest('#offcanvas')) return;
+
+		cart.__amqHoldOpenUntil = Date.now() + HOLD_OPEN_MS;
+		if (cart.__amqHoldOpen) return; // a poll loop is already running for this cart - it'll pick up the later deadline
+		cart.__amqHoldOpen = true;
+		(function poll() {
+			ensurePlacement(cart);
+			forceVisible(cart);
+			if (Date.now() < cart.__amqHoldOpenUntil) {
+				setTimeout(poll, HOLD_POLL_MS);
+				return;
+			}
+			cart.__amqHoldOpen = false;
+			// The removal's own spurious mouseleave (see above) has, by now,
+			// already set __amqHovering false - unless the user genuinely
+			// re-entered (a real subsequent mouseenter) during the hold, in
+			// which case leave this alone; CSS :hover is back in control.
+			if (!cart.__amqHovering) releaseForcedVisible(cart);
+		})();
+	}, true);
+
+	// WooCommerce also fires `wc_fragments_loaded` / `wc_fragments_refreshed`
+	// on document.body right after replacing fragment content - but only as
+	// a jQuery-internal event (verified live: a native
+	// document.addEventListener never sees it, only jQuery(...).on(...)
+	// does). Re-stamping data-placement there too covers fragment swaps that
+	// happen without a remove-button click at all (e.g. this site's other
+	// plugins triggering their own refresh cycles), so the dropdown's
+	// position stays correct even outside the hold-open path above.
+	function bindFragmentsLoaded() {
+		if (!window.jQuery) {
+			setTimeout(bindFragmentsLoaded, 50);
+			return;
+		}
+		window.jQuery(document.body).on('wc_fragments_loaded wc_fragments_refreshed', function () {
+			realCarts().forEach(ensurePlacement);
+		});
+	}
+	bindFragmentsLoaded();
 })();
