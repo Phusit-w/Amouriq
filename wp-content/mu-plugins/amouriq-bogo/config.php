@@ -81,14 +81,14 @@ return array(
 	// 	'coupon_code'          => 'PAIRDEAL',
 	// ),
 
-	// Example: buy any 3 items from the "castile-soap" category, cheapest one free — always on.
-	// array(
-	// 	'type'                 => 'category_cheapest_free',
-	// 	'label'                => 'ครบ 3 ชิ้น หมวดสบู่ ลดชิ้นถูกสุดฟรี',
-	// 	'category'             => 'castile-soap',
-	// 	'buy_qty'              => 3,
-	// 	'get_discount_percent' => 100,
-	// 	'trigger'              => 'auto',
-	// ),
+	// Deal 1: buy any 3 Castile soap items, cheapest one free — always on.
+	array(
+		'type'                 => 'category_cheapest_free',
+		'label'                => 'ครบ 3 ชิ้น หมวดสบู่ ลดชิ้นถูกสุดฟรี',
+		'category'             => 'castile-soap',
+		'buy_qty'              => 3,
+		'get_discount_percent' => 100,
+		'trigger'              => 'auto',
+	),
 
 );
