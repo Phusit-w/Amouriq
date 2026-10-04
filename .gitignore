@@ -52,3 +52,6 @@ local-xdebuginfo.php
 
 # WP-CLI binary — local dev tooling only, not project code
 /wp-cli.phar
+
+# Store product exports (prices, stock, SKUs) — local reference only, not code
+/CSV/
