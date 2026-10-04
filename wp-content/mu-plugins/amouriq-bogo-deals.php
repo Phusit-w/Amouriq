@@ -4,12 +4,13 @@
  * Description: Buy-X-get-Y style deals that native WooCommerce coupons can't
  *              express (a coupon can discount the whole cart or restrict
  *              itself to a category, but it can't say "free item B when you
- *              buy item A"). Deals are defined in amouriq-bogo/config.php —
- *              edit that file only, this one is the engine and normally
- *              needs no changes. Applied as one negative cart fee per active
- *              deal on `woocommerce_cart_calculate_fees`, so it shows as its
- *              own "Deal discount" line at checkout without rewriting any
- *              product's displayed price.
+ *              buy item A"). Deals are managed in WooCommerce > ดีล BOGO
+ *              (amouriq-bogo-admin.php), stored in the `amouriq_bogo_deals`
+ *              option. Until the first save, deals come from
+ *              amouriq-bogo/config.php. Applied as one negative cart fee per
+ *              active deal on `woocommerce_cart_calculate_fees`, so it shows
+ *              as its own "Deal discount" line at checkout without rewriting
+ *              any product's displayed price.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -17,8 +18,13 @@ defined( 'ABSPATH' ) || exit;
 function amouriq_bogo_deals() {
 	static $deals = null;
 	if ( null === $deals ) {
-		$file  = __DIR__ . '/amouriq-bogo/config.php';
-		$deals = file_exists( $file ) ? (array) include $file : array();
+		$stored = get_option( 'amouriq_bogo_deals', null );
+		if ( is_array( $stored ) ) {
+			$deals = $stored;
+		} else {
+			$file  = __DIR__ . '/amouriq-bogo/config.php';
+			$deals = file_exists( $file ) ? (array) include $file : array();
+		}
 	}
 	return $deals;
 }
