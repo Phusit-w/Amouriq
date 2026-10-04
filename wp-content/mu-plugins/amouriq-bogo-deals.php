@@ -427,3 +427,21 @@ function amouriq_bogo_refresh_on_email_change() {
 	</script>
 	<?php
 }
+
+/**
+ * WooCommerce's checkout refresh ignores the billing email in the form (it
+ * only reads address fields), so hand it to the customer here. The per-customer
+ * limit is counted by that email until the buyer is logged in.
+ */
+add_action( 'woocommerce_checkout_update_order_review', 'amouriq_bogo_read_checkout_email' );
+
+function amouriq_bogo_read_checkout_email( $post_data ) {
+	if ( ! WC()->customer || ! is_string( $post_data ) ) {
+		return;
+	}
+	parse_str( $post_data, $fields );
+	$email = isset( $fields['billing_email'] ) ? sanitize_email( $fields['billing_email'] ) : '';
+	if ( $email && is_email( $email ) ) {
+		WC()->customer->set_billing_email( $email );
+	}
+}
