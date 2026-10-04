@@ -210,9 +210,24 @@ function amouriq_bogo_calculate_discount( $deal, $cart ) {
 		case 'product_pair':
 			return amouriq_bogo_discount_product_pair( $deal, $cart );
 		case 'category_cheapest_free':
+		case 'cheapest_free':
 			return amouriq_bogo_discount_category_cheapest( $deal, $cart );
+		case 'quantity_tier':
+			return amouriq_bogo_discount_quantity_tier( $deal, $cart );
 	}
 	return 0.0;
+}
+
+/**
+ * True when this cart line must be left out of the deal because the deal is set
+ * to skip products already on sale.
+ */
+function amouriq_bogo_item_excluded( $cart_item, $deal ) {
+	if ( empty( $deal['exclude_sale'] ) ) {
+		return false;
+	}
+	$product = wc_get_product( $cart_item['variation_id'] ? $cart_item['variation_id'] : $cart_item['product_id'] );
+	return $product && $product->is_on_sale();
 }
 
 /**
@@ -226,11 +241,14 @@ function amouriq_bogo_cap_groups( $count, $deal ) {
 /**
  * Total quantity of a given product (or a specific variation) in the cart.
  */
-function amouriq_bogo_qty_in_cart( $cart, $product_id ) {
+function amouriq_bogo_qty_in_cart( $cart, $product_id, $deal = array() ) {
 	$qty = 0;
 	foreach ( $cart->get_cart() as $cart_item ) {
 		if ( (int) $cart_item['product_id'] === (int) $product_id
 			|| (int) $cart_item['variation_id'] === (int) $product_id ) {
+			if ( amouriq_bogo_item_excluded( $cart_item, $deal ) ) {
+				continue;
+			}
 			$qty += $cart_item['quantity'];
 		}
 	}
@@ -264,7 +282,7 @@ function amouriq_bogo_discount_same_product( $deal, $cart ) {
 	$percent = isset( $deal['get_discount_percent'] ) ? (float) $deal['get_discount_percent'] : 100.0;
 
 	$group_size  = $buy_qty + $get_qty;
-	$qty_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['product_id'] );
+	$qty_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['product_id'], $deal );
 	$groups      = amouriq_bogo_cap_groups( intdiv( $qty_in_cart, $group_size ), $deal );
 	if ( $groups <= 0 ) {
 		return 0.0;
@@ -283,8 +301,8 @@ function amouriq_bogo_discount_product_pair( $deal, $cart ) {
 	$get_qty = max( 1, (int) ( $deal['get_qty'] ?? 1 ) );
 	$percent = isset( $deal['get_discount_percent'] ) ? (float) $deal['get_discount_percent'] : 100.0;
 
-	$buy_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['buy_product_id'] );
-	$get_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['get_product_id'] );
+	$buy_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['buy_product_id'], $deal );
+	$get_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['get_product_id'], $deal );
 
 	$triggers         = amouriq_bogo_cap_groups( intdiv( $buy_in_cart, $buy_qty ), $deal );
 	$discounted_units = min( $triggers * $get_qty, $get_in_cart );
@@ -295,18 +313,21 @@ function amouriq_bogo_discount_product_pair( $deal, $cart ) {
 	return $discounted_units * amouriq_bogo_unit_price( $deal['get_product_id'] ) * ( $percent / 100 );
 }
 
+/**
+ * Cheapest item of each group of buy_qty free. Limited to one category when
+ * the deal sets `category`; otherwise any item in the cart counts.
+ */
 function amouriq_bogo_discount_category_cheapest( $deal, $cart ) {
-	if ( empty( $deal['category'] ) ) {
-		return 0.0;
-	}
-
 	$buy_qty = max( 1, (int) ( $deal['buy_qty'] ?? 1 ) );
 	$percent = isset( $deal['get_discount_percent'] ) ? (float) $deal['get_discount_percent'] : 100.0;
 
 	$unit_prices = array();
 	foreach ( $cart->get_cart() as $cart_item ) {
 		$parent_id = $cart_item['product_id'];
-		if ( ! has_term( $deal['category'], 'product_cat', $parent_id ) ) {
+		if ( ! empty( $deal['category'] ) && ! has_term( $deal['category'], 'product_cat', $parent_id ) ) {
+			continue;
+		}
+		if ( amouriq_bogo_item_excluded( $cart_item, $deal ) ) {
 			continue;
 		}
 		$unit_price = amouriq_bogo_unit_price(
@@ -331,4 +352,28 @@ function amouriq_bogo_discount_category_cheapest( $deal, $cart ) {
 		$discount += $unit_prices[ ( $g + 1 ) * $buy_qty - 1 ] * ( $percent / 100 );
 	}
 	return $discount;
+}
+
+/**
+ * Tiered quantity discount on one product: the highest tier reached gives its
+ * percent off every unit of that product in the cart. Tiers look like
+ * array( array( 'min' => 6, 'percent' => 10 ), array( 'min' => 12, 'percent' => 15 ) ).
+ */
+function amouriq_bogo_discount_quantity_tier( $deal, $cart ) {
+	if ( empty( $deal['product_id'] ) || empty( $deal['tiers'] ) || ! is_array( $deal['tiers'] ) ) {
+		return 0.0;
+	}
+
+	$qty     = amouriq_bogo_qty_in_cart( $cart, $deal['product_id'], $deal );
+	$percent = 0.0;
+	foreach ( $deal['tiers'] as $tier ) {
+		if ( isset( $tier['min'], $tier['percent'] ) && $qty >= (int) $tier['min'] ) {
+			$percent = max( $percent, (float) $tier['percent'] );
+		}
+	}
+	if ( $percent <= 0 ) {
+		return 0.0;
+	}
+
+	return $qty * amouriq_bogo_unit_price( $deal['product_id'] ) * ( $percent / 100 );
 }

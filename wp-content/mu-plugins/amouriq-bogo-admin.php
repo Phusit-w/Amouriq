@@ -29,6 +29,8 @@ function amouriq_bogo_type_labels() {
 		'same_product'           => 'ซื้อ X แถม Y (สินค้าเดียวกัน)',
 		'product_pair'           => 'ซื้อ A แล้วได้ B ลดราคา',
 		'category_cheapest_free' => 'ครบ N ชิ้นในหมวด ชิ้นถูกสุดลด',
+		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (ทุกหมวด) ชิ้นถูกสุดลด',
+		'quantity_tier'          => 'ซื้อตามจำนวน ลดเป็นขั้น (สินค้าชิ้นเดียว)',
 	);
 }
 
@@ -139,6 +141,47 @@ function amouriq_bogo_build_deal( array $in ) {
 		$deal['buy_qty']  = max( 1, $int( 'buy_qty', 3 ) );
 	}
 
+	if ( 'cheapest_free' === $type ) {
+		// Category is optional here: empty means any item in the cart.
+		$slug = isset( $in['category'] ) ? sanitize_title( wp_unslash( $in['category'] ) ) : '';
+		if ( '' !== $slug ) {
+			if ( ! term_exists( $slug, 'product_cat' ) ) {
+				return 'ไม่พบหมวดสินค้า slug นี้: ' . $slug;
+			}
+			$deal['category'] = $slug;
+		}
+		$deal['buy_qty'] = max( 1, $int( 'buy_qty', 3 ) );
+	}
+
+	if ( 'quantity_tier' === $type ) {
+		$pid = $int( 'product_id' );
+		if ( ! $pid || ! wc_get_product( $pid ) ) {
+			return 'ไม่พบสินค้า/variation ID นี้: ' . $pid;
+		}
+		$tiers = array();
+		for ( $n = 1; $n <= 3; $n++ ) {
+			$min = $int( 'tier_min_' . $n, 0 );
+			$pct = isset( $in[ 'tier_pct_' . $n ] ) ? (float) $in[ 'tier_pct_' . $n ] : 0;
+			if ( ! $min && '' === ( $in[ 'tier_pct_' . $n ] ?? '' ) ) {
+				continue;
+			}
+			if ( $min < 1 || $pct <= 0 || $pct > 100 ) {
+				return 'ขั้นที่ ' . $n . ' ต้องมีจำนวนขั้นต่ำมากกว่า 0 และส่วนลด 1–100%';
+			}
+			$tiers[] = array( 'min' => $min, 'percent' => $pct );
+		}
+		if ( empty( $tiers ) ) {
+			return 'ต้องกรอกอย่างน้อย 1 ขั้น';
+		}
+		usort( $tiers, function ( $a, $b ) { return $a['min'] <=> $b['min']; } );
+		$deal['product_id'] = $pid;
+		$deal['tiers']      = $tiers;
+	}
+
+	if ( ! empty( $in['exclude_sale'] ) ) {
+		$deal['exclude_sale'] = true;
+	}
+
 	if ( '' === $label ) {
 		$deal['label'] = 'Deal discount';
 	}
@@ -239,11 +282,23 @@ function amouriq_bogo_summary( $deal ) {
 		$detail = 'ซื้อ ' . $deal['buy_product_id'] . ' × ' . ( $deal['buy_qty'] ?? 1 ) . ' ได้ ' . $deal['get_product_id'] . ' × ' . ( $deal['get_qty'] ?? 1 ) . ' (ลด ' . $pct . '%)';
 	} elseif ( 'category_cheapest_free' === $type ) {
 		$detail = 'หมวด ' . $deal['category'] . ' ครบ ' . $deal['buy_qty'] . ' ชิ้น ชิ้นถูกสุดลด ' . $pct . '%';
+	} elseif ( 'cheapest_free' === $type ) {
+		$scope  = ! empty( $deal['category'] ) ? 'หมวด ' . $deal['category'] : 'ทุกหมวด';
+		$detail = $scope . ' ครบ ' . $deal['buy_qty'] . ' ชิ้น ชิ้นถูกสุดลด ' . $pct . '%';
+	} elseif ( 'quantity_tier' === $type ) {
+		$steps = array();
+		foreach ( $deal['tiers'] ?? array() as $tier ) {
+			$steps[] = $tier['min'] . ' ชิ้น ลด ' . $tier['percent'] . '%';
+		}
+		$detail = 'สินค้า/variation ' . $deal['product_id'] . ': ' . implode( ', ', $steps );
 	} else {
 		$detail = 'ไม่รู้จักประเภทนี้';
 	}
 
 	$extra = array( $trig );
+	if ( ! empty( $deal['exclude_sale'] ) ) {
+		$extra[] = 'ไม่รวมสินค้าลดราคา';
+	}
 	if ( ! empty( $deal['valid_from'] ) || ! empty( $deal['valid_to'] ) ) {
 		$extra[] = 'ช่วง ' . ( $deal['valid_from'] ?? '…' ) . ' ถึง ' . ( $deal['valid_to'] ?? '…' );
 	}
@@ -468,6 +523,20 @@ function amouriq_bogo_admin_page() {
 						<p><input type="text" name="coupon_code" class="regular-text" placeholder="รหัสคูปอง (เฉพาะกรณีต้องใส่คูปอง)" value="<?php echo esc_attr( $v( 'coupon_code' ) ); ?>"></p>
 						<p class="description">รหัสต้องมีอยู่จริงในการตลาด &gt; คูปอง ระบบจะตรวจตอนบันทึก</p>
 					</td></tr>
+				<tr><th>ขั้นส่วนลด (ใช้กับ "ซื้อตามจำนวน")</th>
+					<td>
+						<?php for ( $n = 1; $n <= 3; $n++ ) :
+							$tier = isset( $editing['tiers'][ $n - 1 ] ) ? $editing['tiers'][ $n - 1 ] : array();
+						?>
+							ขั้นที่ <?php echo esc_html( $n ); ?>: ซื้อตั้งแต่
+							<input type="number" name="tier_min_<?php echo esc_attr( $n ); ?>" min="1" style="width:80px" value="<?php echo esc_attr( $tier['min'] ?? '' ); ?>">
+							ชิ้น ลด
+							<input type="number" name="tier_pct_<?php echo esc_attr( $n ); ?>" min="0" max="100" style="width:80px" value="<?php echo esc_attr( $tier['percent'] ?? '' ); ?>">
+							%<br>
+						<?php endfor; ?>
+					</td></tr>
+				<tr><th>ไม่รวมสินค้าลดราคา</th>
+					<td><label><input type="checkbox" name="exclude_sale" value="1" <?php checked( ! empty( $editing['exclude_sale'] ) ); ?>> ข้ามสินค้าที่ลดราคาอยู่แล้ว (สินค้านั้นไม่นับและไม่ได้ส่วนลด)</label></td></tr>
 				<tr><th><label for="bogo_from">ใช้ได้ตั้งแต่</label></th>
 					<td><input type="date" name="valid_from" id="bogo_from" value="<?php echo esc_attr( $v( 'valid_from' ) ); ?>">
 						<p class="description">เว้นว่างได้ = ใช้ได้ทันที</p></td></tr>
