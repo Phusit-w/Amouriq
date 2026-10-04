@@ -121,11 +121,15 @@ function amouriq_bogo_deal_within_customer_limit( $deal ) {
 		return true;
 	}
 
+	// Limited deals need an account so the usage count is reliable. Guests
+	// cannot be counted across orders (a changed email would reset the limit).
+	if ( ! get_current_user_id() ) {
+		return false;
+	}
+
 	$used = amouriq_bogo_customer_uses( $deal['id'] );
 	if ( null === $used ) {
-		// Customer not identified yet (e.g. guest before entering an email).
-		// The limit is checked again when the order is created.
-		return true;
+		return false;
 	}
 	return $used < $max;
 }

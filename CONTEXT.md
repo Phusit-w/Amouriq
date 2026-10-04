@@ -28,3 +28,17 @@ _Avoid_: Sales page, landing page
 
 **Buying block**:
 The interactive scent × size selector + Add to Cart control embedded in a Sales page. Bound to live WooCommerce product/variation data (price, SKU, stock), so unlike the rest of the Sales page it cannot be decomposed into independently Elementor-editable static fields — selecting a Scent swaps the underlying WooCommerce product entirely; selecting a Size swaps the variation within it.
+
+**Deal**:
+A buy-X-get-Y style discount on cart items (BOGO) managed in the AMOURIQ BOGO admin screen. Three kinds: same product, product pair, cheapest item in a category free. A Deal is only the BOGO discount; it is never a free-shipping rule or a coupon.
+_Avoid_: Promotion, offer (use Deal), "ดีล" for shipping or coupons
+
+**Trigger**:
+What makes a Deal apply: **auto** (applies as soon as the cart qualifies) or **coupon** (applies only while a named WooCommerce coupon code is in the cart). A coupon-trigger Deal references an existing coupon code; it never creates the coupon.
+
+**Coupon**:
+A WooCommerce coupon created under Marketing → Coupons. The source of truth for coupon codes, expiry, usage limits and its own free-shipping flag. Deals reference coupon codes but never own them.
+
+**Free-shipping threshold**:
+The cart subtotal at which the Flexible Shipping method ships free automatically. Owned by Flexible Shipping (Thailand zone), not by any Deal. Deals and coupons do not change it.
+_Avoid_: Deal, promotion
