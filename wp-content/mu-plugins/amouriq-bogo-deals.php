@@ -179,10 +179,13 @@ function amouriq_bogo_discount_category_cheapest( $deal, $cart ) {
 		return 0.0;
 	}
 
-	sort( $unit_prices );
+	// Sort most expensive first and cut into groups of buy_qty. The cheapest
+	// item of each complete group is the last one in that group, so it sits at
+	// index (group + 1) * buy_qty - 1. A leftover partial group gets nothing.
+	rsort( $unit_prices );
 	$discount = 0.0;
-	for ( $i = 0; $i < $groups; $i++ ) {
-		$discount += $unit_prices[ $i ] * ( $percent / 100 );
+	for ( $g = 0; $g < $groups; $g++ ) {
+		$discount += $unit_prices[ ( $g + 1 ) * $buy_qty - 1 ] * ( $percent / 100 );
 	}
 	return $discount;
 }
