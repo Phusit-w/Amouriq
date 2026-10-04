@@ -91,4 +91,15 @@ return array(
 		'trigger'              => 'auto',
 	),
 
+	// Deal 2: buy 2 Eucalyptus 10 ml, get 1 free — always on.
+	array(
+		'type'                 => 'same_product',
+		'label'                => 'ซื้อ 2 แถม 1 ยูคาลิปตัส 10 ml',
+		'product_id'           => 2019,
+		'buy_qty'              => 2,
+		'get_qty'              => 1,
+		'get_discount_percent' => 100,
+		'trigger'              => 'auto',
+	),
+
 );
