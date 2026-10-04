@@ -279,6 +279,70 @@ function amouriq_bogo_product_options() {
 	return $options;
 }
 
+/**
+ * Read-only overview of every condition that can make an order cheaper or
+ * ship free: BOGO deals, the automatic free-shipping threshold (owned by
+ * Flexible Shipping, not edited here), and coupons that grant free shipping.
+ */
+function amouriq_bogo_status_panel( $deals ) {
+	$now = current_time( 'timestamp' );
+	$today = wp_date( 'Y-m-d', $now );
+
+	// Automatic free shipping threshold lives in Flexible Shipping (zone Thailand).
+	$settings  = get_option( 'woocommerce_flexible_shipping_single_3_settings', array() );
+	$threshold = is_array( $settings ) && isset( $settings['method_free_shipping'] ) ? $settings['method_free_shipping'] : null;
+	$edit_url  = admin_url( 'admin.php?page=wc-settings&tab=shipping&instance_id=3' );
+	?>
+	<h2>เงื่อนไขที่เปิดใช้งานอยู่</h2>
+	<table class="widefat striped" style="max-width:1200px">
+		<thead><tr><th>เงื่อนไข</th><th>รายละเอียด</th><th>สถานะ</th></tr></thead>
+		<tbody>
+		<tr>
+			<td>ส่งฟรีอัตโนมัติ (Flexible Shipping)</td>
+			<td>ขั้นต่อ ฿<?php echo esc_html( null === $threshold ? 'ไม่พบค่า' : $threshold ); ?> — <a href="<?php echo esc_url( $edit_url ); ?>">แก้ไขที่หน้าการจัดส่ง</a></td>
+			<td><?php echo null === $threshold ? 'ตรวจไม่ได้' : 'เปิดใช้งาน'; ?></td>
+		</tr>
+		<?php foreach ( $deals as $deal ) :
+			$in_window = amouriq_bogo_deal_in_window( $deal );
+			$trigger   = ( isset( $deal['trigger'] ) && 'coupon' === $deal['trigger'] ) ? 'คูปอง ' . ( $deal['coupon_code'] ?? '' ) : 'อัตโนมัติ';
+			$status    = $in_window ? 'เปิดใช้งาน' : 'อยู่นอกช่วงวันที่';
+		?>
+			<tr>
+				<td>ดีล BOGO: <?php echo esc_html( $deal['label'] ?? '' ); ?></td>
+				<td><?php echo esc_html( amouriq_bogo_summary( $deal ) ); ?></td>
+				<td><?php echo esc_html( $status . ' (' . $trigger . ')' ); ?></td>
+			</tr>
+		<?php endforeach; ?>
+		<?php
+		$coupons = get_posts( array( 'post_type' => 'shop_coupon', 'post_status' => 'publish', 'numberposts' => -1 ) );
+		foreach ( $coupons as $post ) :
+			$coupon = new WC_Coupon( $post->ID );
+			if ( ! $coupon->get_free_shipping() ) {
+				continue;
+			}
+			$expires = $coupon->get_date_expires();
+			$limit   = $coupon->get_usage_limit();
+			$used    = $coupon->get_usage_count();
+			if ( $expires && $expires->getTimestamp() < $now ) {
+				$state = 'หมดอายุแล้ว';
+			} elseif ( $limit && $used >= $limit ) {
+				$state = 'ใช้ครบจำนวนแล้ว';
+			} else {
+				$state = 'ใช้ได้';
+			}
+		?>
+			<tr>
+				<td>คูปองส่งฟรี: <?php echo esc_html( $coupon->get_code() ); ?></td>
+				<td>หมดอายุ: <?php echo $expires ? esc_html( $expires->date_i18n( 'Y-m-d' ) ) : 'ไม่มีกำหนด'; ?> | ใช้แล้ว <?php echo esc_html( $used ); ?>/<?php echo $limit ? esc_html( $limit ) : '∞'; ?></td>
+				<td><?php echo esc_html( $state ); ?></td>
+			</tr>
+		<?php endforeach; ?>
+		</tbody>
+	</table>
+	<p class="description">หน้านี้อ่านอย่างเดียว การแก้ไขทำที่หน้าการจัดส่งหรือหน้าคูปองโดยตรง (วันที่วันนี้: <?php echo esc_html( $today ); ?>)</p>
+	<?php
+}
+
 function amouriq_bogo_admin_page() {
 	if ( ! current_user_can( 'manage_woocommerce' ) ) {
 		return;
@@ -310,6 +374,8 @@ function amouriq_bogo_admin_page() {
 		<?php if ( $error ) : ?>
 			<div class="notice notice-error is-dismissible"><p><?php echo esc_html( $error ); ?></p></div>
 		<?php endif; ?>
+
+		<?php amouriq_bogo_status_panel( $deals ); ?>
 
 		<h2>ดีลที่ใช้งานอยู่</h2>
 		<?php if ( empty( $deals ) ) : ?>
