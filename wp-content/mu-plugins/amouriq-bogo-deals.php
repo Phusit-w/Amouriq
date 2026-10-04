@@ -65,6 +65,10 @@ function amouriq_bogo_apply_deals( $cart ) {
  * right now (outside its date window, coupon missing, customer limit reached).
  */
 function amouriq_bogo_deal_discount( $deal, $cart ) {
+	// A deal saved before the on/off switch existed has no `enabled` key and stays on.
+	if ( isset( $deal['enabled'] ) && ! $deal['enabled'] ) {
+		return 0.0;
+	}
 	if ( ! amouriq_bogo_deal_in_window( $deal ) ) {
 		return 0.0;
 	}
