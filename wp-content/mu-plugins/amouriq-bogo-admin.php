@@ -181,6 +181,9 @@ function amouriq_bogo_build_deal( array $in ) {
 	if ( ! empty( $in['exclude_sale'] ) ) {
 		$deal['exclude_sale'] = true;
 	}
+	if ( ! empty( $in['no_combine'] ) ) {
+		$deal['no_combine'] = true;
+	}
 
 	if ( '' === $label ) {
 		$deal['label'] = 'Deal discount';
@@ -317,6 +320,9 @@ function amouriq_bogo_summary( $deal ) {
 	if ( ! empty( $deal['exclude_sale'] ) ) {
 		$extra[] = 'ไม่รวมสินค้าลดราคา';
 	}
+	if ( ! empty( $deal['no_combine'] ) ) {
+		$extra[] = 'ไม่ใช้ร่วมกับคูปองอื่น';
+	}
 	if ( ! empty( $deal['valid_from'] ) || ! empty( $deal['valid_to'] ) ) {
 		$extra[] = 'ช่วง ' . ( $deal['valid_from'] ?? '…' ) . ' ถึง ' . ( $deal['valid_to'] ?? '…' );
 	}
@@ -352,6 +358,39 @@ function amouriq_bogo_product_options() {
 	return $options;
 }
 
+/**
+ * "Active" in the glossary sense, as far as it can be known without a cart:
+ * Enabled, inside its dates, and (for a coupon Deal) the coupon is usable.
+ * Returns 'ใช้งานอยู่' or the reason the deal is not working.
+ */
+function amouriq_bogo_deal_state( $deal ) {
+	if ( isset( $deal['enabled'] ) && ! $deal['enabled'] ) {
+		return 'ปิดอยู่';
+	}
+	$today = current_time( 'Y-m-d' );
+	if ( ! empty( $deal['valid_from'] ) && $today < $deal['valid_from'] ) {
+		return 'ยังไม่ถึงวันเริ่ม';
+	}
+	if ( ! empty( $deal['valid_to'] ) && $today > $deal['valid_to'] ) {
+		return 'หมดช่วงวันที่แล้ว';
+	}
+	if ( isset( $deal['trigger'] ) && 'coupon' === $deal['trigger'] ) {
+		$coupon_id = ! empty( $deal['coupon_code'] ) ? wc_get_coupon_id_by_code( $deal['coupon_code'] ) : 0;
+		if ( ! $coupon_id || 'publish' !== get_post_status( $coupon_id ) ) {
+			return 'คูปองไม่พร้อมใช้ (ไม่มี/ปิดอยู่)';
+		}
+		$coupon  = new WC_Coupon( $coupon_id );
+		$expires = $coupon->get_date_expires();
+		if ( $expires && $expires->getTimestamp() < time() ) {
+			return 'คูปองหมดอายุแล้ว';
+		}
+		if ( $coupon->get_usage_limit() && $coupon->get_usage_count() >= $coupon->get_usage_limit() ) {
+			return 'คูปองใช้ครบจำนวนแล้ว';
+		}
+	}
+	return 'ใช้งานอยู่';
+}
+
 function amouriq_bogo_toggle_form( $action, $field, $value, $is_on ) {
 	?>
 	<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=amouriq-bogo' ) ); ?>" style="display:inline">
@@ -384,14 +423,13 @@ function amouriq_bogo_status_panel( $deals ) {
 		<tr>
 			<td>ส่งฟรีอัตโนมัติ (Flexible Shipping)</td>
 			<td>ขั้นต่อ ฿<?php echo esc_html( null === $threshold ? 'ไม่พบค่า' : $threshold ); ?> — <a href="<?php echo esc_url( $edit_url ); ?>">แก้ไขที่หน้าการจัดส่ง</a></td>
-			<td><?php echo null === $threshold ? 'ตรวจไม่ได้' : 'เปิดใช้งาน'; ?></td>
+			<td><?php echo null === $threshold ? 'ตรวจไม่ได้' : 'ใช้งานอยู่'; ?></td>
 			<td></td>
 		</tr>
 		<?php foreach ( $deals as $deal_index => $deal ) :
 			$deal_on   = ! isset( $deal['enabled'] ) || $deal['enabled'];
-			$in_window = amouriq_bogo_deal_in_window( $deal );
 			$trigger   = ( isset( $deal['trigger'] ) && 'coupon' === $deal['trigger'] ) ? 'คูปอง ' . ( $deal['coupon_code'] ?? '' ) : 'อัตโนมัติ';
-			$status    = ! $deal_on ? 'ปิดอยู่' : ( $in_window ? 'เปิดใช้งาน' : 'อยู่นอกช่วงวันที่' );
+			$status    = amouriq_bogo_deal_state( $deal );
 		?>
 			<tr>
 				<td>ดีล BOGO: <?php echo esc_html( $deal['label'] ?? '' ); ?></td>
@@ -417,7 +455,7 @@ function amouriq_bogo_status_panel( $deals ) {
 			} elseif ( $limit && $used >= $limit ) {
 				$state = 'ใช้ครบจำนวนแล้ว';
 			} else {
-				$state = 'ใช้ได้';
+				$state = 'ใช้งานอยู่';
 			}
 		?>
 			<tr>
@@ -483,7 +521,7 @@ function amouriq_bogo_admin_page() {
 						<td><?php echo esc_html( $types[ $deal['type'] ] ?? $deal['type'] ); ?></td>
 						<td><?php echo esc_html( amouriq_bogo_summary( $deal ) ); ?></td>
 						<td><?php echo esc_html( $deal['label'] ?? '' ); ?></td>
-						<td><?php echo ( ! isset( $deal['enabled'] ) || $deal['enabled'] ) ? 'เปิด' : '<strong>ปิดอยู่</strong>'; ?></td>
+						<td><?php echo esc_html( amouriq_bogo_deal_state( $deal ) ); ?></td>
 						<td><?php echo esc_html( $rep['orders'] ); ?></td>
 						<td><?php echo esc_html( number_format( $rep['total'], 2 ) ); ?></td>
 						<td style="white-space:nowrap">
@@ -573,6 +611,8 @@ function amouriq_bogo_admin_page() {
 					</td></tr>
 				<tr><th>ไม่รวมสินค้าลดราคา</th>
 					<td><label><input type="checkbox" name="exclude_sale" value="1" <?php checked( ! empty( $editing['exclude_sale'] ) ); ?>> ข้ามสินค้าที่ลดราคาอยู่แล้ว (สินค้านั้นไม่นับและไม่ได้ส่วนลด)</label></td></tr>
+				<tr><th>ไม่ใช้ร่วมกับคูปองอื่น</th>
+					<td><label><input type="checkbox" name="no_combine" value="1" <?php checked( ! empty( $editing['no_combine'] ) ); ?>> ถ้ามีคูปองอื่นในตะกร้า ดีลนี้จะไม่ลด (คูปองที่ใช้เปิดดีลนี้เองไม่นับ)</label></td></tr>
 				<tr><th><label for="bogo_from">ใช้ได้ตั้งแต่</label></th>
 					<td><input type="date" name="valid_from" id="bogo_from" value="<?php echo esc_attr( $v( 'valid_from' ) ); ?>">
 						<p class="description">เว้นว่างได้ = ใช้ได้ทันที</p></td></tr>

@@ -78,7 +78,34 @@ function amouriq_bogo_deal_discount( $deal, $cart ) {
 	if ( ! amouriq_bogo_deal_within_customer_limit( $deal ) ) {
 		return 0.0;
 	}
+	if ( amouriq_bogo_blocked_by_other_coupon( $deal, $cart ) ) {
+		return 0.0;
+	}
 	return amouriq_bogo_calculate_discount( $deal, $cart );
+}
+
+/**
+ * A deal marked `no_combine` gives nothing while the cart holds a coupon other
+ * than the one that triggers it. The cart says why, once per page.
+ */
+function amouriq_bogo_blocked_by_other_coupon( $deal, $cart ) {
+	if ( empty( $deal['no_combine'] ) ) {
+		return false;
+	}
+	$own = ( isset( $deal['trigger'] ) && 'coupon' === $deal['trigger'] && ! empty( $deal['coupon_code'] ) )
+		? wc_format_coupon_code( $deal['coupon_code'] ) : '';
+
+	foreach ( $cart->get_applied_coupons() as $applied ) {
+		if ( $own && wc_is_same_coupon( $applied, $own ) ) {
+			continue;
+		}
+		$message = sprintf( 'ดีล "%s" ไม่ใช้ร่วมกับคูปองอื่น จึงยังไม่ได้ส่วนลดดีลนี้', ! empty( $deal['label'] ) ? $deal['label'] : 'Deal discount' );
+		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
+			wc_add_notice( $message, 'notice' );
+		}
+		return true;
+	}
+	return false;
 }
 
 function amouriq_bogo_deal_in_window( $deal ) {
@@ -125,12 +152,9 @@ function amouriq_bogo_deal_within_customer_limit( $deal ) {
 		return true;
 	}
 
-	// Limited deals need an account so the usage count is reliable. Guests
-	// cannot be counted across orders (a changed email would reset the limit).
-	if ( ! get_current_user_id() ) {
-		return false;
-	}
-
+	// Guest checkout is off, so every buyer ends up with an account. Until they
+	// log in the count follows the billing email entered at checkout; the deal
+	// waits until that email is known.
 	$used = amouriq_bogo_customer_uses( $deal['id'] );
 	if ( null === $used ) {
 		return false;
