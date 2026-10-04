@@ -405,3 +405,25 @@ function amouriq_bogo_discount_quantity_tier( $deal, $cart ) {
 
 	return $qty * amouriq_bogo_unit_price( $deal['product_id'] ) * ( $percent / 100 );
 }
+
+/**
+ * WooCommerce refreshes checkout totals when an address field changes but not
+ * when the billing email does. A deal limited per customer depends on that
+ * email, so ask for a refresh when it changes.
+ */
+add_action( 'wp_footer', 'amouriq_bogo_refresh_on_email_change' );
+
+function amouriq_bogo_refresh_on_email_change() {
+	if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+		return;
+	}
+	?>
+	<script>
+	jQuery(function ($) {
+		$(document.body).on('change', 'input#billing_email', function () {
+			$(document.body).trigger('update_checkout');
+		});
+	});
+	</script>
+	<?php
+}
