@@ -13,6 +13,6 @@
 ## Notes (implementation)
 
 - Discount Rules review: no enabled live rule needs recreating. The six coupons (AMOURIQ2025, WELCOME, 67LX6HU8U, FKAPRNPG7, AMOTHCM20, AMOTHTHX20) all have "Allow free shipping" ticked on live (read 2026-10-11) and are expired; the ฿299 threshold lives in Flexible Shipping. The new free-shipping Deal type is an option, not a replacement that has to be built.
-- Kit: `D:\Localpp\deploy-round2\` with `step1\` (conditions.php, must go first), `step2\` (6 files), the matching zips (forward-slash paths), `rollback\` (the 5 live files as they are now, taken from commit b8a7b6d) and `rollback.zip`, `test-checklist.md` (Thai) and `qa-results.md`. The step 2 files include the points programme changes (ticket 01 and 03 of points-v2); the points system itself stays OFF.
+- Kit: `D:\Local\app\deploy-round2\` with `step1\` (conditions.php, must go first), `step2\` (6 files), the matching zips (forward-slash paths), `rollback\` (the 5 live files as they are now, taken from commit b8a7b6d) and `rollback.zip`, `test-checklist.md` (Thai) and `qa-results.md`. The step 2 files include the points programme changes (points-v2 tickets 01 and 03); the points system itself stays OFF.
 - Whole suite green (256 tests); every kit file is byte-identical to the repository file.
 - Still unverified anywhere: the new admin screens in a real wp-admin, a real checkout, phone width, Omise retry.
