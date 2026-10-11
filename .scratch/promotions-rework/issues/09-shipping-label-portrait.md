@@ -4,11 +4,19 @@
 
 **Blocked by:** None (can start immediately; needs the local site's database running to confirm the plugin)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human (checked by eye on a local sample; a real print and paper size on the warehouse printer not checked)
 
-- [ ] Confirmed which plugin prints the label, and that it is active
-- [ ] The label matches the layout above, with the logo and sender details
-- [ ] A long address and an order with many items both render without cutting anything off
-- [ ] No prices, discounts or totals appear anywhere on the label
-- [ ] Items, including free gifts, show with name, option and quantity
-- [ ] A printed or PDF sample from a real local order is checked by eye
+- [x] Confirmed which plugin prints the label, and that it is active
+- [x] The label matches the layout above, with the logo and sender details
+- [x] A long address and an order with many items both render without cutting anything off
+- [x] No prices, discounts or totals appear anywhere on the label
+- [x] Items, including free gifts, show with name, option and quantity
+- [x] A printed or PDF sample from a real local order is checked by eye
+
+## Notes (implementation)
+
+- Confirmed: the plugin is "Print Invoices, Packing Slips, Labels for WooCommerce" (WebToffee) 4.9.6, active on the local site, with its Shipping Label module; its sender name, address, phone and logo are set in its own settings and are reused. The PDF Invoices plugin is installed but inactive.
+- Instead of editing the plugin's template (lost on a plugin update, and the stored template differs per site) the new `amouriq-shipping-label.php` replaces the printed HTML through the plugin's `wt_pklist_alter_final_order_template_html` filter for the `shippinglabel` document. The layout is `amouriq-shipping-label/label-html.php` (plain data in, HTML out, no amounts ever passed in). Tests: `tests/ShippingLabelTest.php` (order of blocks, numbering, gift listed, no price words or currency, long address and 60 items, escaping).
+- The option column is the variation's attribute values (for example "250 ml"); a simple product has none. The recipient is the shipping address (billing when the order has none) and its phone.
+- Checked by eye: a local order with 13 lines (one a ฿0 gift), a long Thai address with a second line, rendered through the plugin's own generation path and screenshotted from headless Chrome. The order was deleted afterwards. Not checked: the plugin's actual print window/button flow and paper size on the real printer; label size setting "full page" is the plugin default.
+- Live: upload `amouriq-shipping-label.php` and the `amouriq-shipping-label/` folder to `wp-content/mu-plugins/`; the plugin and its settings must be present there (confirm it is active on live first).
