@@ -346,3 +346,75 @@ function amouriq_points_core_refund_reversal_share( $eligible, $refunded, $origi
 	$kept = (int) floor( round( $original * $left, 6 ) );
 	return max( 0, (int) $awarded_now - $kept );
 }
+
+/* ------------------------------------------------------------------ bonuses */
+
+/** Thai names of the ledger entry types, for the customer's list and the admin list. */
+function amouriq_points_core_type_names() {
+	return array(
+		'earn'         => 'ได้รับแต้ม',
+		'use'          => 'ใช้แต้ม',
+		'give_back'    => 'คืนแต้ม',
+		'refund'       => 'หักแต้ม (คืนเงิน)',
+		'adjust'       => 'ปรับแต้มโดยร้าน',
+		'bonus_signup' => 'โบนัสสมัครสมาชิก',
+		'bonus_first'  => 'โบนัสออเดอร์แรก',
+		'bonus_review' => 'โบนัสรีวิวสินค้า',
+	);
+}
+
+/** The three one-time bonuses, each off until the owner switches it on. */
+function amouriq_points_core_bonus_defaults() {
+	return array(
+		'signup'      => array( 'enabled' => false, 'points' => 20 ),
+		'first_order' => array( 'enabled' => false, 'points' => 30 ),
+		'review'      => array( 'enabled' => false, 'points' => 10, 'per_year' => 5 ),
+	);
+}
+
+/** Stored bonus settings with the defaults filled in; non-numbers and negatives fall back to the default. */
+function amouriq_points_core_bonus_clean( $raw ) {
+	$raw = is_array( $raw ) ? $raw : array();
+	$out = amouriq_points_core_bonus_defaults();
+	foreach ( $out as $kind => $settings ) {
+		$given = isset( $raw[ $kind ] ) && is_array( $raw[ $kind ] ) ? $raw[ $kind ] : array();
+		if ( isset( $given['enabled'] ) ) {
+			$out[ $kind ]['enabled'] = ! in_array( $given['enabled'], array( false, 0, '0', 'no', '' ), true );
+		}
+		foreach ( array( 'points', 'per_year' ) as $number ) {
+			if ( isset( $settings[ $number ] ) && isset( $given[ $number ] ) && is_numeric( $given[ $number ] ) && $given[ $number ] >= 0 ) {
+				$out[ $kind ][ $number ] = (int) $given[ $number ];
+			}
+		}
+	}
+	return $out;
+}
+
+/**
+ * Points for an approved verified-purchase review of $product_id: the review bonus
+ * when it is on, the customer has not had it for this product before, and fewer than
+ * `per_year` review bonuses were given in the last 365 days (0 = no yearly cap).
+ * `$ledger` is the customer's ledger; review bonuses carry `ref` = the product ID.
+ */
+function amouriq_points_core_review_bonus( $bonus, $ledger, $product_id, $now ) {
+	$review = $bonus['review'];
+	if ( ! $review['enabled'] || $review['points'] <= 0 ) {
+		return 0;
+	}
+	$recent = 0;
+	foreach ( $ledger as $entry ) {
+		if ( ! isset( $entry['type'] ) || 'bonus_review' !== $entry['type'] ) {
+			continue;
+		}
+		if ( isset( $entry['ref'] ) && (int) $entry['ref'] === (int) $product_id ) {
+			return 0;
+		}
+		if ( (int) $entry['time'] > $now - 365 * 86400 ) {
+			$recent++;
+		}
+	}
+	if ( $review['per_year'] > 0 && $recent >= $review['per_year'] ) {
+		return 0;
+	}
+	return (int) $review['points'];
+}

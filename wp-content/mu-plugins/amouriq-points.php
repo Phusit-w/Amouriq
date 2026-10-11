@@ -45,7 +45,7 @@ function amouriq_points_ledger( $user_id ) {
  * Record a change of $points (earned +, used -). Earned points (and restored or
  * adjusted-up ones) carry an expiry date.
  */
-function amouriq_points_record( $user_id, $points, $type, $order_id = 0, $note = '', $by = 0 ) {
+function amouriq_points_record( $user_id, $points, $type, $order_id = 0, $note = '', $by = 0, $ref = 0 ) {
 	$points = (int) $points;
 	if ( ! $user_id || 0 === $points ) {
 		return;
@@ -62,6 +62,9 @@ function amouriq_points_record( $user_id, $points, $type, $order_id = 0, $note =
 	);
 	if ( $by ) {
 		$ledger[ count( $ledger ) - 1 ]['by'] = (int) $by; // the staff member who made an Adjustment
+	}
+	if ( $ref ) {
+		$ledger[ count( $ledger ) - 1 ]['ref'] = (int) $ref; // what the entry is about (the reviewed product for a review bonus)
 	}
 	update_user_meta( (int) $user_id, 'amouriq_points_ledger', $ledger );
 }
@@ -249,6 +252,14 @@ function amouriq_points_follow_order_status( $order_id, $from, $to ) {
 		$order->add_order_note( sprintf( 'หักแต้มสะสมคืน %d แต้ม เพราะออเดอร์ถูกยกเลิก/คืนเงิน', $awarded ) );
 	}
 
+	// A first-order bonus goes back with an order that is cancelled or refunded.
+	$first_bonus = (int) $order->get_meta( '_amouriq_points_bonus_first', true );
+	if ( $first_bonus > 0 && in_array( $to, array( 'cancelled', 'failed', 'refunded' ), true ) ) {
+		$order->update_meta_data( '_amouriq_points_bonus_first', 0 );
+		$order->save();
+		amouriq_points_record( $order->get_customer_id(), -$first_bonus, 'refund', $order_id, 'หักโบนัสออเดอร์แรกคืน' );
+	}
+
 	$used = (int) $order->get_meta( '_amouriq_points_used', true );
 	if ( $used <= 0 ) {
 		return;
@@ -384,7 +395,7 @@ function amouriq_points_account_page() {
 	$user_id  = get_current_user_id();
 	$settings = amouriq_points_settings();
 	$balance  = amouriq_points_balance( $user_id );
-	$names    = array( 'earn' => 'ได้รับแต้ม', 'use' => 'ใช้แต้ม', 'give_back' => 'คืนแต้ม', 'refund' => 'หักแต้ม (คืนเงิน)', 'adjust' => 'ปรับแต้มโดยร้าน' );
+	$names    = amouriq_points_core_type_names();
 
 	printf( '<p><strong>แต้มสะสมคงเหลือ: %s แต้ม</strong></p>', esc_html( number_format_i18n( $balance['points'] ) ) );
 	if ( $balance['soonest_expiry'] ) {
@@ -452,6 +463,8 @@ function amouriq_points_admin_handle() {
 		}
 		update_option( 'amouriq_points_settings', amouriq_points_core_settings( $in ), false );
 		$notice = 'บันทึกการตั้งค่าแล้ว';
+	} elseif ( 'bonus_save' === $action ) {
+		$notice = amouriq_points_admin_bonus_save();
 	} elseif ( in_array( $action, array( 'earn_add', 'earn_delete', 'earn_toggle', 'earn_limits' ), true ) ) {
 		$notice = amouriq_points_admin_earning_action( $action );
 	} elseif ( 'adjust' === $action ) {
@@ -528,6 +541,7 @@ function amouriq_points_admin_page() {
 	amouriq_points_admin_form( 'adjust', $inner, 'ปรับแต้ม' );
 
 	amouriq_points_admin_earning_section();
+	amouriq_points_admin_bonus_section();
 
 	amouriq_points_admin_customer_list();
 
@@ -542,7 +556,7 @@ function amouriq_points_admin_page() {
 			printf(
 				'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
 				esc_html( wp_date( 'j M Y H:i', $row['time'] ) ),
-				esc_html( isset( $row['type'] ) ? $row['type'] : '' ),
+				esc_html( isset( $row['type'] ) ? ( amouriq_points_core_type_names()[ $row['type'] ] ?? $row['type'] ) : '' ),
 				! empty( $row['order_id'] ) ? esc_html( '#' . $row['order_id'] ) : '—',
 				esc_html( ( $row['points'] > 0 ? '+' : '' ) . $row['points'] ),
 				! empty( $row['expires'] ) ? esc_html( wp_date( 'j M Y', $row['expires'] ) ) : '—',
@@ -818,4 +832,129 @@ function amouriq_points_admin_earning_section() {
 		. '<label>แต้มสูงสุดต่อออเดอร์ <input type="number" min="0" name="max_per_order" value="' . esc_attr( $earning['max_per_order'] ) . '" style="width:7em"> แต้ม</label> <small>(0 = ไม่จำกัด)</small></p>';
 	echo '<h3>ข้อจำกัดต่อออเดอร์</h3>';
 	amouriq_points_admin_form( 'earn_limits', $inner, 'บันทึก' );
+}
+
+/* ------------------------------------------------------------------ bonuses */
+
+/** The owner's one-time bonuses (sign-up, first order, verified review), each off until switched on. */
+function amouriq_points_bonus() {
+	return amouriq_points_core_bonus_clean( get_option( 'amouriq_points_bonus', array() ) );
+}
+
+add_action( 'user_register', 'amouriq_points_signup_bonus', 20, 1 );
+
+/** Points for a new customer account, once per account. */
+function amouriq_points_signup_bonus( $user_id ) {
+	$bonus = amouriq_points_bonus();
+	if ( ! amouriq_points_enabled() || ! $bonus['signup']['enabled'] || $bonus['signup']['points'] <= 0 ) {
+		return;
+	}
+	$user = get_userdata( $user_id );
+	if ( ! $user || ! in_array( 'customer', (array) $user->roles, true ) || get_user_meta( $user_id, '_amouriq_points_signup_bonus', true ) ) {
+		return;
+	}
+	update_user_meta( $user_id, '_amouriq_points_signup_bonus', 1 );
+	amouriq_points_record( $user_id, $bonus['signup']['points'], 'bonus_signup' );
+}
+
+add_action( 'woocommerce_order_status_completed', 'amouriq_points_first_order_bonus', 20, 1 );
+
+/**
+ * Points when a customer's first order is Completed: no other Completed order of theirs
+ * exists, and the bonus was never given to them before (a refunded first order does not
+ * make the next one "first" again).
+ */
+function amouriq_points_first_order_bonus( $order_id ) {
+	$bonus = amouriq_points_bonus();
+	$order = wc_get_order( $order_id );
+	if ( ! $order || ! amouriq_points_enabled() || ! $bonus['first_order']['enabled'] || $bonus['first_order']['points'] <= 0 || ! $order->get_customer_id() ) {
+		return;
+	}
+	$customer = $order->get_customer_id();
+	if ( '' !== (string) $order->get_meta( '_amouriq_points_bonus_first', true ) || get_user_meta( $customer, '_amouriq_points_first_bonus_given', true ) ) {
+		return;
+	}
+	$earlier = wc_get_orders( array( 'limit' => 1, 'return' => 'ids', 'customer' => $customer, 'status' => array( 'completed' ), 'exclude' => array( $order_id ) ) );
+	if ( $earlier ) {
+		return;
+	}
+	update_user_meta( $customer, '_amouriq_points_first_bonus_given', 1 );
+	$order->update_meta_data( '_amouriq_points_bonus_first', (int) $bonus['first_order']['points'] );
+	$order->save();
+	amouriq_points_record( $customer, $bonus['first_order']['points'], 'bonus_first', $order_id );
+	$order->add_order_note( sprintf( 'ลูกค้าได้รับโบนัสออเดอร์แรก %d แต้ม', $bonus['first_order']['points'] ) );
+}
+
+add_action(
+	'comment_post',
+	static function ( $comment_id, $approved ) {
+		if ( 1 === (int) $approved ) {
+			amouriq_points_review_bonus( get_comment( $comment_id ) );
+		}
+	},
+	20,
+	2
+);
+
+add_action(
+	'transition_comment_status',
+	static function ( $new, $old, $comment ) {
+		if ( 'approved' === $new && 'approved' !== $old ) {
+			amouriq_points_review_bonus( $comment );
+		}
+	},
+	20,
+	3
+);
+
+/** Points for an approved product review by a customer who bought the product; once per review and per product. */
+function amouriq_points_review_bonus( $comment ) {
+	if ( ! $comment || ! amouriq_points_enabled() || 'review' !== $comment->comment_type || '1' !== (string) $comment->comment_approved || ! $comment->user_id ) {
+		return;
+	}
+	if ( get_comment_meta( $comment->comment_ID, '_amouriq_points_review_bonus', true ) ) {
+		return;
+	}
+	$product_id = (int) $comment->comment_post_ID;
+	if ( 'product' !== get_post_type( $product_id ) || ! wc_customer_bought_product( $comment->comment_author_email, (int) $comment->user_id, $product_id ) ) {
+		return;
+	}
+	$points = amouriq_points_core_review_bonus( amouriq_points_bonus(), amouriq_points_ledger( $comment->user_id ), $product_id, time() );
+	if ( $points <= 0 ) {
+		return;
+	}
+	update_comment_meta( $comment->comment_ID, '_amouriq_points_review_bonus', $points );
+	amouriq_points_record( (int) $comment->user_id, $points, 'bonus_review', 0, 'รีวิวสินค้า: ' . get_the_title( $product_id ), 0, $product_id );
+}
+
+/** Save the bonus form. Returns the notice. */
+function amouriq_points_admin_bonus_save() {
+	// phpcs:disable WordPress.Security.NonceVerification -- checked in amouriq_points_admin_handle()
+	$post = wp_unslash( $_POST );
+	$raw  = array();
+	foreach ( array( 'signup', 'first_order', 'review' ) as $kind ) {
+		$raw[ $kind ] = array(
+			'enabled'  => ! empty( $post[ 'bonus_' . $kind . '_on' ] ),
+			'points'   => isset( $post[ 'bonus_' . $kind . '_points' ] ) ? $post[ 'bonus_' . $kind . '_points' ] : '',
+			'per_year' => isset( $post['bonus_review_per_year'] ) ? $post['bonus_review_per_year'] : '',
+		);
+	}
+	// phpcs:enable
+	update_option( 'amouriq_points_bonus', amouriq_points_core_bonus_clean( $raw ), false );
+	return 'บันทึกโบนัสแต้มแล้ว';
+}
+
+function amouriq_points_admin_bonus_section() {
+	$b = amouriq_points_bonus();
+	echo '<h2>โบนัสแต้ม</h2><p>โบนัสแต่ละอย่างเปิดหรือปิดแยกกัน (ปิดอยู่จนกว่าจะติ๊ก) และให้ครั้งเดียวตามเงื่อนไข ปิดโบนัสแล้วแต้มที่ให้ไปแล้วไม่ถูกเอาคืน แต้มโบนัสหมดอายุเหมือนแต้มทั่วไป</p>';
+	$row = static function ( $kind, $label, $extra = '' ) use ( $b ) {
+		return '<tr><th>' . esc_html( $label ) . '</th><td><label><input type="checkbox" name="bonus_' . esc_attr( $kind ) . '_on" value="1" ' . checked( $b[ $kind ]['enabled'], true, false ) . '> เปิดใช้</label> '
+			. 'ให้ <input type="number" min="0" name="bonus_' . esc_attr( $kind ) . '_points" value="' . esc_attr( $b[ $kind ]['points'] ) . '" style="width:6em"> แต้ม' . $extra . '</td></tr>';
+	};
+	$inner = '<table class="form-table">'
+		. $row( 'signup', 'สมัครสมาชิก' )
+		. $row( 'first_order', 'ออเดอร์แรกที่เสร็จสมบูรณ์', ' <small>(เมื่อออเดอร์แรกเปลี่ยนเป็น "เสร็จสมบูรณ์" ให้ครั้งเดียวต่อสมาชิก; ถ้าออเดอร์นั้นถูกยกเลิกหรือคืนเงินจะหักโบนัสคืน)</small>' )
+		. $row( 'review', 'รีวิวสินค้าที่ซื้อแล้ว', ' ต่อสินค้าครั้งเดียว สูงสุด <input type="number" min="0" name="bonus_review_per_year" value="' . esc_attr( $b['review']['per_year'] ) . '" style="width:5em"> ครั้งใน 12 เดือน (0 = ไม่จำกัด) <small>(ให้เมื่อรีวิวได้รับอนุมัติ และผู้รีวิวเคยซื้อสินค้านั้น)</small>' )
+		. '</table>';
+	amouriq_points_admin_form( 'bonus_save', $inner, 'บันทึกโบนัส' );
 }
