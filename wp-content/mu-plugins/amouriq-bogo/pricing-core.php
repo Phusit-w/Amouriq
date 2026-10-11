@@ -33,15 +33,29 @@ defined( 'ABSPATH' ) || exit;
 function amouriq_bogo_price( $deal, $lines, $ctx ) {
 	$reason = amouriq_bogo_core_stop_reason( $deal, $ctx );
 	if ( null !== $reason ) {
-		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => $reason, 'choices_left' => 0 );
+		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => $reason, 'choices_left' => 0, 'allowed' => 0 );
 	}
 	// A callable, so the caller only builds the cart lines for a deal that got this far.
 	$lines = is_callable( $lines ) ? call_user_func( $lines ) : $lines;
 
+	// Gifts are free lines: they never count toward a minimum spend or another Deal's quantities.
+	$gifts = array_filter( $lines, 'amouriq_bogo_core_is_gift' );
+	$lines = array_filter(
+		$lines,
+		static function ( $line ) {
+			return ! amouriq_bogo_core_is_gift( $line );
+		}
+	);
+
+	if ( isset( $deal['type'] ) && 'spend_gift' === $deal['type'] ) {
+		$gift = amouriq_bogo_core_gift( $deal, $lines, $gifts );
+		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => null, 'choices_left' => $gift['left'], 'allowed' => $gift['allowed'] );
+	}
+
 	// A buy-A-choose-B Deal also says how many B the customer may still pick.
 	if ( amouriq_bogo_core_is_pair_choice( $deal ) ) {
 		$pair = amouriq_bogo_core_pair_choice( $deal, $lines );
-		return array( 'discount' => $pair['discount'], 'per_line' => $pair['per_line'], 'reason' => null, 'choices_left' => $pair['left'] );
+		return array( 'discount' => $pair['discount'], 'per_line' => $pair['per_line'], 'reason' => null, 'choices_left' => $pair['left'], 'allowed' => 0 );
 	}
 
 	$discount = (float) amouriq_bogo_core_discount( $deal, $lines, $ctx );
@@ -50,7 +64,58 @@ function amouriq_bogo_price( $deal, $lines, $ctx ) {
 		'per_line'     => $discount > 0 ? amouriq_bogo_core_split( $deal, $lines, $discount ) : array(),
 		'reason'       => null,
 		'choices_left' => 0,
+		'allowed'      => 0,
 	);
+}
+
+function amouriq_bogo_core_is_gift( $line ) {
+	return ! empty( $line['is_gift'] );
+}
+
+/**
+ * Spend-threshold gift: once the paid items reach `min_spend` (as the shopper sees
+ * the prices, Sale Price items included) the customer may have `gift_qty` gifts
+ * from `gift_ids`. Returns the number allowed and how many choices are left after
+ * the gifts of this Deal already in the cart.
+ */
+function amouriq_bogo_core_gift( $deal, $paid_lines, $gift_lines ) {
+	$spend = 0.0;
+	foreach ( $paid_lines as $line ) {
+		$shown  = isset( $line['price_incl_tax'] ) ? $line['price_incl_tax'] : $line['unit_price'];
+		$spend += $line['quantity'] * $shown;
+	}
+	$allowed = round( $spend, 2 ) >= (float) ( isset( $deal['min_spend'] ) ? $deal['min_spend'] : 0 ) ? max( 0, (int) ( isset( $deal['gift_qty'] ) ? $deal['gift_qty'] : 1 ) ) : 0;
+
+	$taken = 0;
+	foreach ( $gift_lines as $line ) {
+		if ( isset( $line['gift_deal'], $deal['id'] ) && $line['gift_deal'] === $deal['id'] ) {
+			$taken += $line['quantity'];
+		}
+	}
+	return array( 'allowed' => $allowed, 'left' => max( 0, $allowed - $taken ) );
+}
+
+/**
+ * Gift lines the cart must drop: a gift whose Deal allows fewer gifts than are in
+ * the cart (none when the Deal is gone, off, or the minimum is no longer met).
+ * `$allowed` maps Deal id => gifts allowed. Returns line indexes.
+ */
+function amouriq_bogo_core_gifts_to_remove( $lines, $allowed ) {
+	$kept   = array();
+	$remove = array();
+	foreach ( $lines as $i => $line ) {
+		if ( ! amouriq_bogo_core_is_gift( $line ) ) {
+			continue;
+		}
+		$deal_id = isset( $line['gift_deal'] ) ? $line['gift_deal'] : '';
+		$room    = ( isset( $allowed[ $deal_id ] ) ? $allowed[ $deal_id ] : 0 ) - ( isset( $kept[ $deal_id ] ) ? $kept[ $deal_id ] : 0 );
+		if ( $line['quantity'] > $room ) {
+			$remove[] = $i;
+			continue;
+		}
+		$kept[ $deal_id ] = ( isset( $kept[ $deal_id ] ) ? $kept[ $deal_id ] : 0 ) + $line['quantity'];
+	}
+	return $remove;
 }
 
 /** Member Privilege's rule: percent off Regular Price lines once the item total reaches min_spend. */
@@ -109,6 +174,9 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 	// The minimum counts every item, Sale Price ones too, before any discount.
 	$spend = 0.0;
 	foreach ( $lines as $line ) {
+		if ( amouriq_bogo_core_is_gift( $line ) ) {
+			continue;
+		}
 		$price  = isset( $line['price_incl_tax'] ) ? $line['price_incl_tax'] : $line['unit_price'];
 		$spend += $line['quantity'] * $price;
 	}
@@ -120,7 +188,7 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 	$out     = $none;
 	$regular = false;
 	foreach ( $lines as $i => $line ) {
-		if ( ! empty( $line['on_sale'] ) ) {
+		if ( ! empty( $line['on_sale'] ) || amouriq_bogo_core_is_gift( $line ) ) {
 			continue;
 		}
 		$regular = true;

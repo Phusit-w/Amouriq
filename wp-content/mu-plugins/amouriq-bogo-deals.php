@@ -182,21 +182,26 @@ function amouriq_bogo_deal_discount( $deal, $cart ) {
  */
 function amouriq_bogo_cart_lines( $cart ) {
 	$lines = array();
-	foreach ( $cart->get_cart() as $cart_item ) {
+	foreach ( $cart->get_cart() as $cart_key => $cart_item ) {
 		$item_id = $cart_item['variation_id'] ? $cart_item['variation_id'] : $cart_item['product_id'];
 		$product = wc_get_product( $item_id );
 		$terms   = wp_get_post_terms( $cart_item['product_id'], 'product_cat' );
 		$terms   = is_array( $terms ) ? $terms : array();
+		// A gift (spend-threshold gift Deal) is a free line: it keeps its Deal id and costs nothing.
+		$is_gift = ! empty( $cart_item['amq_gift'] );
 
 		$lines[] = array(
-			'product_id'   => (int) $cart_item['product_id'],
-			'variation_id' => (int) $cart_item['variation_id'],
-			'quantity'     => (int) $cart_item['quantity'],
-			'unit_price'     => amouriq_bogo_unit_price( $item_id ),
+			'cart_key'       => $cart_key,
+			'is_gift'        => $is_gift,
+			'gift_deal'      => $is_gift ? $cart_item['amq_gift'] : '',
+			'product_id'     => (int) $cart_item['product_id'],
+			'variation_id'   => (int) $cart_item['variation_id'],
+			'quantity'       => (int) $cart_item['quantity'],
+			'unit_price'     => $is_gift ? 0.0 : amouriq_bogo_unit_price( $item_id ),
 			// What the shopper sees per item (tax included when the shop shows it so); the minimum spend is judged on this.
-			'price_incl_tax' =>$product ? (float) wc_get_price_to_display( $product ) : 0.0,
-			'on_sale'      => $product && $product->is_on_sale(),
-			'categories'   => array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) ),
+			'price_incl_tax' => ( $product && ! $is_gift ) ? (float) wc_get_price_to_display( $product ) : 0.0,
+			'on_sale'        => $product && $product->is_on_sale(),
+			'categories'     => array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) ),
 		);
 	}
 	return $lines;

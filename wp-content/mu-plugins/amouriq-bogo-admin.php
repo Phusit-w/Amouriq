@@ -32,6 +32,7 @@ function amouriq_bogo_type_labels() {
 		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (ทุกหมวด) ชิ้นถูกสุดลด',
 		'quantity_tier'          => 'ซื้อตามจำนวน ลดเป็นขั้น (รวมหลายสินค้า)',
 		'spend_threshold'        => 'ซื้อครบ X บาท ลด Y% หรือ Y บาท',
+		'spend_gift'             => 'ซื้อครบ X บาท เลือกของแถมฟรี',
 	);
 }
 
@@ -199,6 +200,21 @@ function amouriq_bogo_build_deal( array $in ) {
 			$deal['excluded_ids'] = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
 		}
 		// The percent field shared by the other types does not apply here.
+		unset( $deal['get_discount_percent'] );
+	}
+
+	if ( 'spend_gift' === $type ) {
+		$min = isset( $in['min_spend'] ) ? (float) $in['min_spend'] : 0;
+		if ( $min <= 0 ) {
+			return 'ใส่ยอดซื้อขั้นต่ำมากกว่า 0 บาท';
+		}
+		$gift_ids = amouriq_bogo_posted_ids( $in, 'gift_ids' );
+		if ( ! $gift_ids ) {
+			return 'ติ๊กเลือกของแถมอย่างน้อย 1 รายการ';
+		}
+		$deal['min_spend'] = $min;
+		$deal['gift_ids']  = $gift_ids;
+		$deal['gift_qty']  = max( 1, $int( 'gift_qty', 1 ) );
 		unset( $deal['get_discount_percent'] );
 	}
 
@@ -375,6 +391,9 @@ function amouriq_bogo_detail( $deal ) {
 	if ( 'cheapest_free' === $type ) {
 		$scope = ! empty( $deal['category'] ) ? 'หมวด ' . amouriq_bogo_cat_name( $deal['category'] ) : 'ทุกหมวด';
 		return $scope . ' ครบ ' . $deal['buy_qty'] . ' ชิ้น ชิ้นถูกสุด' . $off;
+	}
+	if ( 'spend_gift' === $type ) {
+		return 'ซื้อครบ ฿' . $deal['min_spend'] . ' เลือกของแถมฟรีได้ ' . ( $deal['gift_qty'] ?? 1 ) . ' ชิ้น จาก ' . count( $deal['gift_ids'] ?? array() ) . ' รายการ';
 	}
 	if ( 'spend_threshold' === $type ) {
 		$what  = 'percent' === ( $deal['mode'] ?? 'percent' ) ? $deal['value'] . '%' : '฿' . $deal['value'];
@@ -758,6 +777,7 @@ function amouriq_bogo_admin_page() {
 		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (เลือกหมวดหรือทุกหมวด) ชิ้นถูกสุดลด',
 		'quantity_tier'          => 'นับจำนวนรวมของสินค้าที่ติ๊ก (ผสมกลิ่นได้) ยิ่งมากยิ่งลดเป็นขั้น ขั้นสูงสุดที่ถึงใช้กับทุกชิ้น',
 		'spend_threshold'        => 'ยอดสั่งซื้อครบเท่าไรลดกี่ % หรือกี่บาท เลือกสินค้าที่ร่วมรายการได้',
+		'spend_gift'             => 'ยอดสั่งซื้อครบเท่าไร ลูกค้าเลือกของแถมฟรีจากรายการในตะกร้า',
 	);
 
 	$groups = $show ? amouriq_bogo_product_groups() : array();
@@ -858,9 +878,16 @@ function amouriq_bogo_admin_page() {
 					<div class="v amq-row" data-types="same_product category_cheapest_free cheapest_free"><input type="number" name="get_discount_percent" id="bogo_pct" min="0" max="100" value="<?php echo esc_attr( $v( 'get_discount_percent', 100 ) ); ?>">
 						<p class="description">100 = ฟรี</p></div>
 
-					<label class="k amq-row" data-types="spend_threshold" for="bogo_min">ยอดซื้อขั้นต่ำ (฿)</label>
-					<div class="v amq-row" data-types="spend_threshold"><input type="number" name="min_spend" id="bogo_min" min="1" step="any" value="<?php echo esc_attr( $v( 'min_spend' ) ); ?>">
+					<label class="k amq-row" data-types="spend_threshold spend_gift" for="bogo_min">ยอดซื้อขั้นต่ำ (฿)</label>
+					<div class="v amq-row" data-types="spend_threshold spend_gift"><input type="number" name="min_spend" id="bogo_min" min="1" step="any" value="<?php echo esc_attr( $v( 'min_spend' ) ); ?>">
 						<p class="description">นับทุกสินค้าในตะกร้า (รวมสินค้าลดราคา) ก่อนหักส่วนลด ไม่รวมค่าส่ง ตามราคาที่ลูกค้าเห็น</p></div>
+
+					<span class="k amq-row" data-types="spend_gift" style="font-weight:600;padding-top:6px">ของแถมที่ให้เลือก</span>
+					<div class="v amq-row" data-types="spend_gift"><?php amouriq_bogo_product_checklist( 'gift_ids', $v( 'gift_ids', array() ), $groups, $stock, 'ติ๊กได้หลายรายการ ลูกค้าเลือกเองในตะกร้า ตัวที่หมดสต็อกจะเลือกไม่ได้ ของแถมไม่นับรวมในยอดขั้นต่ำและจำนวนของดีลอื่น' ); ?></div>
+
+					<label class="k amq-row" data-types="spend_gift" for="bogo_giftq">เลือกของแถมได้กี่ชิ้น</label>
+					<div class="v amq-row" data-types="spend_gift"><input type="number" name="gift_qty" id="bogo_giftq" min="1" value="<?php echo esc_attr( $v( 'gift_qty', 1 ) ); ?>">
+						<p class="description">เลือกได้ชิ้นละหนึ่งรายการ (เลือกรายการเดิมซ้ำไม่ได้)</p></div>
 
 					<span class="k amq-row" data-types="spend_threshold" style="font-weight:600;padding-top:6px">ส่วนลด</span>
 					<div class="v amq-row" data-types="spend_threshold">
