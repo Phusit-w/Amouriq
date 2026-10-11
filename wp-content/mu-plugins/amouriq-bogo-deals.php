@@ -90,19 +90,25 @@ function amouriq_bogo_apply_deals( $cart ) {
 		}
 		$cart->add_fee( $label, -$member['discount'], false );
 	} elseif ( 'below_minimum' === $member['reason'] ) {
-		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ' );
+		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ', true );
 	} elseif ( 'coupon_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับส่วนลดสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)' );
+		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับส่วนลดสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
 	}
 }
 
 /**
  * Member Privilege is for a customer with an account: logged in, or creating one
- * in the checkout being filled in (or placed). A logged-out visitor is not a
- * member until then.
+ * in the checkout being filled in (or placed). A logged-out visitor on any
+ * other page is not a member.
  */
 function amouriq_bogo_is_member() {
-	return is_user_logged_in() || amouriq_bogo_checkout_creates_account();
+	if ( is_user_logged_in() || amouriq_bogo_checkout_creates_account() ) {
+		return true;
+	}
+	// With guest checkout off WooCommerce creates the account itself and the form
+	// sends no "create account" field, so on the checkout (not the cart) a logged-out
+	// shopper is about to register.
+	return function_exists( 'is_checkout' ) && is_checkout() && WC()->checkout() && WC()->checkout()->is_registration_required();
 }
 
 /** Whether the checkout form being refreshed or placed ticks "create an account". */
@@ -127,8 +133,15 @@ add_action(
 	5
 );
 
-/** Show the shopper a cart notice once (the cart is recalculated many times per page). */
-function amouriq_bogo_notice( $message ) {
+/**
+ * Show the shopper a cart notice once (the cart is recalculated many times per page).
+ * With $cart_pages_only it is skipped elsewhere (adding to cart, mini-cart refreshes), so a
+ * notice about a half-built cart is not queued and shown on a later page.
+ */
+function amouriq_bogo_notice( $message, $cart_pages_only = false ) {
+	if ( $cart_pages_only && ! ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() ) ) ) {
+		return;
+	}
 	if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
 		wc_add_notice( $message, 'notice' );
 	}

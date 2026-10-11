@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-human (built and unit-tested; browser check on the local site still to do)
+**Status:** ready-for-human (tested locally; only a real order placed while registering is still unchecked)
 
 - [x] 5% applies to Regular Price lines only, with no maximum, once the ฿299 minimum spend is met (boundary: 298 no, 299 yes)
 - [x] Sale Price lines are never discounted by it
@@ -26,3 +26,8 @@
 - **Not yet done (ticket 03)**: Member Privilege still stacks with native Coupons; whole-cart larger-wins comes later.
 - **Launch gate**: any Points & Rewards membership levels active on the live site must be switched off before this goes live, otherwise customers get both.
 - Not covered by automated tests: the WooCommerce layer (fee label, account detection). Check in the browser: logged out (no fee), logged in (fee), a Deal item plus other items, a Sale Price item, 298 vs 299 cart.
+
+## Local test run (2026-10-11)
+
+Driven against the local site (amouriq-backup.local) with a throwaway member and coupons (deleted afterwards): WooCommerce cart in PHP plus headless Chrome on /cart-page/ and /checkout/. Confirmed: guest sees no Member Privilege on the cart; member gets 5% (฿918 -> -฿45.90); 298 no / 299 yes; Sale Price line excluded; Deal item gets the Deal and the other item 5%; coupon 3% -> only the difference is added (same total as 5% alone); coupon 10% -> coupon wins with a notice; removing the coupon brings the 5% back; a guest on /checkout/ (guest checkout is off, so they register there) gets it. Not run: placing a real order while registering.
+Fix found by this run: with guest checkout off WooCommerce posts no `createaccount` field, so the checkout page now treats a logged-out shopper as a member (cart page still does not). The cart notices are shown only on cart/checkout pages.
