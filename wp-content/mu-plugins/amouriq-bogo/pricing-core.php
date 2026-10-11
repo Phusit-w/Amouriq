@@ -165,7 +165,7 @@ function amouriq_bogo_core_split( $deal, $lines, $discount ) {
 		return amouriq_bogo_core_cheapest_split( $deal, $lines );
 	}
 
-	if ( 'spend_threshold' === $type ) {
+	if ( 'spend_threshold' === $type || ( 'quantity_tier' === $type && ! empty( $deal['product_ids'] ) ) ) {
 		$weights = array();
 		foreach ( $lines as $i => $line ) {
 			if ( amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
@@ -460,11 +460,43 @@ function amouriq_bogo_core_cheapest_split( $deal, $lines ) {
 }
 
 /**
+ * Mix and match: the pieces of all ticked products and variations (`product_ids`,
+ * minus `excluded_ids`, minus Sale Price items when the deal skips them) are
+ * counted together. The highest tier reached gives its percent off every one of
+ * those pieces at its own price; tiers never add up.
+ */
+function amouriq_bogo_core_mix_and_match( $deal, $lines ) {
+	if ( empty( $deal['tiers'] ) || ! is_array( $deal['tiers'] ) ) {
+		return 0.0;
+	}
+
+	$qty   = 0;
+	$value = 0.0;
+	foreach ( $lines as $line ) {
+		if ( amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
+			$qty   += $line['quantity'];
+			$value += $line['quantity'] * $line['unit_price'];
+		}
+	}
+
+	$percent = 0.0;
+	foreach ( $deal['tiers'] as $tier ) {
+		if ( isset( $tier['min'], $tier['percent'] ) && $qty >= (int) $tier['min'] ) {
+			$percent = max( $percent, (float) $tier['percent'] );
+		}
+	}
+	return $value * $percent / 100;
+}
+
+/**
  * Tiered quantity discount on one product: the highest tier reached gives its
  * percent off every unit of that product in the cart. Tiers look like
  * array( array( 'min' => 6, 'percent' => 10 ), array( 'min' => 12, 'percent' => 15 ) ).
  */
 function amouriq_bogo_core_quantity_tier( $deal, $lines, $ctx ) {
+	if ( ! empty( $deal['product_ids'] ) ) {
+		return amouriq_bogo_core_mix_and_match( $deal, $lines );
+	}
 	if ( empty( $deal['product_id'] ) || empty( $deal['tiers'] ) || ! is_array( $deal['tiers'] ) ) {
 		return 0.0;
 	}

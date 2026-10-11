@@ -30,7 +30,7 @@ function amouriq_bogo_type_labels() {
 		'product_pair'           => 'ซื้อ A แล้วได้ B ลดราคา',
 		'category_cheapest_free' => 'ครบ N ชิ้นในหมวด ชิ้นถูกสุดลด',
 		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (ทุกหมวด) ชิ้นถูกสุดลด',
-		'quantity_tier'          => 'ซื้อตามจำนวน ลดเป็นขั้น (สินค้าชิ้นเดียว)',
+		'quantity_tier'          => 'ซื้อตามจำนวน ลดเป็นขั้น (รวมหลายสินค้า)',
 		'spend_threshold'        => 'ซื้อครบ X บาท ลด Y% หรือ Y บาท',
 	);
 }
@@ -48,6 +48,11 @@ function amouriq_bogo_valid_date( $value ) {
 		return false;
 	}
 	return $value;
+}
+
+/** The ticked product/variation IDs posted under $key, as a clean list of positive integers. */
+function amouriq_bogo_posted_ids( array $in, $key ) {
+	return isset( $in[ $key ] ) ? array_values( array_unique( array_filter( array_map( 'absint', (array) $in[ $key ] ) ) ) ) : array();
 }
 
 /**
@@ -159,12 +164,12 @@ function amouriq_bogo_build_deal( array $in ) {
 	}
 
 	if ( 'quantity_tier' === $type ) {
-		$pid = $int( 'product_id' );
-		if ( ! $pid || ! wc_get_product( $pid ) ) {
-			return 'ไม่พบสินค้า/variation ID นี้: ' . $pid;
+		$product_ids = amouriq_bogo_posted_ids( $in, 'product_ids' );
+		if ( ! $product_ids ) {
+			return 'ติ๊กเลือกสินค้าที่ร่วมรายการอย่างน้อย 1 รายการ';
 		}
 		$tiers = array();
-		for ( $n = 1; $n <= 3; $n++ ) {
+		for ( $n = 1; $n <= 5; $n++ ) {
 			$min = $int( 'tier_min_' . $n, 0 );
 			$pct = isset( $in[ 'tier_pct_' . $n ] ) ? (float) $in[ 'tier_pct_' . $n ] : 0;
 			if ( ! $min && '' === ( $in[ 'tier_pct_' . $n ] ?? '' ) ) {
@@ -179,8 +184,13 @@ function amouriq_bogo_build_deal( array $in ) {
 			return 'ต้องกรอกอย่างน้อย 1 ขั้น';
 		}
 		usort( $tiers, function ( $a, $b ) { return $a['min'] <=> $b['min']; } );
-		$deal['product_id'] = $pid;
-		$deal['tiers']      = $tiers;
+		$deal['product_ids'] = $product_ids;
+		$deal['tiers']       = $tiers;
+		if ( amouriq_bogo_posted_ids( $in, 'excluded_ids' ) ) {
+			$deal['excluded_ids'] = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
+		}
+		// The percent field shared by the other types does not apply here.
+		unset( $deal['get_discount_percent'] );
 	}
 
 	if ( 'spend_threshold' === $type ) {
@@ -196,14 +206,11 @@ function amouriq_bogo_build_deal( array $in ) {
 		$deal['min_spend'] = $min;
 		$deal['mode']      = $mode;
 		$deal['value']     = $value;
-		$ids = function ( $key ) use ( $in ) {
-			return isset( $in[ $key ] ) ? array_values( array_unique( array_filter( array_map( 'absint', (array) $in[ $key ] ) ) ) ) : array();
-		};
-		if ( $ids( 'product_ids' ) ) {
-			$deal['product_ids'] = $ids( 'product_ids' );
+		if ( amouriq_bogo_posted_ids( $in, 'product_ids' ) ) {
+			$deal['product_ids'] = amouriq_bogo_posted_ids( $in, 'product_ids' );
 		}
-		if ( $ids( 'excluded_ids' ) ) {
-			$deal['excluded_ids'] = $ids( 'excluded_ids' );
+		if ( amouriq_bogo_posted_ids( $in, 'excluded_ids' ) ) {
+			$deal['excluded_ids'] = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
 		}
 		// The percent field shared by the other types does not apply here.
 		unset( $deal['get_discount_percent'] );
@@ -367,7 +374,8 @@ function amouriq_bogo_detail( $deal ) {
 		foreach ( $deal['tiers'] ?? array() as $tier ) {
 			$steps[] = $tier['min'] . ' ชิ้นลด ' . $tier['percent'] . '%';
 		}
-		return amouriq_bogo_pname( $deal['product_id'] ) . ': ' . implode(' / ', $steps );
+		$what = ! empty( $deal['product_ids'] ) ? 'สินค้าที่เลือก ' . count( $deal['product_ids'] ) . ' รายการ (นับรวมกัน)' : amouriq_bogo_pname( $deal['product_id'] );
+		return $what . ': ' . implode( ' / ', $steps );
 	}
 	return 'ไม่รู้จักประเภทนี้';
 }
@@ -735,7 +743,7 @@ function amouriq_bogo_admin_page() {
 		'product_pair'           => 'ซื้อสินค้า A แล้วสินค้า B ลดราคา',
 		'category_cheapest_free' => 'ครบ N ชิ้นในหมวดที่เลือก ชิ้นถูกสุดลด',
 		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (เลือกหมวดหรือทุกหมวด) ชิ้นถูกสุดลด',
-		'quantity_tier'          => 'ซื้อสินค้าตัวเดียวกันยิ่งมากยิ่งลดเป็นขั้น เช่น 2/3/4 ชิ้นลด 2/4/6%',
+		'quantity_tier'          => 'นับจำนวนรวมของสินค้าที่ติ๊ก (ผสมกลิ่นได้) ยิ่งมากยิ่งลดเป็นขั้น ขั้นสูงสุดที่ถึงใช้กับทุกชิ้น',
 		'spend_threshold'        => 'ยอดสั่งซื้อครบเท่าไรลดกี่ % หรือกี่บาท เลือกสินค้าที่ร่วมรายการได้',
 	);
 
@@ -788,8 +796,8 @@ function amouriq_bogo_admin_page() {
 					<div class="v"><input type="text" name="label" id="bogo_label" class="amq-wide" maxlength="100" placeholder="เช่น ซื้อ 2 แถม 1" value="<?php echo esc_attr( $v( 'label' ) ); ?>">
 						<p class="description">ข้อความที่ลูกค้าเห็นในตะกร้าและหน้าชำระเงิน</p></div>
 
-					<label class="k amq-row" data-types="same_product quantity_tier">สินค้า</label>
-					<div class="v amq-row" data-types="same_product quantity_tier"><?php amouriq_bogo_product_select( 'product_id', $v( 'product_id' ), $groups ); ?></div>
+					<label class="k amq-row" data-types="same_product">สินค้า</label>
+					<div class="v amq-row" data-types="same_product"><?php amouriq_bogo_product_select( 'product_id', $v( 'product_id' ), $groups ); ?></div>
 
 					<label class="k amq-row" data-types="product_pair">สินค้า A (ซื้อ)</label>
 					<div class="v amq-row" data-types="product_pair"><?php amouriq_bogo_product_select( 'buy_product_id', $v( 'buy_product_id' ), $groups ); ?></div>
@@ -830,12 +838,22 @@ function amouriq_bogo_admin_page() {
 					<span class="k amq-row" data-types="spend_threshold" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
 					<div class="v amq-row" data-types="spend_threshold"><?php amouriq_bogo_product_checklist( 'product_ids', $v( 'product_ids', array() ), $groups, $stock, 'ไม่ติ๊กเลย = ทุกสินค้าร่วมรายการ' ); ?></div>
 
-					<span class="k amq-row" data-types="spend_threshold" style="font-weight:600;padding-top:6px">สินค้าที่ยกเว้น</span>
-					<div class="v amq-row" data-types="spend_threshold"><?php amouriq_bogo_product_checklist( 'excluded_ids', $v( 'excluded_ids', array() ), $groups, $stock, 'สินค้าที่ติ๊กจะไม่ได้ส่วนลด แต่ยังนับรวมในยอดขั้นต่ำ' ); ?></div>
+					<span class="k amq-row" data-types="quantity_tier" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
+					<?php
+					// A tier Deal saved before this form had one product; show it ticked.
+					$tier_ids = $v( 'product_ids', array() );
+					if ( ! $tier_ids && $v( 'product_id' ) ) {
+						$tier_ids = array( (int) $v( 'product_id' ) );
+					}
+					?>
+					<div class="v amq-row" data-types="quantity_tier"><?php amouriq_bogo_product_checklist( 'product_ids', $tier_ids, $groups, $stock, 'ติ๊กหลายรายการได้ เช่น ทุกกลิ่นของ Castile Soap ขนาด 250 ml จำนวนนับรวมกันข้ามกลิ่น' ); ?></div>
+
+					<span class="k amq-row" data-types="spend_threshold quantity_tier" style="font-weight:600;padding-top:6px">สินค้าที่ยกเว้น</span>
+					<div class="v amq-row" data-types="spend_threshold quantity_tier"><?php amouriq_bogo_product_checklist( 'excluded_ids', $v( 'excluded_ids', array() ), $groups, $stock, 'สินค้าที่ติ๊กจะไม่ได้ส่วนลด แต่ยังนับรวมในยอดขั้นต่ำ' ); ?></div>
 
 					<span class="k amq-row" data-types="quantity_tier" style="font-weight:600;padding-top:6px">ขั้นส่วนลด</span>
 					<div class="v amq-row" data-types="quantity_tier">
-						<?php for ( $n = 1; $n <= 3; $n++ ) :
+						<?php for ( $n = 1; $n <= 5; $n++ ) :
 							$tier = isset( $editing['tiers'][ $n - 1 ] ) ? $editing['tiers'][ $n - 1 ] : array();
 						?>
 							<p style="margin:0 0 6px">ขั้นที่ <?php echo esc_html( $n ); ?>: ซื้อตั้งแต่
