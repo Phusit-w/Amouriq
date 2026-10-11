@@ -98,7 +98,7 @@ function amouriq_bogo_choice_pick_url( $deal, $item_id ) {
 		array(
 			'amq_pick' => $deal['id'],
 			'amq_item' => $item_id,
-			'_wpnonce' => wp_create_nonce( 'amq_pick' ),
+			'_wpnonce' => wp_create_nonce( 'amq_pick_' . $deal['id'] . '_' . $item_id ),
 		),
 		wc_get_cart_url()
 	);
@@ -179,15 +179,16 @@ function amouriq_bogo_handle_pick() {
 	if ( empty( $_GET['amq_pick'] ) || empty( $_GET['amq_item'] ) || ! function_exists( 'WC' ) || ! WC()->cart ) {
 		return;
 	}
-	$back = wc_get_cart_url();
-	if ( ! wp_verify_nonce( isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '', 'amq_pick' ) ) {
+	$back    = wc_get_cart_url();
+	$deal_id = sanitize_text_field( wp_unslash( $_GET['amq_pick'] ) );
+	$item_id = absint( $_GET['amq_item'] );
+
+	// The link is good for this Deal and this item only.
+	if ( ! wp_verify_nonce( isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '', 'amq_pick_' . $deal_id . '_' . $item_id ) ) {
 		wc_add_notice( 'ลิงก์หมดอายุ กรุณาเลือกใหม่อีกครั้ง', 'error' );
 		wp_safe_redirect( $back );
 		exit;
 	}
-
-	$deal_id = sanitize_text_field( wp_unslash( $_GET['amq_pick'] ) );
-	$item_id = absint( $_GET['amq_item'] );
 
 	$chosen = null;
 	foreach ( amouriq_bogo_open_choices() as $open ) {
@@ -261,7 +262,7 @@ function amouriq_bogo_settle_gifts( $cart ) {
 			continue;
 		}
 		$item = wc_get_product( $line['variation_id'] ? $line['variation_id'] : $line['product_id'] );
-		if ( ! $item || ! $item->is_in_stock() ) {
+		if ( ! $item || ! amouriq_bogo_gift_in_stock( $item, $cart ) ) {
 			$drop[ $line['cart_key'] ] = 'stock';
 		}
 	}
@@ -288,6 +289,44 @@ function amouriq_bogo_settle_gifts( $cart ) {
 	}
 	$busy = false;
 }
+
+/**
+ * Whether one unit is left for the gift after the paid lines of the same stock. Paid
+ * lines are counted so a customer buying the last unit does not keep a gift that
+ * WooCommerce would then refuse at checkout.
+ */
+function amouriq_bogo_gift_in_stock( $item, $cart ) {
+	if ( ! $item->is_in_stock() ) {
+		return false;
+	}
+	if ( ! $item->managing_stock() || $item->backorders_allowed() ) {
+		return true;
+	}
+	$stock_id = $item->get_stock_managed_by_id();
+	$paid     = 0;
+	foreach ( $cart->get_cart() as $cart_item ) {
+		if ( ! empty( $cart_item['amq_gift'] ) ) {
+			continue;
+		}
+		$other = $cart_item['data'];
+		if ( $other && $other->get_stock_managed_by_id() === $stock_id ) {
+			$paid += (int) $cart_item['quantity'];
+		}
+	}
+	return (int) $item->get_stock_quantity() - $paid >= 1;
+}
+
+// The order line says it was a gift (the cart line is tagged, the order item gets a note).
+add_action(
+	'woocommerce_checkout_create_order_line_item',
+	static function ( $order_item, $cart_item_key, $values ) {
+		if ( ! empty( $values['amq_gift'] ) ) {
+			$order_item->add_meta_data( 'ของแถม', 'ฟรี', true );
+		}
+	},
+	10,
+	3
+);
 
 // A gift's quantity is shown, not editable, and the line says it is a gift.
 add_filter(

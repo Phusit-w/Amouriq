@@ -36,6 +36,7 @@ _Avoid_: Promotion, offer, Campaign (use Deal), "ดีล" for shipping or coup
 **Member Privilege**:
 A 5% discount on Regular Price items for any customer with an account, from their first order, with a minimum item total of ฿299 and no maximum discount. Because every buyer has an account (guest checkout is off), in practice it applies to every order. Items already on Sale Price get nothing from it. It never adds to another discount: see Stacking.
 _Avoid_: Member discount, loyalty discount (the Points & Rewards plugin's membership levels are a different, unused-by-us mechanism)
+In Thai screens it is called **สิทธิพิเศษสมาชิก** (a working choice; the owner can change it). Do not call it ส่วนลดสมาชิก, which is "member discount". It is not a Deal, so it is not listed as one: it has its own owner switch (WooCommerce > ดีล BOGO), off until switched on, so uploading the code never changes prices by itself.
 
 **Minimum spend**:
 The cart item total, before any discount and excluding shipping, that a Deal, Coupon or Member Privilege requires. It counts every item, Sale Price items included, even when the discount itself only applies to some of them.

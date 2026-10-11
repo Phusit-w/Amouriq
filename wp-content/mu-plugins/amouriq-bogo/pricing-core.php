@@ -81,7 +81,7 @@ function amouriq_bogo_core_is_gift( $line ) {
 function amouriq_bogo_core_gift( $deal, $paid_lines, $gift_lines ) {
 	$spend = 0.0;
 	foreach ( $paid_lines as $line ) {
-		$shown  = isset( $line['price_incl_tax'] ) ? $line['price_incl_tax'] : $line['unit_price'];
+		$shown  = amouriq_bogo_core_shown_price( $line );
 		$spend += $line['quantity'] * $shown;
 	}
 	$allowed = round( $spend, 2 ) >= (float) ( isset( $deal['min_spend'] ) ? $deal['min_spend'] : 0 ) ? max( 0, (int) ( isset( $deal['gift_qty'] ) ? $deal['gift_qty'] : 1 ) ) : 0;
@@ -177,8 +177,7 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 		if ( amouriq_bogo_core_is_gift( $line ) ) {
 			continue;
 		}
-		$price  = isset( $line['price_incl_tax'] ) ? $line['price_incl_tax'] : $line['unit_price'];
-		$spend += $line['quantity'] * $price;
+		$spend += $line['quantity'] * amouriq_bogo_core_shown_price( $line );
 	}
 	if ( round( $spend, 2 ) < $rule['min_spend'] ) {
 		$none['reason'] = 'below_minimum';
@@ -376,18 +375,25 @@ function amouriq_bogo_core_threshold_eligible( $line, $deal ) {
 	if ( amouriq_bogo_core_excluded( $line, $deal ) ) {
 		return false;
 	}
-	$matches = static function ( $ids ) use ( $line ) {
-		foreach ( (array) $ids as $id ) {
-			if ( (int) $line['product_id'] === (int) $id || ( $line['variation_id'] && (int) $line['variation_id'] === (int) $id ) ) {
-				return true;
-			}
-		}
-		return false;
-	};
-	if ( ! empty( $deal['product_ids'] ) && ! $matches( $deal['product_ids'] ) ) {
+	if ( ! empty( $deal['product_ids'] ) && ! amouriq_bogo_core_line_is_any_of( $line, $deal['product_ids'] ) ) {
 		return false;
 	}
-	return empty( $deal['excluded_ids'] ) || ! $matches( $deal['excluded_ids'] );
+	return empty( $deal['excluded_ids'] ) || ! amouriq_bogo_core_line_is_any_of( $line, $deal['excluded_ids'] );
+}
+
+/** True when the line is one of these products or variations (a product ID also covers all its variations). */
+function amouriq_bogo_core_line_is_any_of( $line, $ids ) {
+	foreach ( (array) $ids as $id ) {
+		if ( (int) $line['product_id'] === (int) $id || ( $line['variation_id'] && (int) $line['variation_id'] === (int) $id ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** The price of one unit as the shopper sees it (tax included when the shop shows it so). */
+function amouriq_bogo_core_shown_price( $line ) {
+	return isset( $line['price_incl_tax'] ) ? (float) $line['price_incl_tax'] : (float) $line['unit_price'];
 }
 
 /**
@@ -402,7 +408,7 @@ function amouriq_bogo_core_spend_threshold( $deal, $lines ) {
 	$ex    = 0.0;
 	$incl  = 0.0;
 	foreach ( $lines as $line ) {
-		$shown  = isset( $line['price_incl_tax'] ) ? $line['price_incl_tax'] : $line['unit_price'];
+		$shown  = amouriq_bogo_core_shown_price( $line );
 		$spend += $line['quantity'] * $shown;
 		if ( amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
 			$ex   += $line['quantity'] * $line['unit_price'];
@@ -485,14 +491,6 @@ function amouriq_bogo_core_pair_choice( $deal, $lines ) {
 	$baht    = isset( $deal['get_mode'] ) && 'baht' === $deal['get_mode'];
 	$value   = isset( $deal['get_value'] ) ? (float) $deal['get_value'] : 100.0;
 
-	$matches = static function ( $line, $ids ) {
-		foreach ( (array) $ids as $id ) {
-			if ( (int) $line['product_id'] === (int) $id || ( $line['variation_id'] && (int) $line['variation_id'] === (int) $id ) ) {
-				return true;
-			}
-		}
-		return false;
-	};
 
 	$buy_in_cart = 0;
 	$b_lines     = array();
@@ -500,9 +498,9 @@ function amouriq_bogo_core_pair_choice( $deal, $lines ) {
 		if ( amouriq_bogo_core_excluded( $line, $deal ) ) {
 			continue;
 		}
-		if ( $matches( $line, $deal['get_product_ids'] ) ) {
+		if ( amouriq_bogo_core_line_is_any_of( $line, $deal['get_product_ids'] ) ) {
 			$b_lines[ $i ] = $line;
-		} elseif ( $matches( $line, $deal['buy_product_id'] ) ) {
+		} elseif ( amouriq_bogo_core_line_is_any_of( $line, $deal['buy_product_id'] ) ) {
 			$buy_in_cart += $line['quantity'];
 		}
 	}
@@ -519,7 +517,7 @@ function amouriq_bogo_core_pair_choice( $deal, $lines ) {
 
 		$unit = (float) $line['unit_price'];
 		if ( $baht ) {
-			$shown = isset( $line['price_incl_tax'] ) ? (float) $line['price_incl_tax'] : $unit;
+			$shown = amouriq_bogo_core_shown_price( $line );
 			$each  = $shown > 0 ? min( $unit, $value * $unit / $shown ) : 0.0;
 		} else {
 			$each = $unit * min( 100.0, $value ) / 100;

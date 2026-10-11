@@ -196,8 +196,9 @@ function amouriq_bogo_build_deal( array $in ) {
 		usort( $tiers, function ( $a, $b ) { return $a['min'] <=> $b['min']; } );
 		$deal['product_ids'] = $product_ids;
 		$deal['tiers']       = $tiers;
-		if ( amouriq_bogo_posted_ids( $in, 'excluded_ids' ) ) {
-			$deal['excluded_ids'] = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
+		$excluded = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
+		if ( $excluded ) {
+			$deal['excluded_ids'] = $excluded;
 		}
 		// The percent field shared by the other types does not apply here.
 		unset( $deal['get_discount_percent'] );
@@ -248,6 +249,11 @@ function amouriq_bogo_build_deal( array $in ) {
 		$deal['no_combine'] = true;
 	}
 
+	if ( 'spend_gift' === $type ) {
+		// A gift is a free line, not a discount: sale items, per-customer and per-order limits do not apply to it.
+		unset( $deal['exclude_sale'], $deal['max_uses_per_customer'], $deal['max_per_order'] );
+	}
+
 	if ( '' === $label ) {
 		$deal['label'] = 'Deal discount';
 	}
@@ -267,6 +273,15 @@ function amouriq_bogo_admin_handle() {
 	$index  = isset( $_POST['index'] ) ? (int) $_POST['index'] : -1;
 	$back   = admin_url( 'admin.php?page=amouriq-bogo' );
 
+	// A second browser tab can hold an older list: act only on the Deal the page showed.
+	if ( in_array( $action, array( 'delete', 'toggle_deal', 'update' ), true ) && isset( $_POST['deal_id'] ) ) {
+		if ( ! isset( $deals[ $index ] ) || ( isset( $deals[ $index ]['id'] ) ? $deals[ $index ]['id'] : '' ) !== sanitize_text_field( wp_unslash( $_POST['deal_id'] ) ) ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, 'รายการดีลเปลี่ยนไปแล้ว (อาจมีการแก้ไขหรือลบจากหน้าอื่น) ไม่ได้ทำรายการ กรุณาดูรายการล่าสุดแล้วลองใหม่', 60 );
+			wp_safe_redirect( $back );
+			exit;
+		}
+	}
+
 	if ( 'delete' === $action ) {
 		if ( isset( $deals[ $index ] ) ) {
 			unset( $deals[ $index ] );
@@ -281,7 +296,7 @@ function amouriq_bogo_admin_handle() {
 	} elseif ( 'toggle_member' === $action ) {
 		$turn_on = ! amouriq_member_privilege_enabled();
 		update_option( 'amouriq_member_privilege', $turn_on ? 'yes' : 'no', false );
-		set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดส่วนลดสมาชิก 5% แล้ว' : 'ปิดส่วนลดสมาชิก 5% แล้ว', 60 );
+		set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดสิทธิพิเศษสมาชิก 5% แล้ว' : 'ปิดสิทธิพิเศษสมาชิก 5% แล้ว', 60 );
 		wp_safe_redirect( $back );
 		exit;
 	} elseif ( 'toggle_coupon' === $action ) {
@@ -594,19 +609,20 @@ function amouriq_bogo_page_url() {
 /**
  * Small POST button for one row action (toggle, delete).
  */
-function amouriq_bogo_action_form( $action, $field, $value, $label, $class = 'button', $confirm = '' ) {
+function amouriq_bogo_action_form( $action, $field, $value, $label, $class = 'button', $confirm = '', $deal_id = '' ) {
 	?>
 	<form method="post" action="<?php echo esc_url( amouriq_bogo_page_url() ); ?>" style="display:inline"<?php echo $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : ''; ?>>
 		<?php wp_nonce_field( 'amouriq_bogo_save' ); ?>
 		<input type="hidden" name="amouriq_bogo_action" value="<?php echo esc_attr( $action ); ?>">
 		<input type="hidden" name="<?php echo esc_attr( $field ); ?>" value="<?php echo esc_attr( $value ); ?>">
+		<?php if ( '' !== $deal_id ) : ?><input type="hidden" name="deal_id" value="<?php echo esc_attr( $deal_id ); ?>"><?php endif; ?>
 		<button class="<?php echo esc_attr( $class ); ?>"><?php echo esc_html( $label ); ?></button>
 	</form>
 	<?php
 }
 
 function amouriq_bogo_badge( $state ) {
-	if ( 'ใช้งานอยู่' === $state ) {
+	if ( 'ใช้งานอยู่' === $state || 'เปิดอยู่' === $state ) {
 		$class = 'on';
 	} elseif ( 'ปิดอยู่' === $state ) {
 		$class = 'off';
@@ -647,12 +663,12 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 		</tr>
 		<?php $member_on = amouriq_member_privilege_enabled(); ?>
 		<tr class="<?php echo $member_on ? '' : 'amq-dim'; ?>">
-			<td><span class="amq-kind amq-kind-deal">ส่วนลดสมาชิก</span></td>
-			<td><strong>ส่วนลดสมาชิก 5%</strong><br>ลูกค้าที่มีบัญชี ลด 5% เฉพาะสินค้าราคาปกติ เมื่อยอดสินค้าครบ ฿299 ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า)<br>
+			<td><span class="amq-kind amq-kind-member">สิทธิพิเศษสมาชิก</span></td>
+			<td><strong>สิทธิพิเศษสมาชิก 5%</strong><br>ลูกค้าที่มีบัญชี ลด 5% เฉพาะสินค้าราคาปกติ เมื่อยอดสินค้าครบ ฿299 ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า)<br>
 				<small>ตรวจ Discount Rules เดิมและ Points &amp; Rewards ก่อนเปิด เพื่อไม่ให้ลดซ้ำ</small></td>
-			<td><?php echo amouriq_bogo_badge( $member_on ? 'ใช้งานอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></td>
+			<td><?php echo amouriq_bogo_badge( $member_on ? 'เปิดอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></td>
 			<td>—</td>
-			<td><?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $member_on ? 'ปิด' : 'เปิด', $member_on ? 'button' : 'button button-primary', $member_on ? '' : 'เปิดส่วนลดสมาชิก 5% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?></td>
+			<td><?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $member_on ? 'ปิด' : 'เปิด', $member_on ? 'button' : 'button button-primary', $member_on ? '' : 'เปิดสิทธิพิเศษสมาชิก 5% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?></td>
 		</tr>
 		<?php foreach ( $deals as $i => $deal ) :
 			$rep   = $report[ $deal['id'] ?? '' ] ?? array( 'orders' => 0, 'total' => 0 );
@@ -669,9 +685,9 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 				<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
 				<td><?php echo esc_html( $rep['orders'] ); ?> ออเดอร์<br><small>ลดรวม ฿<?php echo esc_html( number_format( $rep['total'], 2 ) ); ?></small></td>
 				<td style="white-space:nowrap">
-					<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary' ); ?>
+					<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
 					<a class="button" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
-					<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-link-delete', 'ลบดีลนี้?' ); ?>
+					<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-link-delete', 'ลบดีลนี้?', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
 				</td>
 			</tr>
 		<?php endforeach; ?>
@@ -732,6 +748,7 @@ function amouriq_bogo_admin_css() {
 		.amq-warn { background:#fdecc8; color:#7a4a00; }
 		.amq-kind { font-weight:600; }
 		.amq-kind-deal { color:#2271b1; }
+		.amq-kind-member { color:#1d6b3a; }
 		.amq-kind-coupon { color:#8a4b00; }
 		.amq-chip { display:inline-block; margin:4px 4px 0 0; padding:1px 8px; background:#eef2f6; border-radius:4px; font-size:12px; color:#3c434a; }
 		.amq-card { max-width:1250px; background:#fff; border:1px solid #c3c4c7; border-radius:4px; padding:4px 24px 20px; margin-top:24px; }
@@ -823,6 +840,7 @@ function amouriq_bogo_admin_page() {
 				<input type="hidden" name="amouriq_bogo_action" value="<?php echo $editing ? 'update' : 'add'; ?>">
 				<?php if ( $editing ) : ?>
 					<input type="hidden" name="index" value="<?php echo esc_attr( $edit_at ); ?>">
+					<input type="hidden" name="deal_id" value="<?php echo esc_attr( isset( $editing['id'] ) ? $editing['id'] : '' ); ?>">
 				<?php endif; ?>
 
 				<h2><?php echo $editing ? 'แก้ไขดีล #' . esc_html( $edit_at + 1 ) : 'เพิ่มดีลใหม่'; ?></h2>
@@ -957,18 +975,18 @@ function amouriq_bogo_admin_page() {
 					<div class="amq-grid">
 						<span class="k" style="font-weight:600">เงื่อนไขพิเศษ</span>
 						<div class="v">
-							<label><input type="checkbox" name="exclude_sale" value="1" <?php checked( $editing ? ! empty( $editing['exclude_sale'] ) : true ); ?>> ไม่รวมสินค้าที่ลดราคาอยู่แล้ว (ไม่ได้ส่วนลด; ยังนับในยอดขั้นต่ำ)</label><br>
+							<label class="amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="checkbox" name="exclude_sale" value="1" <?php checked( $editing ? ! empty( $editing['exclude_sale'] ) : true ); ?>> ไม่รวมสินค้าที่ลดราคาอยู่แล้ว (ไม่ได้ส่วนลด; ยังนับในยอดขั้นต่ำ)</label><br>
 							<label><input type="checkbox" name="no_combine" value="1" <?php checked( ! empty( $editing['no_combine'] ) ); ?>> ไม่ใช้ร่วมกับคูปองอื่น (คูปองที่เปิดดีลนี้เองไม่นับ)</label>
 						</div>
 						<label class="k" for="bogo_from">ใช้ได้ตั้งแต่</label>
 						<div class="v"><input type="datetime-local" name="valid_from" id="bogo_from" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_from' ), false ) ); ?>"> <span class="description">เว้นว่าง = ใช้ได้ทันที</span></div>
 						<label class="k" for="bogo_to">ใช้ได้ถึง</label>
 						<div class="v"><input type="datetime-local" name="valid_to" id="bogo_to" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_to' ), true ) ); ?>"> <span class="description">เว้นว่าง = ไม่มีวันหมด</span></div>
-						<label class="k" for="bogo_maxc">จำกัดต่อลูกค้า (ครั้ง)</label>
-						<div class="v"><input type="number" name="max_uses_per_customer" id="bogo_maxc" min="0" value="<?php echo esc_attr( $v( 'max_uses_per_customer', 0 ) ); ?>">
+						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold" for="bogo_maxc">จำกัดต่อลูกค้า (ครั้ง)</label>
+						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="number" name="max_uses_per_customer" id="bogo_maxc" min="0" value="<?php echo esc_attr( $v( 'max_uses_per_customer', 0 ) ); ?>">
 							<p class="description">0 = ไม่จำกัด ลูกค้าที่ล็อกอินนับตามบัญชี ที่ยังไม่ล็อกอินนับตามอีเมลตอนชำระเงิน</p></div>
-						<label class="k" for="bogo_maxo">จำกัดต่อออเดอร์ (ครั้ง)</label>
-						<div class="v"><input type="number" name="max_per_order" id="bogo_maxo" min="0" value="<?php echo esc_attr( $v( 'max_per_order', 0 ) ); ?>">
+						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold" for="bogo_maxo">จำกัดต่อออเดอร์ (ครั้ง)</label>
+						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="number" name="max_per_order" id="bogo_maxo" min="0" value="<?php echo esc_attr( $v( 'max_per_order', 0 ) ); ?>">
 							<p class="description">0 = ไม่จำกัด</p></div>
 					</div>
 				</details>

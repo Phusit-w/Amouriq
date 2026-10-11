@@ -82,17 +82,17 @@ function amouriq_bogo_apply_deals( $cart ) {
 	if ( $member['discount'] > 0 ) {
 		// When a Deal gave more on some item, this fee is only the rest, so don't claim a flat 5%.
 		if ( 'member' === $member['winner'] ) {
-			$label = 'ส่วนลดสมาชิก 5% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
+			$label = 'สิทธิพิเศษสมาชิก 5% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
 		} elseif ( $member['deal_won'] ) {
-			$label = 'ส่วนลดสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า 5%)';
+			$label = 'สิทธิพิเศษสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า 5%)';
 		} else {
-			$label = 'ส่วนลดสมาชิก 5% (สินค้าราคาปกติ)';
+			$label = 'สิทธิพิเศษสมาชิก 5% (สินค้าราคาปกติ)';
 		}
 		$cart->add_fee( $label, -$member['discount'], false );
 	} elseif ( 'below_minimum' === $member['reason'] ) {
-		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ', true );
+		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับสิทธิพิเศษสมาชิก 5% สำหรับสินค้าราคาปกติ', true );
 	} elseif ( 'coupon_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับส่วนลดสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
+		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับสิทธิพิเศษสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
 	}
 }
 
