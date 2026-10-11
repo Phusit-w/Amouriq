@@ -13,7 +13,9 @@
  *               a callable given the deal and returning either, so the lookup only runs when needed),
  *               prices (product or variation id => tax-exclusive unit price)
  *
- * Returns array( 'discount' => float, 'per_line' => array, 'reason' => string|null ).
+ * Returns array( 'discount' => float, 'per_line' => array, 'reason' => string|null,
+ * 'choices_left' => int ), `choices_left` being how many more items the customer
+ * may pick for a buy-A-choose-B Deal (0 for every other Deal).
  * `per_line` splits the discount over the cart lines (line index => amount; the
  * amounts add up to `discount`). `reason` says why a Deal gave nothing when it was
  * stopped before the maths:
@@ -31,15 +33,23 @@ defined( 'ABSPATH' ) || exit;
 function amouriq_bogo_price( $deal, $lines, $ctx ) {
 	$reason = amouriq_bogo_core_stop_reason( $deal, $ctx );
 	if ( null !== $reason ) {
-		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => $reason );
+		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => $reason, 'choices_left' => 0 );
 	}
 	// A callable, so the caller only builds the cart lines for a deal that got this far.
-	$lines    = is_callable( $lines ) ? call_user_func( $lines ) : $lines;
+	$lines = is_callable( $lines ) ? call_user_func( $lines ) : $lines;
+
+	// A buy-A-choose-B Deal also says how many B the customer may still pick.
+	if ( amouriq_bogo_core_is_pair_choice( $deal ) ) {
+		$pair = amouriq_bogo_core_pair_choice( $deal, $lines );
+		return array( 'discount' => $pair['discount'], 'per_line' => $pair['per_line'], 'reason' => null, 'choices_left' => $pair['left'] );
+	}
+
 	$discount = (float) amouriq_bogo_core_discount( $deal, $lines, $ctx );
 	return array(
-		'discount' => $discount,
-		'per_line' => $discount > 0 ? amouriq_bogo_core_split( $deal, $lines, $discount ) : array(),
-		'reason'   => null,
+		'discount'     => $discount,
+		'per_line'     => $discount > 0 ? amouriq_bogo_core_split( $deal, $lines, $discount ) : array(),
+		'reason'       => null,
+		'choices_left' => 0,
 	);
 }
 
@@ -387,6 +397,70 @@ function amouriq_bogo_core_same_product( $deal, $lines, $ctx ) {
 	}
 
 	return $groups * $get_qty * amouriq_bogo_core_price_of( $deal['product_id'], $ctx ) * ( $percent / 100 );
+}
+
+/** True for a product-pair Deal that lists several choosable B items (`get_product_ids`). */
+function amouriq_bogo_core_is_pair_choice( $deal ) {
+	return isset( $deal['type'] ) && 'product_pair' === $deal['type'] && ! empty( $deal['get_product_ids'] ) && ! empty( $deal['buy_product_id'] );
+}
+
+/**
+ * Buy `buy_qty` of A, then `get_qty` of the ticked B items (`get_product_ids`) get
+ * `get_value` percent (or baht, `get_mode`) off. The B items are ordinary cart
+ * lines the customer picked; the discount goes to the first units of B in cart
+ * order, up to the allowance. Returns array( 'discount', 'per_line', 'left' ),
+ * `left` being the choices the customer has not used yet.
+ */
+function amouriq_bogo_core_pair_choice( $deal, $lines ) {
+	$buy_qty = max( 1, (int) ( isset( $deal['buy_qty'] ) ? $deal['buy_qty'] : 1 ) );
+	$get_qty = max( 1, (int) ( isset( $deal['get_qty'] ) ? $deal['get_qty'] : 1 ) );
+	$baht    = isset( $deal['get_mode'] ) && 'baht' === $deal['get_mode'];
+	$value   = isset( $deal['get_value'] ) ? (float) $deal['get_value'] : 100.0;
+
+	$matches = static function ( $line, $ids ) {
+		foreach ( (array) $ids as $id ) {
+			if ( (int) $line['product_id'] === (int) $id || ( $line['variation_id'] && (int) $line['variation_id'] === (int) $id ) ) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	$buy_in_cart = 0;
+	$b_lines     = array();
+	foreach ( $lines as $i => $line ) {
+		if ( amouriq_bogo_core_excluded( $line, $deal ) ) {
+			continue;
+		}
+		if ( $matches( $line, $deal['get_product_ids'] ) ) {
+			$b_lines[ $i ] = $line;
+		} elseif ( $matches( $line, $deal['buy_product_id'] ) ) {
+			$buy_in_cart += $line['quantity'];
+		}
+	}
+
+	$allowed = amouriq_bogo_core_cap( intdiv( $buy_in_cart, $buy_qty ), $deal ) * $get_qty;
+	$left    = $allowed;
+	$out     = array( 'discount' => 0.0, 'per_line' => array(), 'left' => 0 );
+	foreach ( $b_lines as $i => $line ) {
+		if ( $left <= 0 ) {
+			break;
+		}
+		$units = min( $left, $line['quantity'] );
+		$left -= $units;
+
+		$unit = (float) $line['unit_price'];
+		if ( $baht ) {
+			$shown = isset( $line['price_incl_tax'] ) ? (float) $line['price_incl_tax'] : $unit;
+			$each  = $shown > 0 ? min( $unit, $value * $unit / $shown ) : 0.0;
+		} else {
+			$each = $unit * min( 100.0, $value ) / 100;
+		}
+		$out['per_line'][ $i ] = $units * $each;
+		$out['discount']      += $units * $each;
+	}
+	$out['left'] = max( 0, $left );
+	return $out;
 }
 
 function amouriq_bogo_core_product_pair( $deal, $lines, $ctx ) {

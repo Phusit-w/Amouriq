@@ -27,7 +27,7 @@ function amouriq_bogo_admin_menu() {
 function amouriq_bogo_type_labels() {
 	return array(
 		'same_product'           => 'ซื้อ X แถม Y (สินค้าเดียวกัน)',
-		'product_pair'           => 'ซื้อ A แล้วได้ B ลดราคา',
+		'product_pair'           => 'ซื้อ A แล้วเลือก B ลดราคา',
 		'category_cheapest_free' => 'ครบ N ชิ้นในหมวด ชิ้นถูกสุดลด',
 		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (ทุกหมวด) ชิ้นถูกสุดลด',
 		'quantity_tier'          => 'ซื้อตามจำนวน ลดเป็นขั้น (รวมหลายสินค้า)',
@@ -129,17 +129,26 @@ function amouriq_bogo_build_deal( array $in ) {
 
 	if ( 'product_pair' === $type ) {
 		$buy = $int( 'buy_product_id' );
-		$get = $int( 'get_product_id' );
 		if ( ! $buy || ! wc_get_product( $buy ) ) {
 			return 'ไม่พบสินค้า A (buy) ID นี้: ' . $buy;
 		}
-		if ( ! $get || ! wc_get_product( $get ) ) {
-			return 'ไม่พบสินค้า B (get) ID นี้: ' . $get;
+		$get_ids = amouriq_bogo_posted_ids( $in, 'get_product_ids' );
+		if ( ! $get_ids ) {
+			return 'ติ๊กเลือกสินค้า B ที่ให้ลูกค้าเลือกอย่างน้อย 1 รายการ';
 		}
-		$deal['buy_product_id'] = $buy;
-		$deal['get_product_id'] = $get;
-		$deal['buy_qty']        = max( 1, $int( 'buy_qty', 1 ) );
-		$deal['get_qty']        = max( 1, $int( 'get_qty', 1 ) );
+		$mode  = ( isset( $in['get_mode'] ) && 'baht' === $in['get_mode'] ) ? 'baht' : 'percent';
+		$value = isset( $in['get_value'] ) && '' !== $in['get_value'] ? (float) $in['get_value'] : 0;
+		if ( $value <= 0 || ( 'percent' === $mode && $value > 100 ) ) {
+			return 'ส่วนลดของสินค้า B ต้องมากกว่า 0 (เป็น % ต้องไม่เกิน 100)';
+		}
+		$deal['buy_product_id']  = $buy;
+		$deal['get_product_ids'] = $get_ids;
+		$deal['buy_qty']         = max( 1, $int( 'buy_qty', 1 ) );
+		$deal['get_qty']         = max( 1, $int( 'get_qty', 1 ) );
+		$deal['get_mode']        = $mode;
+		$deal['get_value']       = $value;
+		// Replaced by get_mode / get_value.
+		unset( $deal['get_discount_percent'] );
 	}
 
 	if ( 'category_cheapest_free' === $type ) {
@@ -354,6 +363,10 @@ function amouriq_bogo_detail( $deal ) {
 		return 'ซื้อ ' . $deal['buy_qty'] . ' แถม ' . $deal['get_qty'] . ' (' . $off . '): ' . amouriq_bogo_pname( $deal['product_id'] );
 	}
 	if ( 'product_pair' === $type ) {
+		if ( ! empty( $deal['get_product_ids'] ) ) {
+			$what = 'percent' === ( $deal['get_mode'] ?? 'percent' ) ? 'ลด ' . $deal['get_value'] . '%' : 'ลด ฿' . $deal['get_value'];
+			return 'ซื้อ ' . amouriq_bogo_pname( $deal['buy_product_id'] ) . ' × ' . ( $deal['buy_qty'] ?? 1 ) . ' เลือก B ได้ ' . ( $deal['get_qty'] ?? 1 ) . ' ชิ้น (' . $what . ') จาก ' . count( $deal['get_product_ids'] ) . ' รายการ';
+		}
 		return 'ซื้อ ' . amouriq_bogo_pname( $deal['buy_product_id'] ) . ' × ' . ( $deal['buy_qty'] ?? 1 ) . ' ได้ ' . amouriq_bogo_pname( $deal['get_product_id'] ) . ' × ' . ( $deal['get_qty'] ?? 1 ) . ' (' . $off . ')';
 	}
 	if ( 'category_cheapest_free' === $type ) {
@@ -740,7 +753,7 @@ function amouriq_bogo_admin_page() {
 
 	$type_help = array(
 		'same_product'           => 'เช่น ซื้อ 2 แถม 1 ของสินค้าตัวเดียวกัน',
-		'product_pair'           => 'ซื้อสินค้า A แล้วสินค้า B ลดราคา',
+		'product_pair'           => 'ซื้อสินค้า A ครบแล้วลูกค้าเลือก B (จากรายการที่ติ๊ก) ในตะกร้าเพื่อรับส่วนลด',
 		'category_cheapest_free' => 'ครบ N ชิ้นในหมวดที่เลือก ชิ้นถูกสุดลด',
 		'cheapest_free'          => 'ครบ N ชิ้นในตะกร้า (เลือกหมวดหรือทุกหมวด) ชิ้นถูกสุดลด',
 		'quantity_tier'          => 'นับจำนวนรวมของสินค้าที่ติ๊ก (ผสมกลิ่นได้) ยิ่งมากยิ่งลดเป็นขั้น ขั้นสูงสุดที่ถึงใช้กับทุกชิ้น',
@@ -802,8 +815,28 @@ function amouriq_bogo_admin_page() {
 					<label class="k amq-row" data-types="product_pair">สินค้า A (ซื้อ)</label>
 					<div class="v amq-row" data-types="product_pair"><?php amouriq_bogo_product_select( 'buy_product_id', $v( 'buy_product_id' ), $groups ); ?></div>
 
-					<label class="k amq-row" data-types="product_pair">สินค้า B (ได้ส่วนลด)</label>
-					<div class="v amq-row" data-types="product_pair"><?php amouriq_bogo_product_select( 'get_product_id', $v( 'get_product_id' ), $groups ); ?></div>
+					<span class="k amq-row" data-types="product_pair" style="font-weight:600;padding-top:6px">สินค้า B (ลูกค้าเลือกในตะกร้า)</span>
+					<?php
+					// A pair Deal saved before this form had one B; show it ticked.
+					$pair_ids = $v( 'get_product_ids', array() );
+					if ( ! $pair_ids && $v( 'get_product_id' ) ) {
+						$pair_ids = array( (int) $v( 'get_product_id' ) );
+					}
+					?>
+					<div class="v amq-row" data-types="product_pair"><?php amouriq_bogo_product_checklist( 'get_product_ids', $pair_ids, $groups, $stock, 'ติ๊กได้หลายรายการ เช่น ทุกกลิ่นของ Castile Soap 250 ml ลูกค้าจะเลือกเองในตะกร้า (ตัวที่หมดสต็อกจะเลือกไม่ได้)' ); ?></div>
+
+					<label class="k amq-row" data-types="product_pair" for="bogo_gq2">จำนวน B ที่ได้ส่วนลด (ชิ้น)</label>
+					<div class="v amq-row" data-types="product_pair"><input type="number" name="get_qty" id="bogo_gq2" min="1" value="<?php echo esc_attr( $v( 'get_qty', 1 ) ); ?>"></div>
+
+					<span class="k amq-row" data-types="product_pair" style="font-weight:600;padding-top:6px">ส่วนลดของ B</span>
+					<div class="v amq-row" data-types="product_pair">
+						<?php
+						$pair_mode  = $v( 'get_mode', 'percent' );
+						$pair_value = $v( 'get_value', $v( 'get_discount_percent', '' ) );
+						?>
+						<input type="number" name="get_value" min="0" step="any" style="width:110px" value="<?php echo esc_attr( $pair_value ); ?>">
+						<select name="get_mode"><option value="percent" <?php selected( $pair_mode, 'percent' ); ?>>%</option><option value="baht" <?php selected( $pair_mode, 'baht' ); ?>>บาทต่อชิ้น (ไม่เกินราคาสินค้า)</option></select>
+					</div>
 
 					<label class="k amq-row" data-types="category_cheapest_free cheapest_free" for="bogo_cat">หมวดสินค้า</label>
 					<div class="v amq-row" data-types="category_cheapest_free cheapest_free">
@@ -815,14 +848,14 @@ function amouriq_bogo_admin_page() {
 						</select>
 					</div>
 
-					<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free" for="bogo_bq">ซื้อกี่ชิ้น</label>
+					<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free" for="bogo_bq">ซื้อกี่ชิ้น (สินค้า A)</label>
 					<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free"><input type="number" name="buy_qty" id="bogo_bq" min="1" value="<?php echo esc_attr( $v( 'buy_qty', 1 ) ); ?>"></div>
 
-					<label class="k amq-row" data-types="same_product product_pair" for="bogo_gq">แถมกี่ชิ้น</label>
-					<div class="v amq-row" data-types="same_product product_pair"><input type="number" name="get_qty" id="bogo_gq" min="1" value="<?php echo esc_attr( $v( 'get_qty', 1 ) ); ?>"></div>
+					<label class="k amq-row" data-types="same_product" for="bogo_gq">แถมกี่ชิ้น</label>
+					<div class="v amq-row" data-types="same_product"><input type="number" name="get_qty" id="bogo_gq" min="1" value="<?php echo esc_attr( $v( 'get_qty', 1 ) ); ?>"></div>
 
-					<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free" for="bogo_pct">ส่วนลดของชิ้นที่ได้ (%)</label>
-					<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free"><input type="number" name="get_discount_percent" id="bogo_pct" min="0" max="100" value="<?php echo esc_attr( $v( 'get_discount_percent', 100 ) ); ?>">
+					<label class="k amq-row" data-types="same_product category_cheapest_free cheapest_free" for="bogo_pct">ส่วนลดของชิ้นที่ได้ (%)</label>
+					<div class="v amq-row" data-types="same_product category_cheapest_free cheapest_free"><input type="number" name="get_discount_percent" id="bogo_pct" min="0" max="100" value="<?php echo esc_attr( $v( 'get_discount_percent', 100 ) ); ?>">
 						<p class="description">100 = ฟรี</p></div>
 
 					<label class="k amq-row" data-types="spend_threshold" for="bogo_min">ยอดซื้อขั้นต่ำ (฿)</label>
@@ -913,11 +946,19 @@ function amouriq_bogo_admin_page() {
 				var trig = form.querySelector('input[name=trigger]:checked');
 				type = type ? type.value : '';
 				trig = trig ? trig.value : 'auto';
+				// Fields of a type that is not chosen are hidden and also disabled, so they are not posted
+				// (several types share field names such as product_ids and get_qty).
+				function show(el, visible) {
+					el.hidden = !visible;
+					el.querySelectorAll('input, select, textarea').forEach(function (field) {
+						field.disabled = !visible;
+					});
+				}
 				form.querySelectorAll('[data-types]').forEach(function (el) {
-					el.hidden = el.getAttribute('data-types').split(' ').indexOf(type) === -1;
+					show(el, el.getAttribute('data-types').split(' ').indexOf(type) !== -1);
 				});
 				form.querySelectorAll('[data-trigger]').forEach(function (el) {
-					el.hidden = el.getAttribute('data-trigger') !== trig;
+					show(el, el.getAttribute('data-trigger') === trig);
 				});
 			}
 			form.querySelectorAll('.amq-check-filter').forEach(function (box) {
