@@ -421,7 +421,7 @@ function amouriq_points_account_page() {
 	foreach ( array_slice( $ledger, 0, 50 ) as $row ) {
 		$type = isset( $row['type'] ) ? $row['type'] : '';
 		printf(
-			'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+			'<tr><td data-title="วันที่">%s</td><td data-title="รายการ">%s</td><td data-title="ออเดอร์">%s</td><td data-title="แต้ม">%s</td></tr>',
 			esc_html( wp_date( 'j M Y', $row['time'] ) ),
 			esc_html( isset( $names[ $type ] ) ? $names[ $type ] : $type ),
 			! empty( $row['order_id'] ) ? esc_html( '#' . $row['order_id'] ) : '—',
@@ -1260,7 +1260,7 @@ function amouriq_points_account_rewards( $user_id, $balance ) {
 				$status = 'ใช้ได้' . ( $expires ? ' ถึง ' . wp_date( 'j M Y', $expires->getTimestamp() ) : '' );
 			}
 			printf(
-				'<tr><td>%s</td><td>%s</td><td><code>%s</code></td><td>%s</td></tr>',
+				'<tr><td data-title="วันที่">%s</td><td data-title="ของรางวัล">%s</td><td data-title="รหัสคูปอง"><code>%s</code></td><td data-title="สถานะ">%s</td></tr>',
 				esc_html( wp_date( 'j M Y', $row['time'] ) ),
 				esc_html( $row['label'] ),
 				esc_html( $row['code'] ),
