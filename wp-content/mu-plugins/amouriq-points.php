@@ -542,6 +542,7 @@ function amouriq_points_admin_page() {
 
 	amouriq_points_admin_earning_section();
 	amouriq_points_admin_bonus_section();
+	amouriq_points_admin_report_section();
 
 	amouriq_points_admin_customer_list();
 
@@ -957,4 +958,137 @@ function amouriq_points_admin_bonus_section() {
 		. $row( 'review', 'รีวิวสินค้าที่ซื้อแล้ว', ' ต่อสินค้าครั้งเดียว สูงสุด <input type="number" min="0" name="bonus_review_per_year" value="' . esc_attr( $b['review']['per_year'] ) . '" style="width:5em"> ครั้งใน 12 เดือน (0 = ไม่จำกัด) <small>(ให้เมื่อรีวิวได้รับอนุมัติ และผู้รีวิวเคยซื้อสินค้านั้น)</small>' )
 		. '</table>';
 	amouriq_points_admin_form( 'bonus_save', $inner, 'บันทึกโบนัส' );
+}
+
+/* ------------------------------------------------------------------- report */
+
+/** Every member's ledger (user ID => ledger) for the report and the CSV. Fine at this store's size; no table of its own. */
+function amouriq_points_all_ledgers() {
+	$query = new WP_User_Query(
+		array(
+			'number'       => -1,
+			'fields'       => 'ID',
+			'meta_key'     => 'amouriq_points_ledger', // phpcs:ignore WordPress.DB.SlowDBQuery
+			'meta_compare' => 'EXISTS',
+		)
+	);
+	$ledgers = array();
+	foreach ( $query->get_results() as $user_id ) {
+		$ledger = amouriq_points_ledger( $user_id );
+		if ( $ledger ) {
+			$ledgers[ (int) $user_id ] = $ledger;
+		}
+	}
+	return $ledgers;
+}
+
+/** The site's UTC offset in seconds (Thailand has no daylight saving). */
+function amouriq_points_site_offset() {
+	return (int) round( (float) get_option( 'gmt_offset', 0 ) * 3600 );
+}
+
+function amouriq_points_admin_report_section() {
+	$ledgers = amouriq_points_all_ledgers();
+	$report  = amouriq_points_core_report( $ledgers, time(), amouriq_points_site_offset() );
+	$redeem  = amouriq_points_settings()['redeem_baht'];
+	$baht    = static function ( $points ) use ( $redeem ) {
+		return '฿' . number_format_i18n( $points * $redeem, 2 );
+	};
+
+	echo '<h2>รายงานแต้มสะสม</h2>';
+	printf(
+		'<p><strong>แต้มคงเหลือของสมาชิกทั้งหมด:</strong> %s แต้ม (มูลค่า %s ตามอัตราแลก) · <strong>จะหมดอายุภายใน 30 วัน:</strong> %s แต้ม · <strong>สมาชิกที่มีรายการแต้ม:</strong> %d คน</p>',
+		esc_html( number_format_i18n( $report['outstanding'] ) ),
+		esc_html( $baht( $report['outstanding'] ) ),
+		esc_html( number_format_i18n( $report['expiring_soon'] ) ),
+		count( $ledgers )
+	);
+
+	echo '<table class="widefat striped" style="max-width:800px"><thead><tr><th>เดือน</th><th>ได้รับ</th><th>ใช้</th><th>ร้านปรับ</th><th>หักคืน/คืนแต้ม</th><th>หมดอายุ</th></tr></thead><tbody>';
+	$months = array_reverse( $report['months'], true );
+	if ( ! $months ) {
+		echo '<tr><td colspan="6">ยังไม่มีรายการแต้ม</td></tr>';
+	}
+	foreach ( array_slice( $months, 0, 12, true ) as $key => $m ) {
+		printf(
+			'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+			esc_html( $key ),
+			esc_html( number_format_i18n( $m['earned'] ) ),
+			esc_html( number_format_i18n( $m['used'] ) ),
+			esc_html( ( $m['adjusted'] > 0 ? '+' : '' ) . number_format_i18n( $m['adjusted'] ) ),
+			esc_html( number_format_i18n( $m['taken'] ) ),
+			esc_html( number_format_i18n( $m['expired'] ) )
+		);
+	}
+	echo '</tbody></table><p class="description">แสดง 12 เดือนล่าสุด "หักคืน/คืนแต้ม" คือแต้มที่ถูกหักเพราะคืนเงินหรือยกเลิก (ลบ) รวมกับแต้มที่คืนให้เมื่อออเดอร์ถูกยกเลิก (บวก)</p>';
+
+	if ( $report['top_earners'] ) {
+		echo '<h3>สมาชิกที่ได้รับแต้มสะสมสูงสุด</h3><table class="widefat striped" style="max-width:600px"><thead><tr><th>สมาชิก</th><th>แต้มที่ได้รับตลอดเวลา</th></tr></thead><tbody>';
+		foreach ( $report['top_earners'] as $user_id => $points ) {
+			$user = get_userdata( $user_id );
+			printf(
+				'<tr><td>%s</td><td>%s</td></tr>',
+				$user ? '<a href="' . esc_url( amouriq_points_admin_url( array( 'email' => $user->user_email ) ) ) . '">' . esc_html( $user->user_email ) . '</a>' : esc_html( '#' . $user_id ),
+				esc_html( number_format_i18n( $points ) )
+			);
+		}
+		echo '</tbody></table>';
+	}
+
+	echo '<h3>ส่งออกรายการแต้ม (CSV)</h3><form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
+	echo '<input type="hidden" name="page" value="amouriq-points"><input type="hidden" name="amouriq_points_csv" value="1">';
+	wp_nonce_field( 'amouriq_points_csv', '_wpnonce', false );
+	echo '<label>ตั้งแต่ <input type="date" name="from"></label> <label>ถึง <input type="date" name="to"></label> ';
+	echo '<button class="button">ดาวน์โหลด CSV</button> <span class="description">เว้นว่าง = ทั้งหมด ไฟล์เปิดใน Excel ได้ (UTF-8) มีหนึ่งแถวต่อหนึ่งรายการ</span></form>';
+}
+
+add_action( 'admin_init', 'amouriq_points_csv_export' );
+
+/** Stream the ledger as CSV for the dates asked (site time, both ends included). Nothing is kept on the server. */
+function amouriq_points_csv_export() {
+	// phpcs:disable WordPress.Security.NonceVerification -- verified below
+	if ( empty( $_GET['amouriq_points_csv'] ) || empty( $_GET['page'] ) || 'amouriq-points' !== $_GET['page'] ) {
+		return;
+	}
+	// phpcs:enable
+	if ( ! current_user_can( 'manage_woocommerce' ) || ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'amouriq_points_csv' ) ) {
+		wp_die( 'ไม่มีสิทธิ์ส่งออกข้อมูลนี้', '', array( 'response' => 403 ) );
+	}
+
+	$offset = amouriq_points_site_offset();
+	$from   = isset( $_GET['from'] ) ? sanitize_text_field( wp_unslash( $_GET['from'] ) ) : '';
+	$to     = isset( $_GET['to'] ) ? sanitize_text_field( wp_unslash( $_GET['to'] ) ) : '';
+	$start  = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $from ) ? strtotime( $from . ' 00:00:00 UTC' ) - $offset : 0;
+	$end    = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $to ) ? strtotime( $to . ' 23:59:59 UTC' ) - $offset : PHP_INT_MAX;
+
+	nocache_headers();
+	header( 'Content-Type: text/csv; charset=utf-8' );
+	header( 'Content-Disposition: attachment; filename="amouriq-points-' . gmdate( 'Ymd', time() + $offset ) . '.csv"' );
+	echo "\xEF\xBB\xBF"; // lets Excel read the Thai text as UTF-8
+	echo amouriq_points_core_csv_line( array( 'วันที่', 'รหัสสมาชิก', 'อีเมล', 'ชื่อ', 'รายการ', 'ออเดอร์', 'แต้ม', 'หมดอายุ', 'หมายเหตุ', 'ปรับโดย' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
+	$names = amouriq_points_core_type_names();
+	foreach ( amouriq_points_all_ledgers() as $user_id => $ledger ) {
+		$user = get_userdata( $user_id );
+		foreach ( $ledger as $row ) {
+			if ( $row['time'] < $start || $row['time'] > $end ) {
+				continue;
+			}
+			$by = ! empty( $row['by'] ) ? get_userdata( $row['by'] ) : false;
+			echo amouriq_points_core_csv_line( // phpcs:ignore WordPress.Security.EscapeOutput
+				array(
+					gmdate( 'Y-m-d H:i', $row['time'] + $offset ),
+					$user_id,
+					$user ? $user->user_email : '',
+					$user ? $user->display_name : '',
+					isset( $names[ $row['type'] ] ) ? $names[ $row['type'] ] : $row['type'],
+					! empty( $row['order_id'] ) ? $row['order_id'] : '',
+					$row['points'],
+					! empty( $row['expires'] ) ? gmdate( 'Y-m-d', $row['expires'] + $offset ) : '',
+					isset( $row['note'] ) ? $row['note'] : '',
+					$by ? $by->display_name : '',
+				)
+			);
+		}
+	}
+	exit;
 }

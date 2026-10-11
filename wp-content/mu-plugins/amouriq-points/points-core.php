@@ -63,11 +63,11 @@ function amouriq_points_core_expiry( $time, $settings ) {
 }
 
 /**
- * What the customer can spend at $now: the points left in lots that have not
- * expired, after every use and reversal has taken from the lots expiring first.
- * Returns the points and the soonest expiry among them (0 when none expires).
+ * The lots of earned points with what is left of each after every use and reversal
+ * has taken from the lots expiring first (a use cannot touch a lot that had already
+ * expired on its day). Each lot: array( 'left' => points, 'expires' => unix time or 0 ).
  */
-function amouriq_points_core_balance( $ledger, $now ) {
+function amouriq_points_core_lots( $ledger ) {
 	usort(
 		$ledger,
 		static function ( $a, $b ) {
@@ -105,8 +105,17 @@ function amouriq_points_core_balance( $ledger, $now ) {
 		}
 		unset( $lot );
 	}
+	return $lots;
+}
 
-	$points = 0;
+/**
+ * What the customer can spend at $now: the points left in lots that have not
+ * expired, after every use and reversal has taken from the lots expiring first.
+ * Returns the points and the soonest expiry among them (0 when none expires).
+ */
+function amouriq_points_core_balance( $ledger, $now ) {
+	$lots    = amouriq_points_core_lots( $ledger );
+	$points  = 0;
 	$soonest = 0;
 	foreach ( $lots as $lot ) {
 		if ( $lot['left'] <= 0 || ( $lot['expires'] && $lot['expires'] <= $now ) ) {
@@ -417,4 +426,87 @@ function amouriq_points_core_review_bonus( $bonus, $ledger, $product_id, $now ) 
 		return 0;
 	}
 	return (int) $review['points'];
+}
+
+/* ------------------------------------------------------------------- report */
+
+/**
+ * The programme in numbers from every customer's ledger (`$ledgers`: user ID => ledger).
+ * Months are 'Y-m' of the entry time shifted by `$offset` seconds (the site's UTC offset).
+ *   earned    points given by earning and bonuses
+ *   used      points customers spent
+ *   adjusted  staff Adjustments, net
+ *   taken     points taken back (refunds, cancellations) and given back (a cancelled order's points used), net
+ *   expired   points that went unused past their expiry, in the month they expired
+ * Also `outstanding` (points customers can still spend at `$now`), `expiring_soon`
+ * (of those, expiring within 30 days) and `top_earners` (user ID => points earned in all
+ * time, the ten highest).
+ */
+function amouriq_points_core_report( $ledgers, $now, $offset = 0 ) {
+	$months  = array();
+	$blank   = array( 'earned' => 0, 'used' => 0, 'adjusted' => 0, 'taken' => 0, 'expired' => 0 );
+	$month   = static function ( $time ) use ( $offset ) {
+		return gmdate( 'Y-m', (int) $time + $offset );
+	};
+	$earners = array();
+	$out     = 0;
+	$soon    = 0;
+
+	foreach ( $ledgers as $user_id => $ledger ) {
+		foreach ( $ledger as $entry ) {
+			$type   = isset( $entry['type'] ) ? $entry['type'] : '';
+			$points = (int) $entry['points'];
+			$key    = $month( $entry['time'] );
+			if ( ! isset( $months[ $key ] ) ) {
+				$months[ $key ] = $blank;
+			}
+			if ( 'earn' === $type || 0 === strpos( $type, 'bonus_' ) ) {
+				$months[ $key ]['earned'] += $points;
+				$earners[ $user_id ]       = ( isset( $earners[ $user_id ] ) ? $earners[ $user_id ] : 0 ) + $points;
+			} elseif ( 'use' === $type ) {
+				$months[ $key ]['used'] += -$points;
+			} elseif ( 'adjust' === $type ) {
+				$months[ $key ]['adjusted'] += $points;
+			} else {
+				$months[ $key ]['taken'] += $points; // refund (negative) and give_back (positive)
+			}
+		}
+
+		foreach ( amouriq_points_core_lots( $ledger ) as $lot ) {
+			if ( $lot['left'] <= 0 ) {
+				continue;
+			}
+			if ( $lot['expires'] && $lot['expires'] <= $now ) {
+				$key = $month( $lot['expires'] );
+				if ( ! isset( $months[ $key ] ) ) {
+					$months[ $key ] = $blank;
+				}
+				$months[ $key ]['expired'] += $lot['left'];
+				continue;
+			}
+			$out += $lot['left'];
+			if ( $lot['expires'] && $lot['expires'] <= $now + 30 * 86400 ) {
+				$soon += $lot['left'];
+			}
+		}
+	}
+
+	ksort( $months );
+	arsort( $earners );
+	return array(
+		'months'        => $months,
+		'outstanding'   => $out,
+		'expiring_soon' => $soon,
+		'top_earners'   => array_slice( $earners, 0, 10, true ),
+	);
+}
+
+/** One CSV line (UTF-8, quoted when needed) from a list of values. */
+function amouriq_points_core_csv_line( $fields ) {
+	$handle = fopen( 'php://temp', 'r+' );
+	fputcsv( $handle, array_map( 'strval', $fields ) );
+	rewind( $handle );
+	$line = stream_get_contents( $handle );
+	fclose( $handle );
+	return $line;
 }
