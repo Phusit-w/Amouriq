@@ -6,9 +6,9 @@
 
 **Status:** done locally (not uploaded, not in the deploy-round2 kit). My Account and the admin tab were not opened in a browser
 
-- [x] Redeeming with too few points, or twice quickly (double click, two tabs), deducts at most once per click that succeeds and never goes below zero
+- [x] Redeeming with too few points, or twice quickly (double click, two tabs), deducts at most once per click that succeeds and never goes below zero (the same form submitted twice and too few points were run; a truly parallel double click was not)
 - [x] The coupon works only with the customer's email, once, and expires on the stated day (checked with the real WooCommerce cart by CLI, not in a browser)
-- [x] The coupon competes with Member Privilege as ADR-0006 says (larger wins), checked in the cart
+- [x] The coupon competes with Member Privilege as ADR-0006 says (larger wins), checked in the real WooCommerce cart by CLI
 - [x] The redemption shows in the ledger and in the reports; the admin can see which coupon belongs to which redemption
 - [x] PHPUnit for the arithmetic and limits; the WooCommerce flow checked locally with throwaway users
 
