@@ -9,7 +9,7 @@
 - [x] Nobody is emailed twice for the same expiring batch; a customer with nothing expiring gets nothing
 - [x] Off by default; switching it on never sends a backlog for points that already expired
 - [x] Locally mail is blocked, so the send path is checked with a captured `wp_mail` (done); the first live send is the owner's to confirm (not done)
-- [x] Text is Thai, readable on a phone, and has no price or order detail beyond points
+- [x] Text is Thai, short and plain (how it looks in a mail app or on a phone was not checked), and has no price or order detail beyond points
 
 ## Notes (implementation)
 
