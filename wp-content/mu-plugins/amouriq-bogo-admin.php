@@ -10,6 +10,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+// How many Condition rows the form offers.
+const AMOURIQ_BOGO_CONDITION_ROWS = 5;
+
 add_action( 'admin_menu', 'amouriq_bogo_admin_menu' );
 add_action( 'admin_init', 'amouriq_bogo_admin_handle' );
 
@@ -54,6 +57,63 @@ function amouriq_bogo_valid_date( $value ) {
 /** The ticked product/variation IDs posted under $key, as a clean list of positive integers. */
 function amouriq_bogo_posted_ids( array $in, $key ) {
 	return isset( $in[ $key ] ) ? array_values( array_unique( array_filter( array_map( 'absint', (array) $in[ $key ] ) ) ) ) : array();
+}
+
+
+/**
+ * The Condition rows posted by the form (`cond_type_N`, `cond_op_N`, `cond_value_N`, N = 1 to 5)
+ * as a stored set, null when no row is used, or a string with the error to show.
+ */
+function amouriq_bogo_build_conditions( array $in ) {
+	$rows = array();
+	for ( $n = 1; $n <= AMOURIQ_BOGO_CONDITION_ROWS; $n++ ) {
+		$type = isset( $in[ 'cond_type_' . $n ] ) ? sanitize_key( wp_unslash( $in[ 'cond_type_' . $n ] ) ) : '';
+		if ( '' === $type ) {
+			continue;
+		}
+		$op     = isset( $in[ 'cond_op_' . $n ] ) ? sanitize_key( wp_unslash( $in[ 'cond_op_' . $n ] ) ) : '';
+		$text   = isset( $in[ 'cond_value_' . $n ] ) ? sanitize_textarea_field( wp_unslash( $in[ 'cond_value_' . $n ] ) ) : '';
+		$parsed = amouriq_cond_parse_row( $type, $op, $text );
+		if ( isset( $parsed['error'] ) ) {
+			return 'เงื่อนไขข้อ ' . $n . ': ' . $parsed['error'];
+		}
+		$row = $parsed['row'];
+		if ( 'cart_has_category' === $row['type'] ) {
+			$ids = array();
+			foreach ( $row['value'] as $token ) {
+				$term = ctype_digit( (string) $token ) ? get_term( (int) $token, 'product_cat' ) : get_term_by( 'slug', sanitize_title( $token ), 'product_cat' );
+				if ( ! $term || is_wp_error( $term ) ) {
+					return 'เงื่อนไขข้อ ' . $n . ': ไม่พบหมวดสินค้า "' . $token . '"';
+				}
+				$ids[] = (int) $term->term_id;
+			}
+			$row['value'] = array_values( array_unique( $ids ) );
+		}
+		$rows[] = $row;
+	}
+	if ( ! $rows ) {
+		return null;
+	}
+	return array( 'match' => ( isset( $in['cond_match'] ) && 'any' === $in['cond_match'] ) ? 'any' : 'all', 'rows' => $rows );
+}
+
+/** The stored Condition set as the form shows it: category IDs back to slugs. */
+function amouriq_bogo_conditions_for_form( $set ) {
+	if ( empty( $set['rows'] ) ) {
+		return array( 'match' => 'all', 'rows' => array() );
+	}
+	foreach ( $set['rows'] as $i => $row ) {
+		if ( 'cart_has_category' === $row['type'] ) {
+			$set['rows'][ $i ]['value'] = array_map(
+				static function ( $id ) {
+					$term = get_term( (int) $id, 'product_cat' );
+					return ( $term && ! is_wp_error( $term ) ) ? $term->slug : (string) $id;
+				},
+				(array) $row['value']
+			);
+		}
+	}
+	return $set;
 }
 
 /**
@@ -240,6 +300,14 @@ function amouriq_bogo_build_deal( array $in ) {
 		}
 		// The percent field shared by the other types does not apply here.
 		unset( $deal['get_discount_percent'] );
+	}
+
+	$conditions = amouriq_bogo_build_conditions( $in );
+	if ( is_string( $conditions ) ) {
+		return $conditions;
+	}
+	if ( $conditions ) {
+		$deal['conditions'] = $conditions;
 	}
 
 	if ( ! empty( $in['exclude_sale'] ) ) {
@@ -479,6 +547,9 @@ function amouriq_bogo_chips( $deal ) {
 	}
 	if ( ! empty( $deal['new_customer_only'] ) ) {
 		$chips[] = 'ลูกค้าใหม่เท่านั้น';
+	}
+	if ( ! empty( $deal['conditions'] ) ) {
+		$chips[] = amouriq_cond_describe( amouriq_bogo_conditions_for_form( $deal['conditions'] ) );
 	}
 	if ( ! empty( $deal['valid_from'] ) || ! empty( $deal['valid_to'] ) ) {
 		$chips[] = ( $deal['valid_from'] ?? '…' ) . ' ถึง ' . ( $deal['valid_to'] ?? '…' );
@@ -1017,6 +1088,40 @@ function amouriq_bogo_admin_page() {
 						<p class="description">ต้องสร้างคูปองไว้แล้วที่ การตลาด &gt; คูปอง ระบบตรวจตอนบันทึก (สร้างเป็นส่วนลดคงที่ 0 ได้ถ้าใช้คูปองเป็นแค่ตัวเปิดดีล)</p></div>
 				</div>
 
+				<?php
+				$catalog   = amouriq_cond_catalog();
+				$cond_set  = amouriq_bogo_conditions_for_form( $v( 'conditions', array() ) );
+				$cond_rows = array_values( $cond_set['rows'] );
+				?>
+				<h2>เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่</h2>
+				<p class="description">ไม่ใส่เลย = ใช้กับทุกคนตลอดเวลา ใส่ได้สูงสุด <?php echo esc_html( AMOURIQ_BOGO_CONDITION_ROWS ); ?> ข้อ ข้อมูลที่ยังไม่ทราบ (เช่น ยังไม่กรอกอีเมล) จะถือว่ายังไม่ตรงเงื่อนไข ดีลจะเริ่มทำงานเมื่อทราบข้อมูลแล้ว</p>
+				<div class="amq-grid" id="amq-conditions">
+					<label class="k" for="cond_match">ต้องตรง</label>
+					<div class="v">
+						<select name="cond_match" id="cond_match">
+							<option value="all" <?php selected( $cond_set['match'], 'all' ); ?>>ครบทุกข้อ</option>
+							<option value="any" <?php selected( $cond_set['match'], 'any' ); ?>>ข้อใดข้อหนึ่ง</option>
+						</select>
+					</div>
+					<?php for ( $n = 1; $n <= AMOURIQ_BOGO_CONDITION_ROWS; $n++ ) :
+						$row = isset( $cond_rows[ $n - 1 ] ) ? $cond_rows[ $n - 1 ] : array( 'type' => '', 'op' => '', 'value' => '' );
+					?>
+						<span class="k">เงื่อนไขข้อ <?php echo esc_html( $n ); ?></span>
+						<div class="v amq-cond-row">
+							<select name="cond_type_<?php echo esc_attr( $n ); ?>" class="amq-cond-type">
+								<option value="">— ไม่ใช้ —</option>
+								<?php foreach ( $catalog as $ckey => $cmeta ) : ?>
+									<option value="<?php echo esc_attr( $ckey ); ?>" <?php selected( $row['type'], $ckey ); ?>><?php echo esc_html( $cmeta['label'] ); ?></option>
+								<?php endforeach; ?>
+							</select>
+							<select name="cond_op_<?php echo esc_attr( $n ); ?>" class="amq-cond-op" data-current="<?php echo esc_attr( $row['op'] ); ?>"></select>
+							<input type="text" name="cond_value_<?php echo esc_attr( $n ); ?>" class="amq-cond-value" style="min-width:220px" value="<?php echo esc_attr( $row['type'] ? amouriq_cond_format_value( $row ) : '' ); ?>">
+							<span class="description amq-cond-hint"></span>
+						</div>
+					<?php endfor; ?>
+				</div>
+				<script type="application/json" id="amq-cond-catalog"><?php echo wp_json_encode( $catalog ); // phpcs:ignore WordPress.Security.EscapeOutput ?></script>
+
 				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
 					<summary>4. ตัวเลือกเพิ่มเติม (วันที่ จำกัดสิทธิ์ ไม่ใช้ร่วมกับคูปอง)</summary>
 					<div class="amq-grid">
@@ -1076,6 +1181,37 @@ function amouriq_bogo_admin_page() {
 						l.style.display = l.textContent.toLowerCase().indexOf(q) === -1 ? 'none' : '';
 					});
 				});
+			});
+			// Condition rows: the operators and the hint follow the chosen type.
+			var catalogEl = document.getElementById('amq-cond-catalog');
+			var catalog = catalogEl ? JSON.parse(catalogEl.textContent) : {};
+			function syncCondition(row) {
+				var type = row.querySelector('.amq-cond-type').value;
+				var op = row.querySelector('.amq-cond-op');
+				var value = row.querySelector('.amq-cond-value');
+				var hint = row.querySelector('.amq-cond-hint');
+				var keep = op.value || op.getAttribute('data-current');
+				op.innerHTML = '';
+				if (!type || !catalog[type]) {
+					op.hidden = true; value.hidden = true; hint.textContent = '';
+					return;
+				}
+				op.hidden = false; value.hidden = false;
+				Object.keys(catalog[type].ops).forEach(function (key) {
+					var option = document.createElement('option');
+					option.value = key;
+					option.textContent = catalog[type].ops[key];
+					if (key === keep) { option.selected = true; }
+					op.appendChild(option);
+				});
+				hint.textContent = catalog[type].hint || '';
+			}
+			form.querySelectorAll('.amq-cond-row').forEach(function (row) {
+				row.querySelector('.amq-cond-type').addEventListener('change', function () {
+					row.querySelector('.amq-cond-op').setAttribute('data-current', '');
+					syncCondition(row);
+				});
+				syncCondition(row);
 			});
 			form.addEventListener('change', sync);
 			sync();
