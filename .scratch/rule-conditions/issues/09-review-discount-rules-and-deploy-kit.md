@@ -7,7 +7,7 @@
 **Status:** done (kit ready; the owner uploads, Claude verifies read-only)
 
 - [x] No enabled live Discount Rule is left without an equivalent or an explicit decision to drop it
-- [x] Full PHPUnit suite green; browser pass over cart, checkout and the admin form
+- [ ] Full PHPUnit suite green (done: 256 tests); a browser pass over cart, checkout and the admin form (NOT done: only CLI against real WooCommerce and headless Chrome on the form script; the owner's checklist covers the rest)
 - [x] Kit lists every file to upload and the order; the owner uploads, Claude only verifies read-only
 
 ## Notes (implementation)
