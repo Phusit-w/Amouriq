@@ -169,8 +169,8 @@ function amouriq_bogo_core_gifts_to_remove( $lines, $allowed ) {
 
 /** Member Privilege's rule: percent off Regular Price lines once the item total reaches min_spend. */
 function amouriq_bogo_member_rule() {
-	$rule = array( 'percent' => 5.0, 'min_spend' => 299.0 );
-	// The owner can change both in WooCommerce > ดีล BOGO; the defaults stand until then (and in plain-PHP tests).
+	$rule = array( 'percent' => 5.0, 'min_spend' => 299.0 ) + amouriq_bogo_member_extra_clean( array() );
+	// The owner can change all of it in WooCommerce > ดีล BOGO; the defaults stand until then (and in plain-PHP tests).
 	if ( function_exists( 'get_option' ) ) {
 		$percent = get_option( 'amouriq_member_percent', '' );
 		$min     = get_option( 'amouriq_member_min_spend', '' );
@@ -180,8 +180,33 @@ function amouriq_bogo_member_rule() {
 		if ( is_numeric( $min ) && $min >= 0 ) {
 			$rule['min_spend'] = (float) $min;
 		}
+		$rule = amouriq_bogo_member_extra_clean( get_option( 'amouriq_member_extra', array() ) ) + $rule;
 	}
 	return $rule;
+}
+
+/**
+ * The extras that make Member Privilege customizable like a Deal, as safe data: `include_sale` (Sale Price
+ * items count too), `label` (its name in the cart), `scope` (a Product scope), `conditions` (a Condition
+ * set) and `valid_from` / `valid_to` (a date, or a date and time). The defaults keep the original rule.
+ */
+function amouriq_bogo_member_extra_clean( $raw ) {
+	$raw  = is_array( $raw ) ? $raw : array();
+	$date = static function ( $value ) {
+		$value = str_replace( 'T', ' ', trim( (string) $value ) );
+		if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})( ([01]\d|2[0-3]):([0-5]\d))?$/', $value, $m ) && checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
+			return $value;
+		}
+		return '';
+	};
+	return array(
+		'include_sale' => isset( $raw['include_sale'] ) && ! in_array( $raw['include_sale'], array( false, 0, '0', 'no', '' ), true ),
+		'label'        => isset( $raw['label'] ) ? mb_substr( trim( strip_tags( (string) $raw['label'] ) ), 0, 60 ) : '',
+		'scope'        => isset( $raw['scope'] ) && is_array( $raw['scope'] ) ? $raw['scope'] : array(),
+		'conditions'   => ( isset( $raw['conditions']['rows'] ) && is_array( $raw['conditions']['rows'] ) ) ? $raw['conditions'] : array(),
+		'valid_from'   => isset( $raw['valid_from'] ) ? $date( $raw['valid_from'] ) : '',
+		'valid_to'     => isset( $raw['valid_to'] ) ? $date( $raw['valid_to'] ) : '',
+	);
 }
 
 /** "5" for 5.0, "7.5" for 7.5: a percent or baht amount without trailing zeros, for shopper-facing text. */
@@ -248,6 +273,16 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 	$lines = is_callable( $lines ) ? call_user_func( $lines ) : $lines;
 	$rule  = amouriq_bogo_member_rule();
 
+	// Its own dates and Conditions (empty by default, so the original rule holds for every member all the time).
+	if ( ! amouriq_bogo_core_in_window( $rule, $ctx ) ) {
+		$none['reason'] = 'outside_window';
+		return $none;
+	}
+	if ( ! empty( $rule['conditions'] ) && 'match' !== amouriq_cond_evaluate( $rule['conditions'], $ctx )['result'] ) {
+		$none['reason'] = 'conditions_not_met';
+		return $none;
+	}
+
 	// The minimum counts every item, Sale Price ones too, before any discount.
 	$spend = 0.0;
 	foreach ( $lines as $line ) {
@@ -264,7 +299,7 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 	$out     = $none;
 	$regular = false;
 	foreach ( $lines as $i => $line ) {
-		if ( ! empty( $line['on_sale'] ) || amouriq_bogo_core_is_gift( $line ) ) {
+		if ( ( ! $rule['include_sale'] && ! empty( $line['on_sale'] ) ) || amouriq_bogo_core_is_gift( $line ) || ! amouriq_bogo_core_in_scope( $line, $rule['scope'] ) ) {
 			continue;
 		}
 		$regular = true;

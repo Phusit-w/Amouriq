@@ -91,22 +91,24 @@ function amouriq_bogo_apply_deals( $cart ) {
 	$member = $result['member'];
 	$rule   = amouriq_bogo_member_rule();
 	$pct    = amouriq_bogo_member_number( $rule['percent'] );
+	$name   = '' !== $rule['label'] ? $rule['label'] : 'สิทธิพิเศษสมาชิก';
+	$what   = $rule['include_sale'] ? 'ทุกรายการที่ร่วม' : 'สินค้าราคาปกติ';
 	if ( $member['discount'] > 0 ) {
 		// When a Deal gave more on some item, this fee is only the rest, so don't claim a flat percent.
 		if ( 'member' === $member['winner'] ) {
-			$label = 'สิทธิพิเศษสมาชิก ' . $pct . '% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
+			$label = $name . ' ' . $pct . '% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
 		} elseif ( $member['deal_won'] ) {
-			$label = 'สิทธิพิเศษสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า ' . $pct . '%)';
+			$label = $name . ' (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า ' . $pct . '%)';
 		} else {
-			$label = 'สิทธิพิเศษสมาชิก ' . $pct . '% (สินค้าราคาปกติ)';
+			$label = $name . ' ' . $pct . '% (' . $what . ')';
 		}
 		$cart->add_fee( $label, -$member['discount'], false );
 	} elseif ( 'below_minimum' === $member['reason'] ) {
-		amouriq_bogo_notice( 'ซื้อครบ ฿' . amouriq_bogo_member_number( $rule['min_spend'] ) . ' รับสิทธิพิเศษสมาชิก ' . $pct . '% สำหรับสินค้าราคาปกติ', true );
+		amouriq_bogo_notice( 'ซื้อครบ ฿' . amouriq_bogo_member_number( $rule['min_spend'] ) . ' รับ' . $name . ' ' . $pct . '% สำหรับ' . $what, true );
 	} elseif ( 'coupon_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับสิทธิพิเศษสมาชิก ' . $pct . '% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
+		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับ' . $name . ' ' . $pct . '% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
 	} elseif ( 'deal_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'สินค้าในตะกร้าได้ส่วนลดจากดีลซึ่งมากกว่าสิทธิพิเศษสมาชิก ' . $pct . '% จึงใช้ส่วนลดของดีล (ไม่ซ้อนกัน)', true );
+		amouriq_bogo_notice( 'สินค้าในตะกร้าได้ส่วนลดจากดีลซึ่งมากกว่า' . $name . ' ' . $pct . '% จึงใช้ส่วนลดของดีล (ไม่ซ้อนกัน)', true );
 	}
 }
 

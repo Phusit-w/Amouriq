@@ -543,19 +543,49 @@ function amouriq_bogo_admin_handle() {
 		$turn_on = ! amouriq_member_privilege_enabled();
 		update_option( 'amouriq_member_privilege', $turn_on ? 'yes' : 'no', false );
 		set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดสิทธิพิเศษสมาชิกแล้ว' : 'ปิดสิทธิพิเศษสมาชิกแล้ว', 60 );
-		wp_safe_redirect( $back );
+		wp_safe_redirect( $back . '&tab=member' );
 		exit;
 	} elseif ( 'save_member' === $action ) {
 		$percent = isset( $_POST['member_percent'] ) ? str_replace( ',', '', sanitize_text_field( wp_unslash( $_POST['member_percent'] ) ) ) : '';
 		$min     = isset( $_POST['member_min_spend'] ) ? str_replace( ',', '', sanitize_text_field( wp_unslash( $_POST['member_min_spend'] ) ) ) : '';
+		$from    = amouriq_bogo_valid_date( isset( $_POST['member_valid_from'] ) ? wp_unslash( $_POST['member_valid_from'] ) : '' );
+		$to      = amouriq_bogo_valid_date( isset( $_POST['member_valid_to'] ) ? wp_unslash( $_POST['member_valid_to'] ) : '' );
+		$scope   = amouriq_bogo_build_scope( $_POST );
+		$conds   = amouriq_bogo_build_conditions( $_POST );
+		$problem = '';
 		if ( ! is_numeric( $percent ) || $percent <= 0 || $percent > 100 || ! is_numeric( $min ) || $min < 0 ) {
-			set_transient( 'amouriq_bogo_error_' . $uid, 'สิทธิพิเศษสมาชิก: เปอร์เซ็นต์ต้องมากกว่า 0 ถึง 100 และยอดขั้นต่ำต้องไม่ติดลบ ไม่ได้บันทึก', 60 );
+			$problem = 'เปอร์เซ็นต์ต้องมากกว่า 0 ถึง 100 และยอดขั้นต่ำต้องไม่ติดลบ';
+		} elseif ( false === $from || false === $to ) {
+			$problem = 'รูปแบบวันที่/เวลาไม่ถูกต้อง';
+		} elseif ( $from && $to && amouriq_bogo_core_full_time( $from, false ) > amouriq_bogo_core_full_time( $to, true ) ) {
+			$problem = 'เวลาเริ่มต้องไม่เกินเวลาสิ้นสุด';
+		} elseif ( is_string( $scope ) ) {
+			$problem = $scope;
+		} elseif ( is_string( $conds ) ) {
+			$problem = $conds;
+		}
+		if ( '' !== $problem ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, 'สิทธิพิเศษสมาชิก: ' . $problem . ' ไม่ได้บันทึก', 60 );
 		} else {
 			update_option( 'amouriq_member_percent', (string) round( (float) $percent, 2 ), false );
 			update_option( 'amouriq_member_min_spend', (string) round( (float) $min, 2 ), false );
-			set_transient( 'amouriq_bogo_notice_' . $uid, 'บันทึกสิทธิพิเศษสมาชิกแล้ว', 60 );
+			update_option(
+				'amouriq_member_extra',
+				amouriq_bogo_member_extra_clean(
+					array(
+						'include_sale' => ! empty( $_POST['member_include_sale'] ),
+						'label'        => isset( $_POST['member_label'] ) ? sanitize_text_field( wp_unslash( $_POST['member_label'] ) ) : '',
+						'scope'        => $scope ? $scope : array(),
+						'conditions'   => $conds ? $conds : array(),
+						'valid_from'   => $from,
+						'valid_to'     => $to,
+					)
+				),
+				false
+			);
+			set_transient( 'amouriq_bogo_notice_' . $uid, 'บันทึกสิทธิพิเศษสมาชิกแล้ว: ' . amouriq_bogo_member_summary(), 60 );
 		}
-		wp_safe_redirect( $back );
+		wp_safe_redirect( $back . '&tab=member' );
 		exit;
 	} elseif ( 'toggle_coupon' === $action ) {
 		$post = get_post( isset( $_POST['coupon_id'] ) ? (int) $_POST['coupon_id'] : 0 );
@@ -564,7 +594,7 @@ function amouriq_bogo_admin_handle() {
 			wp_update_post( array( 'ID' => $post->ID, 'post_status' => $turn_on ? 'publish' : 'draft' ) );
 			set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดคูปองแล้ว' : 'ปิดคูปองแล้ว (เปลี่ยนเป็นฉบับร่าง)', 60 );
 		}
-		wp_safe_redirect( $back );
+		wp_safe_redirect( $back . '&tab=shipping' );
 		exit;
 	} elseif ( 'add' === $action ) {
 		$result = amouriq_bogo_build_deal( $_POST );
@@ -936,116 +966,213 @@ function amouriq_bogo_chips_html( $chips ) {
 	return $html;
 }
 
-/**
- * One table with everything that makes an order cheaper or ship free: the
- * free-shipping threshold (read only, owned by Flexible Shipping), BOGO deals
- * and coupons that grant free shipping.
- */
-function amouriq_bogo_overview( $deals, $report, $types ) {
-	$now       = current_time( 'timestamp' );
-	$settings  = get_option( 'woocommerce_flexible_shipping_single_3_settings', array() );
-	$threshold = is_array( $settings ) && isset( $settings['method_free_shipping'] ) ? $settings['method_free_shipping'] : null;
-	$ship_url  = admin_url( 'admin.php?page=wc-settings&tab=shipping&instance_id=3' );
+/** The tabs of the deals screen (the form for a deal has its own page, opened from the list). */
+function amouriq_bogo_admin_tabs() {
+	return array(
+		'deals'    => 'ดีลทั้งหมด',
+		'member'   => 'สิทธิพิเศษสมาชิก',
+		'shipping' => 'ส่งฟรี',
+	);
+}
+
+function amouriq_bogo_admin_tab() {
+	// phpcs:ignore WordPress.Security.NonceVerification -- read-only
+	$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'deals';
+	return isset( amouriq_bogo_admin_tabs()[ $tab ] ) ? $tab : 'deals';
+}
+
+/** Quick starting points for the first deal: each one fills the new-deal form (see the script on the form). */
+function amouriq_bogo_templates() {
+	return array(
+		array( 'key' => 'spend_percent', 'title' => 'ซื้อครบ ฿1,500 ลด 10%', 'text' => 'ส่วนลดเปอร์เซ็นต์เมื่อยอดซื้อถึงเป้า' ),
+		array( 'key' => 'new_customer', 'title' => 'ลูกค้าใหม่ ลด 10% เมื่อซื้อครบ ฿500', 'text' => 'ให้เฉพาะคนที่ยังไม่เคยสั่งซื้อ ทำงานอัตโนมัติ' ),
+		array( 'key' => 'buy_get', 'title' => 'ซื้อ 2 แถม 1', 'text' => 'สินค้าตัวเดียวกัน ชิ้นที่ 3 ฟรี' ),
+		array( 'key' => 'free_shipping', 'title' => 'ส่งฟรีเมื่อซื้อครบ ฿799', 'text' => 'ค่าส่งเป็น 0 เมื่อยอดซื้อถึงเป้า' ),
+		array( 'key' => 'gift', 'title' => 'ซื้อครบ ฿1,500 เลือกของแถมฟรี', 'text' => 'ลูกค้าเลือกของแถมเองในตะกร้า' ),
+		array( 'key' => 'bundle', 'title' => 'ซื้อ 3 ชิ้น ในราคา ฿999', 'text' => 'ราคาชุดสำหรับสินค้าที่เลือก' ),
+	);
+}
+
+/** The deals the owner made, as one table. Everything else (Member Privilege, free shipping) has its own tab. */
+function amouriq_bogo_deals_table( $deals, $report, $types ) {
+	$new_url = amouriq_bogo_page_url() . '&add=1#amq-form';
+	if ( empty( $deals ) ) {
+		?>
+		<div class="amq-card amq-empty-state">
+			<h2>ยังไม่มีดีล</h2>
+			<p>เริ่มจากแม่แบบด้านล่าง (กดแล้วระบบกรอกให้ แก้ตัวเลขได้ก่อนบันทึก) หรือเพิ่มดีลเองตั้งแต่ต้น</p>
+			<div class="amq-templates">
+				<?php foreach ( amouriq_bogo_templates() as $tpl ) : ?>
+					<a class="amq-template" href="<?php echo esc_url( $new_url . '&tpl=' . $tpl['key'] ); ?>"><strong><?php echo esc_html( $tpl['title'] ); ?></strong><span><?php echo esc_html( $tpl['text'] ); ?></span></a>
+				<?php endforeach; ?>
+			</div>
+			<p><a class="button button-primary" href="<?php echo esc_url( $new_url ); ?>">+ เพิ่มดีลเอง</a></p>
+		</div>
+		<?php
+		return;
+	}
 	?>
 	<div class="amq-scroll"><table class="widefat amq-table">
-		<thead><tr><th style="width:150px">ประเภท</th><th>รายละเอียด</th><th style="width:130px">สถานะ</th><th style="width:110px">ใช้แล้ว</th><th style="width:230px">จัดการ</th></tr></thead>
+		<thead><tr><th>ดีล</th><th style="width:130px">สถานะ</th><th style="width:110px">ใช้แล้ว</th><th style="width:260px">จัดการ</th></tr></thead>
 		<tbody>
-		<tr>
-			<td><span class="amq-kind">ส่งฟรีอัตโนมัติ</span></td>
-			<td>ยอดสั่งซื้อครบ <strong>฿<?php echo esc_html( null === $threshold ? '?' : $threshold ); ?></strong> ส่งฟรี (ตั้งค่าที่ Flexible Shipping)</td>
-			<td><?php echo amouriq_bogo_badge( null === $threshold ? 'ตรวจไม่ได้' : 'ใช้งานอยู่' ); // phpcs:ignore ?></td>
-			<td>—</td>
-			<td><a class="button" href="<?php echo esc_url( $ship_url ); ?>">แก้ที่หน้าการจัดส่ง</a></td>
-		</tr>
-		<?php
-		$member_on   = amouriq_member_privilege_enabled();
-		$member_rule = amouriq_bogo_member_rule();
-		$member_pct  = amouriq_bogo_member_number( $member_rule['percent'] );
-		$member_min  = amouriq_bogo_member_number( $member_rule['min_spend'] );
-		?>
-		<tr class="<?php echo $member_on ? '' : 'amq-dim'; ?>">
-			<td><span class="amq-kind amq-kind-member">สิทธิพิเศษสมาชิก</span></td>
-			<td><strong>สิทธิพิเศษสมาชิก <?php echo esc_html( $member_pct ); ?>%</strong><br>ลูกค้าที่มีบัญชี ลด <?php echo esc_html( $member_pct ); ?>% เฉพาะสินค้าราคาปกติ เมื่อยอดสินค้าครบ ฿<?php echo esc_html( $member_min ); ?> ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า)<br>
-				<form method="post" action="<?php echo esc_url( amouriq_bogo_page_url() ); ?>" style="margin:6px 0">
-					<?php wp_nonce_field( 'amouriq_bogo_save' ); ?>
-					<input type="hidden" name="amouriq_bogo_action" value="save_member">
-					<label>ส่วนลด <input type="number" name="member_percent" value="<?php echo esc_attr( $member_pct ); ?>" min="0.01" max="100" step="0.01" style="width:80px"> %</label>
-					&nbsp;<label>ยอดขั้นต่ำ ฿ <input type="number" name="member_min_spend" value="<?php echo esc_attr( $member_min ); ?>" min="0" step="0.01" style="width:100px"></label>
-					<button class="button">บันทึก</button>
-				</form>
-				<small>ตรวจ Discount Rules เดิมและ Points &amp; Rewards ก่อนเปิด เพื่อไม่ให้ลดซ้ำ</small></td>
-			<td><?php echo amouriq_bogo_badge( $member_on ? 'เปิดอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></td>
-			<td>—</td>
-			<td><?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $member_on ? 'ปิด' : 'เปิด', $member_on ? 'button' : 'button button-primary', $member_on ? '' : 'เปิดสิทธิพิเศษสมาชิก ' . $member_pct . '% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?></td>
-		</tr>
 		<?php foreach ( $deals as $i => $deal ) :
 			$rep   = $report[ $deal['id'] ?? '' ] ?? array( 'orders' => 0, 'total' => 0 );
 			$state = amouriq_bogo_deal_state( $deal );
 			$is_on = ! isset( $deal['enabled'] ) || $deal['enabled'];
+			$id    = isset( $deal['id'] ) ? $deal['id'] : '';
 		?>
 			<tr class="<?php echo $is_on ? '' : 'amq-dim'; ?>">
-				<td><span class="amq-kind amq-kind-deal">ดีล</span><br><small><?php echo esc_html( $types[ $deal['type'] ] ?? $deal['type'] ); ?></small></td>
 				<td>
-					<strong><?php echo esc_html( $deal['label'] ?? '' ); ?></strong><br>
+					<strong><?php echo esc_html( $deal['label'] ?? '' ); ?></strong> <small class="amq-kind amq-kind-deal"><?php echo esc_html( $types[ $deal['type'] ] ?? $deal['type'] ); ?></small><br>
 					<?php echo esc_html( amouriq_bogo_detail( $deal ) ); ?><br>
 					<?php echo amouriq_bogo_chips_html( amouriq_bogo_chips( $deal ) ); // phpcs:ignore ?>
 				</td>
 				<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
 				<td><?php echo esc_html( $rep['orders'] ); ?> ออเดอร์<br><small>ลดรวม ฿<?php echo esc_html( number_format( $rep['total'], 2 ) ); ?></small></td>
 				<td style="white-space:normal">
+					<a class="button button-primary" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
+					<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', $id ); ?>
+					<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'button', '', $id ); ?>
+					<span class="amq-order" title="ลำดับ: ดีลบนทำก่อนดีลล่าง (สำคัญเมื่อใช้ Exclusive)">
 					<?php
 					if ( $i > 0 ) {
-						amouriq_bogo_action_form( 'move_up', 'index', $i, '↑', 'button', '', isset( $deal['id'] ) ? $deal['id'] : '' );
+						amouriq_bogo_action_form( 'move_up', 'index', $i, '↑', 'button', '', $id );
 					}
 					if ( $i < count( $deals ) - 1 ) {
-						amouriq_bogo_action_form( 'move_down', 'index', $i, '↓', 'button', '', isset( $deal['id'] ) ? $deal['id'] : '' );
+						amouriq_bogo_action_form( 'move_down', 'index', $i, '↓', 'button', '', $id );
 					}
 					?>
-					<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
-					<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'button', '', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
-					<a class="button" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
-					<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-link-delete', 'ลบดีลนี้?', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
-				</td>
-			</tr>
-		<?php endforeach; ?>
-		<?php if ( empty( $deals ) ) : ?>
-			<tr><td colspan="5" class="amq-empty">ยังไม่มีดีล กด "+ เพิ่มดีลใหม่" ด้านบนเพื่อสร้างดีลแรก</td></tr>
-		<?php endif; ?>
-		<?php
-		$coupons = get_posts( array( 'post_type' => 'shop_coupon', 'post_status' => array( 'publish', 'draft' ), 'numberposts' => -1 ) );
-		foreach ( $coupons as $post ) :
-			$coupon = new WC_Coupon( $post->ID );
-			if ( ! $coupon->get_free_shipping() ) {
-				continue;
-			}
-			$expires = $coupon->get_date_expires();
-			$limit   = $coupon->get_usage_limit();
-			$used    = $coupon->get_usage_count();
-			if ( 'draft' === $post->post_status ) {
-				$state = 'ปิดอยู่';
-			} elseif ( $expires && $expires->getTimestamp() < $now ) {
-				$state = 'หมดอายุแล้ว';
-			} elseif ( $limit && $used >= $limit ) {
-				$state = 'ใช้ครบจำนวนแล้ว';
-			} else {
-				$state = 'ใช้งานอยู่';
-			}
-			$is_on = 'draft' !== $post->post_status;
-		?>
-			<tr class="<?php echo $is_on ? '' : 'amq-dim'; ?>">
-				<td><span class="amq-kind amq-kind-coupon">คูปองส่งฟรี</span></td>
-				<td><strong><?php echo esc_html( $coupon->get_code() ); ?></strong><br>หมดอายุ: <?php echo $expires ? esc_html( $expires->date_i18n( 'Y-m-d' ) ) : 'ไม่มีกำหนด'; ?></td>
-				<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
-				<td><?php echo esc_html( $used ); ?>/<?php echo $limit ? esc_html( $limit ) : '∞'; ?> ครั้ง</td>
-				<td style="white-space:nowrap">
-					<?php amouriq_bogo_action_form( 'toggle_coupon', 'coupon_id', $post->ID, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary' ); ?>
-					<a class="button" href="<?php echo esc_url( get_edit_post_link( $post->ID ) ); ?>">แก้ที่หน้าคูปอง</a>
+					</span>
+					<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-link-delete', 'ลบดีลนี้?', $id ); ?>
 				</td>
 			</tr>
 		<?php endforeach; ?>
 		</tbody>
 	</table></div>
-	<p class="description">ปิดคูปอง = เปลี่ยนเป็นฉบับร่าง (ยังเปิดกลับได้) ส่วนลดรวมนับเฉพาะออเดอร์ที่ไม่ถูกยกเลิก/ล้มเหลว/คืนเงิน ขั้นต่ำส่งฟรีแก้ที่หน้าการจัดส่ง</p>
+	<p class="description">ดีลที่อยู่ข้างบนทำงานก่อนดีลข้างล่าง (ใช้ลูกศร ↑ ↓ เรียงลำดับ) ส่วนลดรวมนับเฉพาะออเดอร์ที่ไม่ถูกยกเลิก ล้มเหลว หรือคืนเงิน</p>
+	<?php
+}
+
+/** Free shipping in one place: the Flexible Shipping threshold (read only) and the coupons that give free shipping. */
+function amouriq_bogo_shipping_panel() {
+	$now       = current_time( 'timestamp' );
+	$settings  = get_option( 'woocommerce_flexible_shipping_single_3_settings', array() );
+	$threshold = is_array( $settings ) && isset( $settings['method_free_shipping'] ) ? $settings['method_free_shipping'] : null;
+	$ship_url  = admin_url( 'admin.php?page=wc-settings&tab=shipping&instance_id=3' );
+	?>
+	<div class="amq-card">
+		<h2>ส่งฟรีอัตโนมัติ</h2>
+		<p>ยอดสั่งซื้อครบ <strong>฿<?php echo esc_html( null === $threshold ? '?' : $threshold ); ?></strong> ส่งฟรี <?php echo amouriq_bogo_badge( null === $threshold ? 'ตรวจไม่ได้' : 'ใช้งานอยู่' ); // phpcs:ignore ?> (ตั้งค่าที่ Flexible Shipping) <a class="button" href="<?php echo esc_url( $ship_url ); ?>">แก้ที่หน้าการจัดส่ง</a></p>
+		<p class="description">อยากให้ส่งฟรีด้วยเงื่อนไขอื่น (ใส่คูปอง วันที่กำหนด ลูกค้าใหม่ ยอดซื้อสะสม) สร้างเป็นดีลชนิด "ส่งฟรีตามเงื่อนไข" ในแท็บ "ดีลทั้งหมด"</p>
+	</div>
+	<div class="amq-card">
+		<h2>คูปองที่ให้ส่งฟรี</h2>
+		<?php
+		$coupons = get_posts( array( 'post_type' => 'shop_coupon', 'post_status' => array( 'publish', 'draft' ), 'numberposts' => -1 ) );
+		$rows    = 0;
+		?>
+		<div class="amq-scroll"><table class="widefat amq-table">
+			<thead><tr><th>คูปอง</th><th style="width:140px">สถานะ</th><th style="width:110px">ใช้แล้ว</th><th style="width:230px">จัดการ</th></tr></thead>
+			<tbody>
+			<?php
+			foreach ( $coupons as $post ) :
+				$coupon = new WC_Coupon( $post->ID );
+				if ( ! $coupon->get_free_shipping() ) {
+					continue;
+				}
+				$rows++;
+				$expires = $coupon->get_date_expires();
+				$limit   = $coupon->get_usage_limit();
+				$used    = $coupon->get_usage_count();
+				if ( 'draft' === $post->post_status ) {
+					$state = 'ปิดอยู่';
+				} elseif ( $expires && $expires->getTimestamp() < $now ) {
+					$state = 'หมดอายุแล้ว';
+				} elseif ( $limit && $used >= $limit ) {
+					$state = 'ใช้ครบจำนวนแล้ว';
+				} else {
+					$state = 'ใช้งานอยู่';
+				}
+				$is_on = 'draft' !== $post->post_status;
+			?>
+				<tr class="<?php echo $is_on ? '' : 'amq-dim'; ?>">
+					<td><strong><?php echo esc_html( $coupon->get_code() ); ?></strong><br>หมดอายุ: <?php echo $expires ? esc_html( $expires->date_i18n( 'Y-m-d' ) ) : 'ไม่มีกำหนด'; ?></td>
+					<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
+					<td><?php echo esc_html( $used ); ?>/<?php echo $limit ? esc_html( $limit ) : '∞'; ?> ครั้ง</td>
+					<td style="white-space:normal">
+						<?php amouriq_bogo_action_form( 'toggle_coupon', 'coupon_id', $post->ID, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary' ); ?>
+						<a class="button" href="<?php echo esc_url( get_edit_post_link( $post->ID ) ); ?>">แก้ที่หน้าคูปอง</a>
+					</td>
+				</tr>
+			<?php endforeach; ?>
+			<?php if ( ! $rows ) : ?>
+				<tr><td colspan="4" class="amq-empty">ยังไม่มีคูปองที่ติ๊ก "ส่งฟรี"</td></tr>
+			<?php endif; ?>
+			</tbody>
+		</table></div>
+		<p class="description">ปิดคูปอง = เปลี่ยนเป็นฉบับร่าง (ยังเปิดกลับได้) คูปองใหม่สร้างที่ การตลาด &gt; คูปอง แล้วติ๊ก "Allow free shipping"</p>
+	</div>
+	<?php
+}
+
+/**
+ * Member Privilege: the discount a customer with an account gets, shown and edited like a Deal (name, percent, minimum,
+ * Sale Price items, products it covers, who and when). It never stacks: the larger discount wins (ADR-0006).
+ */
+function amouriq_bogo_member_panel() {
+	$on    = amouriq_member_privilege_enabled();
+	$rule  = amouriq_bogo_member_rule();
+	$cats  = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) );
+	$pct   = amouriq_bogo_member_number( $rule['percent'] );
+	$min   = amouriq_bogo_member_number( $rule['min_spend'] );
+	$name  = '' !== $rule['label'] ? $rule['label'] : 'สิทธิพิเศษสมาชิก';
+	?>
+	<div class="amq-card">
+		<h2><?php echo esc_html( $name ); ?> <?php echo amouriq_bogo_badge( $on ? 'เปิดอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></h2>
+		<p>ลูกค้าที่มีบัญชีได้ส่วนลด <strong><?php echo esc_html( $pct ); ?>%</strong> เมื่อยอดสินค้าครบ <strong>฿<?php echo esc_html( $min ); ?></strong> <?php echo $rule['include_sale'] ? 'ทุกรายการที่ร่วม (รวมสินค้าลดราคา)' : 'เฉพาะสินค้าราคาปกติ'; ?> ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า) ตั้งค่าด้านล่าง แล้วกดเปิด</p>
+		<?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $on ? 'ปิดสิทธิพิเศษสมาชิก' : 'เปิดสิทธิพิเศษสมาชิก', $on ? 'button' : 'button button-primary', $on ? '' : 'เปิดสิทธิพิเศษสมาชิก ' . $pct . '% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?>
+		<?php if ( ! $on ) : ?>
+			<p class="description">ก่อนเปิด ตรวจ Discount Rules เดิมและ Points &amp; Rewards ว่าไม่ได้ลดซ้ำ และทดสอบเช็คเอาต์จริงด้วยบัญชีทดสอบ</p>
+		<?php endif; ?>
+	</div>
+
+	<form method="post" action="<?php echo esc_url( amouriq_bogo_page_url() . '&tab=member' ); ?>" id="amq-member-form" class="amq-card">
+		<?php wp_nonce_field( 'amouriq_bogo_save' ); ?>
+		<input type="hidden" name="amouriq_bogo_action" value="save_member">
+		<h2>ตั้งค่า</h2>
+		<div class="amq-grid">
+			<label class="k" for="member_label">ชื่อที่ลูกค้าเห็น</label>
+			<div class="v"><input type="text" name="member_label" id="member_label" class="amq-wide" maxlength="60" placeholder="สิทธิพิเศษสมาชิก" value="<?php echo esc_attr( $rule['label'] ); ?>">
+				<p class="description">ชื่อบรรทัดส่วนลดในตะกร้าและหน้าชำระเงิน เว้นว่าง = "สิทธิพิเศษสมาชิก"</p></div>
+
+			<label class="k" for="member_percent">ส่วนลด</label>
+			<div class="v"><input type="number" name="member_percent" id="member_percent" value="<?php echo esc_attr( $pct ); ?>" min="0.01" max="100" step="0.01" style="width:100px"> %</div>
+
+			<label class="k" for="member_min_spend">ยอดซื้อขั้นต่ำ</label>
+			<div class="v">฿ <input type="number" name="member_min_spend" id="member_min_spend" value="<?php echo esc_attr( $min ); ?>" min="0" step="0.01" style="width:120px">
+				<p class="description">นับยอดสินค้าก่อนหักส่วนลด ไม่รวมค่าส่ง ตามราคาที่ลูกค้าเห็น (0 = ไม่มีขั้นต่ำ)</p></div>
+
+			<span class="k" style="font-weight:600">สินค้าลดราคาอยู่แล้ว</span>
+			<div class="v"><label><input type="checkbox" name="member_include_sale" value="1" <?php checked( $rule['include_sale'] ); ?>> ให้สิทธิพิเศษกับสินค้าที่ลดราคาอยู่แล้วด้วย</label>
+				<p class="description">ไม่ติ๊ก = สินค้าลดราคาอยู่ไม่ได้ส่วนลดเพิ่ม (ค่าเริ่มต้น)</p></div>
+
+			<label class="k" for="member_from">ใช้ได้ตั้งแต่</label>
+			<div class="v"><input type="datetime-local" name="member_valid_from" id="member_from" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $rule['valid_from'], false ) ); ?>"> <span class="description">เว้นว่าง = ทันที</span></div>
+			<label class="k" for="member_to">ใช้ได้ถึง</label>
+			<div class="v"><input type="datetime-local" name="member_valid_to" id="member_to" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $rule['valid_to'], true ) ); ?>"> <span class="description">เว้นว่าง = ไม่มีวันหมด</span></div>
+		</div>
+
+		<h3>สินค้าที่ร่วมรายการ</h3>
+		<div class="amq-grid"><span class="k">ขอบเขตสินค้า</span><div class="v">
+			<?php amouriq_bogo_scope_fields( $rule['scope'], $cats ); ?>
+		</div></div>
+
+		<h3>ใครได้สิทธิ์ (เงื่อนไขเพิ่มเติม)</h3>
+		<?php amouriq_bogo_condition_fields( amouriq_bogo_conditions_for_form( $rule['conditions'] ), 'สิทธิพิเศษสมาชิกใช้กับลูกค้าที่มีบัญชีเสมอ เงื่อนไขด้านล่างจำกัดให้แคบลงอีก เช่น เฉพาะผู้ที่เคยสั่งซื้อครบ 2 ครั้ง หรือบทบาท wholesale ไม่ใส่เลย = สมาชิกทุกคน' ); ?>
+
+		<p style="margin-top:18px"><button class="button button-primary">บันทึก</button></p>
+	</form>
+	<?php amouriq_bogo_condition_script(); ?>
 	<?php
 }
 
@@ -1055,6 +1182,13 @@ function amouriq_bogo_admin_css() {
 		.amq-bogo .amq-top { display:flex; align-items:center; gap:12px; margin:8px 0 16px; }
 		.amq-bogo h1 { margin:0; }
 		.amq-scroll { overflow-x:auto; max-width:100%; }
+		.amq-templates { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px; margin:12px 0; }
+		.amq-template { display:block; border:1px solid #c3c4c7; border-radius:6px; padding:12px 14px; text-decoration:none; background:#fff; color:#1d2327; }
+		.amq-template:hover { border-color:#2271b1; box-shadow:0 0 0 1px #2271b1; }
+		.amq-template strong { display:block; margin-bottom:4px; } .amq-template span { color:#50575e; font-size:12px; }
+		.amq-empty-state { text-align:center; padding:24px; } .amq-empty-state .amq-templates { text-align:left; max-width:900px; margin-left:auto; margin-right:auto; }
+		.amq-group-title { margin:16px 0 6px; font-size:14px; color:#1d2327; } .amq-group-help { margin:0 0 6px; color:#50575e; }
+		.amq-summary { position:sticky; bottom:0; background:#f0f6fc; border:1px solid #2271b1; border-radius:6px; padding:10px 14px; margin:18px 0 8px; } .amq-summary b { color:#2271b1; }
 		.amq-table { max-width:1250px; }
 		.amq-table td { vertical-align:top; padding:12px 10px; line-height:1.55; }
 		.amq-table tr.amq-dim td { background:#f6f7f7; color:#787c82; }
@@ -1140,12 +1274,22 @@ function amouriq_bogo_admin_page() {
 	amouriq_bogo_admin_css();
 	?>
 	<div class="wrap amq-bogo">
+		<?php $tab = amouriq_bogo_admin_tab(); ?>
 		<div class="amq-top">
 			<h1>ดีลและเงื่อนไขส่วนลด</h1>
-			<?php if ( ! $show ) : ?>
+			<?php if ( ! $show && 'deals' === $tab ) : ?>
 				<a class="button button-primary" href="<?php echo esc_url( $back . '&add=1#amq-form' ); ?>">+ เพิ่มดีลใหม่</a>
 			<?php endif; ?>
 		</div>
+		<?php if ( ! $show ) : ?>
+			<nav class="nav-tab-wrapper" style="margin-bottom:12px">
+				<?php foreach ( amouriq_bogo_admin_tabs() as $key => $label ) : ?>
+					<a class="nav-tab<?php echo $key === $tab ? ' nav-tab-active' : ''; ?>" href="<?php echo esc_url( $back . '&tab=' . $key ); ?>"><?php echo esc_html( $label ); ?></a>
+				<?php endforeach; ?>
+			</nav>
+		<?php else : ?>
+			<p><a href="<?php echo esc_url( $back ); ?>">&larr; กลับไปรายการดีล</a></p>
+		<?php endif; ?>
 		<?php if ( $notice ) : ?>
 			<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $notice ); ?></p></div>
 		<?php endif; ?>
@@ -1153,7 +1297,17 @@ function amouriq_bogo_admin_page() {
 			<div class="notice notice-error is-dismissible"><p><?php echo esc_html( $error ); ?></p></div>
 		<?php endif; ?>
 
-		<?php amouriq_bogo_overview( $deals, $report, $types ); ?>
+		<?php
+		if ( ! $show ) {
+			if ( 'member' === $tab ) {
+				amouriq_bogo_member_panel();
+			} elseif ( 'shipping' === $tab ) {
+				amouriq_bogo_shipping_panel();
+			} else {
+				amouriq_bogo_deals_table( $deals, $report, $types );
+			}
+		}
+		?>
 
 		<?php if ( $show ) : ?>
 		<div class="amq-card" id="amq-form">
@@ -1168,15 +1322,25 @@ function amouriq_bogo_admin_page() {
 				<h2><?php echo $editing ? 'แก้ไขดีล #' . esc_html( $edit_at + 1 ) : 'เพิ่มดีลใหม่'; ?></h2>
 
 				<h2>1. เลือกประเภทดีล</h2>
-				<div class="amq-types">
-					<?php foreach ( $types as $key => $text ) : ?>
-						<label class="amq-type">
-							<input type="radio" name="type" value="<?php echo esc_attr( $key ); ?>" <?php checked( $cur_type, $key ); ?>>
-							<strong><?php echo esc_html( $text ); ?></strong>
-							<span><?php echo esc_html( $type_help[ $key ] ?? '' ); ?></span>
-						</label>
-					<?php endforeach; ?>
-				</div>
+				<?php
+				$type_groups = array(
+					'ลดตามยอดซื้อ ส่งฟรี และของแถม' => array( 'spend_threshold', 'free_shipping', 'spend_gift' ),
+					'ซื้อสินค้าแล้วได้ส่วนลดหรือของแถม' => array( 'same_product', 'quantity_tier', 'product_pair', 'cheapest_free', 'category_cheapest_free' ),
+					'ตั้งราคาพิเศษให้สินค้า' => array( 'bundle_price', 'fixed_price_item', 'amount_off_item' ),
+				);
+				?>
+				<?php foreach ( $type_groups as $group_title => $group_keys ) : ?>
+					<h3 class="amq-group-title"><?php echo esc_html( $group_title ); ?></h3>
+					<div class="amq-types">
+						<?php foreach ( $group_keys as $key ) : ?>
+							<label class="amq-type">
+								<input type="radio" name="type" value="<?php echo esc_attr( $key ); ?>" <?php checked( $cur_type, $key ); ?>>
+								<strong><?php echo esc_html( $types[ $key ] ); ?></strong>
+								<span><?php echo esc_html( $type_help[ $key ] ?? '' ); ?></span>
+							</label>
+						<?php endforeach; ?>
+					</div>
+				<?php endforeach; ?>
 
 				<h2>2. รายละเอียดดีล</h2>
 				<div class="amq-grid">
@@ -1279,22 +1443,6 @@ function amouriq_bogo_admin_page() {
 						<p class="description">ใช้อย่างน้อย 1 ขั้น เว้นว่างขั้นที่ไม่ใช้</p>
 					</div>
 
-					<?php
-					$scope_inc  = isset( $editing['scope']['include'] ) ? $editing['scope']['include'] : array();
-					$scope_exc  = isset( $editing['scope']['exclude'] ) ? $editing['scope']['exclude'] : array();
-					$scope_attr = array();
-					if ( function_exists( 'wc_get_attribute_taxonomies' ) ) {
-						foreach ( wc_get_attribute_taxonomies() as $attribute ) {
-							$scope_attr[ 'pa_' . $attribute->attribute_name ] = $attribute->attribute_label;
-						}
-					}
-					$cur_attr_tax = '';
-					$cur_attr_val = '';
-					if ( ! empty( $scope_inc['attributes'] ) ) {
-						$cur_attr_tax = (string) key( $scope_inc['attributes'] );
-						$cur_attr_val = implode( ', ', (array) reset( $scope_inc['attributes'] ) );
-					}
-					?>
 					<label class="k amq-row" data-types="fixed_price_item bundle_price" for="bogo_price"><span data-only="fixed_price_item">ราคาต่อชิ้น (฿)</span><span data-only="bundle_price">ราคาชุด (฿)</span></label>
 					<div class="v amq-row" data-types="fixed_price_item bundle_price"><input type="number" name="price" id="bogo_price" min="0" step="any" value="<?php echo esc_attr( $v( 'price' ) ); ?>">
 						<p class="description">ราคาที่ลูกค้าเห็น (รวมภาษีถ้าร้านแสดงราคารวมภาษี) สินค้าที่ราคาต่ำกว่านี้ไม่ถูกแตะ ไม่มีการเพิ่มราคา</p></div>
@@ -1309,32 +1457,10 @@ function amouriq_bogo_admin_page() {
 
 					<span class="k amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">ขอบเขตสินค้า</span>
 					<div class="v amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price">
-						<p class="description" style="margin-top:0">ใช้เลือกสินค้าที่ร่วมรายการด้วยหมวด แท็ก ขนาด หรือ SKU แทนการติ๊กทีละรายการ ถ้ากำหนดหลายข้อ สินค้าต้องตรงทุกข้อ (ภายในข้อเดียวกันตรงอย่างใดอย่างหนึ่งก็พอ) เว้นว่างทั้งหมด = ไม่จำกัดตามข้อนี้</p>
-						<p><strong>ร่วมรายการเฉพาะ</strong></p>
-						<p><label>หมวด<br><select name="scope_include_categories[]" multiple size="4" style="min-width:260px">
-							<?php if ( ! is_wp_error( $cats ) ) : foreach ( $cats as $cat ) : ?>
-								<option value="<?php echo esc_attr( $cat->slug ); ?>" <?php selected( in_array( $cat->slug, (array) ( $scope_inc['categories'] ?? array() ), true ) ); ?>><?php echo esc_html( $cat->name ); ?></option>
-							<?php endforeach; endif; ?>
-						</select></label></p>
-						<p><label>แท็กสินค้า (slug คั่นด้วยจุลภาค) <input type="text" name="scope_include_tags" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_inc['tags'] ?? array() ) ) ); ?>" class="regular-text"></label></p>
-						<p><label>คุณสมบัติสินค้า (เช่น ขนาด)
-							<select name="scope_include_attribute">
-								<option value="">— ไม่ใช้ —</option>
-								<?php foreach ( $scope_attr as $tax => $label_text ) : ?>
-									<option value="<?php echo esc_attr( $tax ); ?>" <?php selected( $cur_attr_tax, $tax ); ?>><?php echo esc_html( $label_text . ' (' . $tax . ')' ); ?></option>
-								<?php endforeach; ?>
-							</select></label>
-							ค่า (slug คั่นด้วยจุลภาค เช่น 250-ml) <input type="text" name="scope_include_attribute_values" value="<?php echo esc_attr( $cur_attr_val ); ?>"></p>
-						<p><label>SKU (คั่นด้วยจุลภาค) <input type="text" name="scope_include_skus" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_inc['skus'] ?? array() ) ) ); ?>" class="regular-text"></label></p>
-						<p><label><input type="checkbox" name="scope_include_on_sale_only" value="1" <?php checked( ! empty( $scope_inc['on_sale_only'] ) ); ?>> เฉพาะสินค้าที่ลดราคาอยู่</label></p>
-						<p><strong>ยกเว้น</strong></p>
-						<p><label>หมวด<br><select name="scope_exclude_categories[]" multiple size="4" style="min-width:260px">
-							<?php if ( ! is_wp_error( $cats ) ) : foreach ( $cats as $cat ) : ?>
-								<option value="<?php echo esc_attr( $cat->slug ); ?>" <?php selected( in_array( $cat->slug, (array) ( $scope_exc['categories'] ?? array() ), true ) ); ?>><?php echo esc_html( $cat->name ); ?></option>
-							<?php endforeach; endif; ?>
-						</select></label></p>
-						<p><label>แท็กสินค้า <input type="text" name="scope_exclude_tags" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_exc['tags'] ?? array() ) ) ); ?>" class="regular-text"></label>
-						&nbsp;<label>SKU <input type="text" name="scope_exclude_skus" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_exc['skus'] ?? array() ) ) ); ?>"></label></p>
+						<details <?php echo ( $editing && ! empty( $editing['scope'] ) ) ? 'open' : ''; ?> style="margin:0;border:0;padding:0">
+							<summary>เลือกตามหมวด แท็ก ขนาด หรือ SKU (ไม่บังคับ)</summary>
+							<?php amouriq_bogo_scope_fields( isset( $editing['scope'] ) ? $editing['scope'] : array(), $cats ); ?>
+						</details>
 					</div>
 				</div>
 
@@ -1350,39 +1476,10 @@ function amouriq_bogo_admin_page() {
 						<p class="description">ต้องสร้างคูปองไว้แล้วที่ การตลาด &gt; คูปอง ระบบตรวจตอนบันทึก (สร้างเป็นส่วนลดคงที่ 0 ได้ถ้าใช้คูปองเป็นแค่ตัวเปิดดีล)</p></div>
 				</div>
 
-				<?php
-				$catalog   = amouriq_cond_catalog();
-				$cond_set  = amouriq_bogo_conditions_for_form( $v( 'conditions', array() ) );
-				$cond_rows = array_values( $cond_set['rows'] );
-				?>
-				<h2>เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่</h2>
-				<p class="description">ไม่ใส่เลย = ใช้กับทุกคนตลอดเวลา ใส่ได้สูงสุด <?php echo esc_html( AMOURIQ_BOGO_CONDITION_ROWS ); ?> ข้อ ข้อมูลที่ยังไม่ทราบ (เช่น ยังไม่กรอกอีเมล) จะถือว่ายังไม่ตรงเงื่อนไข ดีลจะเริ่มทำงานเมื่อทราบข้อมูลแล้ว</p>
-				<div class="amq-grid" id="amq-conditions">
-					<label class="k" for="cond_match">ต้องตรง</label>
-					<div class="v">
-						<select name="cond_match" id="cond_match">
-							<option value="all" <?php selected( $cond_set['match'], 'all' ); ?>>ครบทุกข้อ</option>
-							<option value="any" <?php selected( $cond_set['match'], 'any' ); ?>>ข้อใดข้อหนึ่ง</option>
-						</select>
-					</div>
-					<?php for ( $n = 1; $n <= AMOURIQ_BOGO_CONDITION_ROWS; $n++ ) :
-						$row = isset( $cond_rows[ $n - 1 ] ) ? $cond_rows[ $n - 1 ] : array( 'type' => '', 'op' => '', 'value' => '' );
-					?>
-						<span class="k">เงื่อนไขข้อ <?php echo esc_html( $n ); ?></span>
-						<div class="v amq-cond-row">
-							<select name="cond_type_<?php echo esc_attr( $n ); ?>" class="amq-cond-type">
-								<option value="">— ไม่ใช้ —</option>
-								<?php foreach ( $catalog as $ckey => $cmeta ) : ?>
-									<option value="<?php echo esc_attr( $ckey ); ?>" <?php selected( $row['type'], $ckey ); ?>><?php echo esc_html( $cmeta['label'] ); ?></option>
-								<?php endforeach; ?>
-							</select>
-							<select name="cond_op_<?php echo esc_attr( $n ); ?>" class="amq-cond-op" data-current="<?php echo esc_attr( $row['op'] ); ?>"></select>
-							<input type="text" name="cond_value_<?php echo esc_attr( $n ); ?>" class="amq-cond-value" style="min-width:220px" value="<?php echo esc_attr( $row['type'] ? amouriq_cond_format_value( $row ) : '' ); ?>">
-							<span class="description amq-cond-hint"></span>
-						</div>
-					<?php endfor; ?>
-				</div>
-				<script type="application/json" id="amq-cond-catalog"><?php echo wp_json_encode( $catalog ); // phpcs:ignore WordPress.Security.EscapeOutput ?></script>
+				<details <?php echo ( $editing && ! empty( $editing['conditions'] ) ) ? 'open' : ''; ?>>
+					<summary>เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่ (ไม่บังคับ เช่น เฉพาะลูกค้าที่เคยสั่งซื้อ วันในสัปดาห์ จำนวนชิ้นในตะกร้า)</summary>
+					<?php amouriq_bogo_condition_fields( amouriq_bogo_conditions_for_form( $v( 'conditions', array() ) ) ); ?>
+				</details>
 
 				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['exclusive'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
 					<summary>4. ตัวเลือกเพิ่มเติม (วันที่ จำกัดสิทธิ์ ไม่ใช้ร่วมกับคูปอง)</summary>
@@ -1406,6 +1503,8 @@ function amouriq_bogo_admin_page() {
 							<p class="description">0 = ไม่จำกัด</p></div>
 					</div>
 				</details>
+
+				<div class="amq-summary" id="amq-live-summary"></div>
 
 				<p style="margin-top:20px">
 					<?php submit_button( $editing ? 'บันทึกการแก้ไข' : 'เพิ่มดีล', 'primary', 'submit', false ); ?>
@@ -1479,8 +1578,77 @@ function amouriq_bogo_admin_page() {
 				});
 				syncCondition(row);
 			});
+			// Templates (?tpl=...) fill the new-deal form; the live sentence says what the deal will do.
+			function field(name) { return form.querySelector('[name="' + name + '"]:not(:disabled)'); }
+			function fval(name) { var e = field(name); return e ? e.value : ''; }
+			function setField(name, value) {
+				var e = form.querySelector('[name="' + name + '"]');
+				if (!e) { return; }
+				if (e.type === 'checkbox') { e.checked = !!value; } else { e.value = value; }
+			}
+			var templates = {
+				spend_percent: { type: 'spend_threshold', label: 'ซื้อครบ ฿1,500 ลด 10%', min_spend: 1500, mode: 'percent', value: 10 },
+				new_customer: { type: 'spend_threshold', label: 'ลูกค้าใหม่ ลด 10%', min_spend: 500, mode: 'percent', value: 10, new_customer_only: true },
+				buy_get: { type: 'same_product', label: 'ซื้อ 2 แถม 1', buy_qty: 2, get_qty: 1, get_discount_percent: 100 },
+				free_shipping: { type: 'free_shipping', label: 'ส่งฟรีเมื่อซื้อครบ ฿799', min_spend: 799 },
+				gift: { type: 'spend_gift', label: 'ซื้อครบ ฿1,500 เลือกของแถมฟรี', min_spend: 1500, gift_qty: 1 },
+				bundle: { type: 'bundle_price', label: 'ซื้อ 3 ชิ้น ในราคา ฿999', bundle_qty: 3, price: 999 }
+			};
+			var tplKey = new URLSearchParams(window.location.search).get('tpl');
+			var isNew = form.querySelector('input[name=amouriq_bogo_action][value=add]');
+			if (isNew && tplKey && templates[tplKey]) {
+				var tpl = templates[tplKey];
+				var radio = form.querySelector('input[name=type][value=' + tpl.type + ']');
+				if (radio) { radio.checked = true; }
+				Object.keys(tpl).forEach(function (k) { if (k !== 'type') { setField(k, tpl[k]); } });
+				var note = document.createElement('div');
+				note.className = 'notice notice-info inline';
+				note.innerHTML = '<p>กรอกจากแม่แบบแล้ว ตรวจตัวเลขและเลือกสินค้า (ถ้าต้องเลือก) แล้วกด "เพิ่มดีล"</p>';
+				form.insertBefore(note, form.firstChild);
+				var more = [].filter.call(form.querySelectorAll('details'), function (d) { return /^4./.test(d.querySelector('summary').textContent.trim()); })[0];
+				if (more && tpl.new_customer_only) { more.open = true; }
+			}
+			var summaryBox = document.getElementById('amq-live-summary');
+			function money(v) { return v === '' ? '…' : '฿' + Number(v).toLocaleString('en-US'); }
+			function summarise() {
+				if (!summaryBox) { return; }
+				var type = (form.querySelector('input[name=type]:checked') || {}).value || '';
+				var s = '';
+				var pct = function (n) { return fval(n) === '' ? '…' : fval(n) + '%'; };
+				switch (type) {
+					case 'same_product': s = 'ซื้อ ' + (fval('buy_qty') || '…') + ' แถม ' + (fval('get_qty') || '…') + ' (ลด ' + pct('get_discount_percent') + ')'; break;
+					case 'product_pair': s = 'ซื้อสินค้า A ' + (fval('buy_qty') || '…') + ' ชิ้น เลือกสินค้า B ได้ ' + (fval('get_qty') || '…') + ' ชิ้น ลด ' + (fval('get_value') || '…') + (fval('get_mode') === 'baht' ? ' บาทต่อชิ้น' : '%'); break;
+					case 'category_cheapest_free':
+					case 'cheapest_free': s = 'ซื้อครบ ' + (fval('buy_qty') || '…') + ' ชิ้น ชิ้นถูกสุดลด ' + pct('get_discount_percent'); break;
+					case 'quantity_tier':
+						var tiers = [];
+						for (var n = 1; n <= 5; n++) { if (fval('tier_min_' + n) && fval('tier_pct_' + n)) { tiers.push(fval('tier_min_' + n) + ' ชิ้นลด ' + fval('tier_pct_' + n) + '%'); } }
+						s = tiers.length ? 'ซื้อตามจำนวน: ' + tiers.join(' / ') : 'ซื้อตามจำนวน ลดเป็นขั้น (ยังไม่ได้ใส่ขั้น)'; break;
+					case 'spend_threshold': s = 'ซื้อครบ ' + money(fval('min_spend')) + ' ลด ' + (fval('value') || '…') + (fval('mode') === 'baht' ? ' บาท' : '%'); break;
+					case 'spend_gift': s = 'ซื้อครบ ' + money(fval('min_spend')) + ' เลือกของแถมฟรี ' + (fval('gift_qty') || '…') + ' ชิ้น'; break;
+					case 'fixed_price_item': s = 'สินค้าที่เลือกเหลือชิ้นละ ' + money(fval('price')); break;
+					case 'amount_off_item': s = 'ทุกชิ้นที่เลือกลดชิ้นละ ' + money(fval('off_value')); break;
+					case 'bundle_price': s = 'ซื้อ ' + (fval('bundle_qty') || '…') + ' ชิ้น ในราคา ' + money(fval('price')); break;
+					case 'free_shipping': s = 'ส่งฟรี' + (fval('min_spend') ? ' เมื่อซื้อครบ ' + money(fval('min_spend')) : ' (ไม่มีขั้นต่ำ)'); break;
+					default: s = 'เลือกประเภทดีลก่อน';
+				}
+				var extra = [];
+				var trig = form.querySelector('input[name=trigger]:checked');
+				if (trig && trig.value === 'coupon') { extra.push('ต้องใส่คูปอง ' + (fval('coupon_code') || '…')); } else { extra.push('ทำงานอัตโนมัติ'); }
+				var nc = form.querySelector('input[name=new_customer_only]');
+				if (nc && nc.checked) { extra.push('เฉพาะลูกค้าใหม่'); }
+				var conds = 0;
+				form.querySelectorAll('.amq-cond-type').forEach(function (e) { if (e.value) { conds++; } });
+				if (conds) { extra.push('มีเงื่อนไขเพิ่ม ' + conds + ' ข้อ'); }
+				if (fval('valid_from') || fval('valid_to')) { extra.push((fval('valid_from') || '…').replace('T', ' ') + ' ถึง ' + (fval('valid_to') || '…').replace('T', ' ')); }
+				summaryBox.innerHTML = '<b>ดีลนี้:</b> ' + s + ' · ' + extra.join(' · ');
+			}
+			// After the field sync has run, so fields of other types (disabled) are not read.
+			form.addEventListener('input', function () { setTimeout(summarise, 0); });
+			form.addEventListener('change', function () { setTimeout(summarise, 0); });
 			form.addEventListener('change', sync);
 			sync();
+			summarise();
 		})();
 		</script>
 		<?php endif; ?>
@@ -1499,6 +1667,154 @@ function amouriq_bogo_summary( $deal ) {
 	}
 	if ( ! empty( $deal['new_customer_only'] ) ) {
 		$parts[] = 'ลูกค้าใหม่เท่านั้น';
+	}
+	return implode( ' | ', array_filter( $parts ) );
+}
+
+/**
+ * The Product scope editor (include and exclude by category, tag, attribute, SKU, on-sale), shared by the
+ * deal form and the Member Privilege panel. `$scope` is a stored scope, `$cats` the product_cat terms.
+ */
+function amouriq_bogo_scope_fields( $scope, $cats ) {
+	$scope_inc  = isset( $scope['include'] ) ? $scope['include'] : array();
+	$scope_exc  = isset( $scope['exclude'] ) ? $scope['exclude'] : array();
+	$scope_attr = array();
+	if ( function_exists( 'wc_get_attribute_taxonomies' ) ) {
+		foreach ( wc_get_attribute_taxonomies() as $attribute ) {
+			$scope_attr[ 'pa_' . $attribute->attribute_name ] = $attribute->attribute_label;
+		}
+	}
+	$cur_attr_tax = '';
+	$cur_attr_val = '';
+	if ( ! empty( $scope_inc['attributes'] ) ) {
+		$cur_attr_tax = (string) key( $scope_inc['attributes'] );
+		$cur_attr_val = implode( ', ', (array) reset( $scope_inc['attributes'] ) );
+	}
+	?>
+		<p class="description" style="margin-top:0">ใช้เลือกสินค้าที่ร่วมรายการด้วยหมวด แท็ก ขนาด หรือ SKU แทนการติ๊กทีละรายการ ถ้ากำหนดหลายข้อ สินค้าต้องตรงทุกข้อ (ภายในข้อเดียวกันตรงอย่างใดอย่างหนึ่งก็พอ) เว้นว่างทั้งหมด = ไม่จำกัดตามข้อนี้</p>
+		<p><strong>ร่วมรายการเฉพาะ</strong></p>
+		<p><label>หมวด<br><select name="scope_include_categories[]" multiple size="4" style="min-width:260px">
+			<?php if ( ! is_wp_error( $cats ) ) : foreach ( $cats as $cat ) : ?>
+				<option value="<?php echo esc_attr( $cat->slug ); ?>" <?php selected( in_array( $cat->slug, (array) ( $scope_inc['categories'] ?? array() ), true ) ); ?>><?php echo esc_html( $cat->name ); ?></option>
+			<?php endforeach; endif; ?>
+		</select></label></p>
+		<p><label>แท็กสินค้า (slug คั่นด้วยจุลภาค) <input type="text" name="scope_include_tags" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_inc['tags'] ?? array() ) ) ); ?>" class="regular-text"></label></p>
+		<p><label>คุณสมบัติสินค้า (เช่น ขนาด)
+			<select name="scope_include_attribute">
+				<option value="">— ไม่ใช้ —</option>
+				<?php foreach ( $scope_attr as $tax => $label_text ) : ?>
+					<option value="<?php echo esc_attr( $tax ); ?>" <?php selected( $cur_attr_tax, $tax ); ?>><?php echo esc_html( $label_text . ' (' . $tax . ')' ); ?></option>
+				<?php endforeach; ?>
+			</select></label>
+			ค่า (slug คั่นด้วยจุลภาค เช่น 250-ml) <input type="text" name="scope_include_attribute_values" value="<?php echo esc_attr( $cur_attr_val ); ?>"></p>
+		<p><label>SKU (คั่นด้วยจุลภาค) <input type="text" name="scope_include_skus" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_inc['skus'] ?? array() ) ) ); ?>" class="regular-text"></label></p>
+		<p><label><input type="checkbox" name="scope_include_on_sale_only" value="1" <?php checked( ! empty( $scope_inc['on_sale_only'] ) ); ?>> เฉพาะสินค้าที่ลดราคาอยู่</label></p>
+		<p><strong>ยกเว้น</strong></p>
+		<p><label>หมวด<br><select name="scope_exclude_categories[]" multiple size="4" style="min-width:260px">
+			<?php if ( ! is_wp_error( $cats ) ) : foreach ( $cats as $cat ) : ?>
+				<option value="<?php echo esc_attr( $cat->slug ); ?>" <?php selected( in_array( $cat->slug, (array) ( $scope_exc['categories'] ?? array() ), true ) ); ?>><?php echo esc_html( $cat->name ); ?></option>
+			<?php endforeach; endif; ?>
+		</select></label></p>
+		<p><label>แท็กสินค้า <input type="text" name="scope_exclude_tags" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_exc['tags'] ?? array() ) ) ); ?>" class="regular-text"></label>
+		&nbsp;<label>SKU <input type="text" name="scope_exclude_skus" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_exc['skus'] ?? array() ) ) ); ?>"></label></p>
+	<?php
+}
+
+/**
+ * The Condition rows editor (up to 5 rows, all or any), shared by the deal form and the Member Privilege panel.
+ * `$set` is a set as amouriq_bogo_conditions_for_form() returns it; `$note` replaces the default hint when given.
+ */
+function amouriq_bogo_condition_fields( $set, $note = '' ) {
+	$catalog   = amouriq_cond_catalog();
+	$cond_set  = $set;
+	$cond_rows = array_values( $cond_set['rows'] );
+	?>
+	<?php if ( '' !== $note ) : ?>
+	<p class="description"><?php echo esc_html( $note ); ?></p>
+	<?php else : ?>
+<p class="description">ไม่ใส่เลย = ใช้กับทุกคนตลอดเวลา ใส่ได้สูงสุด <?php echo esc_html( AMOURIQ_BOGO_CONDITION_ROWS ); ?> ข้อ ข้อมูลที่ยังไม่ทราบ (เช่น ยังไม่กรอกอีเมล) จะถือว่ายังไม่ตรงเงื่อนไข ดีลจะเริ่มทำงานเมื่อทราบข้อมูลแล้ว</p>
+	<?php endif; ?>
+<div class="amq-grid" id="amq-conditions">
+	<label class="k" for="cond_match">ต้องตรง</label>
+	<div class="v">
+		<select name="cond_match" id="cond_match">
+			<option value="all" <?php selected( $cond_set['match'], 'all' ); ?>>ครบทุกข้อ</option>
+			<option value="any" <?php selected( $cond_set['match'], 'any' ); ?>>ข้อใดข้อหนึ่ง</option>
+		</select>
+	</div>
+	<?php for ( $n = 1; $n <= AMOURIQ_BOGO_CONDITION_ROWS; $n++ ) :
+		$row = isset( $cond_rows[ $n - 1 ] ) ? $cond_rows[ $n - 1 ] : array( 'type' => '', 'op' => '', 'value' => '' );
+	?>
+		<span class="k">เงื่อนไขข้อ <?php echo esc_html( $n ); ?></span>
+		<div class="v amq-cond-row">
+			<select name="cond_type_<?php echo esc_attr( $n ); ?>" class="amq-cond-type">
+				<option value="">— ไม่ใช้ —</option>
+				<?php foreach ( $catalog as $ckey => $cmeta ) : ?>
+					<option value="<?php echo esc_attr( $ckey ); ?>" <?php selected( $row['type'], $ckey ); ?>><?php echo esc_html( $cmeta['label'] ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<select name="cond_op_<?php echo esc_attr( $n ); ?>" class="amq-cond-op" data-current="<?php echo esc_attr( $row['op'] ); ?>"></select>
+			<input type="text" name="cond_value_<?php echo esc_attr( $n ); ?>" class="amq-cond-value" style="min-width:220px" value="<?php echo esc_attr( $row['type'] ? amouriq_cond_format_value( $row ) : '' ); ?>">
+			<span class="description amq-cond-hint"></span>
+		</div>
+	<?php endfor; ?>
+</div>
+<script type="application/json" id="amq-cond-catalog"><?php echo wp_json_encode( $catalog ); // phpcs:ignore WordPress.Security.EscapeOutput ?></script>
+	<?php
+}
+
+/**
+ * The script for the Condition rows on a page that has no deal form (the Member Privilege panel):
+ * the operators and the hint follow the chosen type.
+ */
+function amouriq_bogo_condition_script() {
+	?>
+	<script>
+	(function () {
+		var catalogEl = document.getElementById('amq-cond-catalog');
+		var catalog = catalogEl ? JSON.parse(catalogEl.textContent) : {};
+		function sync(row) {
+			var type = row.querySelector('.amq-cond-type').value;
+			var op = row.querySelector('.amq-cond-op');
+			var value = row.querySelector('.amq-cond-value');
+			var hint = row.querySelector('.amq-cond-hint');
+			var keep = op.value || op.getAttribute('data-current');
+			op.innerHTML = '';
+			if (!type || !catalog[type]) { op.hidden = true; value.hidden = true; hint.textContent = ''; return; }
+			op.hidden = false; value.hidden = false;
+			Object.keys(catalog[type].ops).forEach(function (key) {
+				var option = document.createElement('option');
+				option.value = key; option.textContent = catalog[type].ops[key];
+				if (key === keep) { option.selected = true; }
+				op.appendChild(option);
+			});
+			hint.textContent = catalog[type].hint || '';
+		}
+		document.querySelectorAll('#amq-member-form .amq-cond-row').forEach(function (row) {
+			row.querySelector('.amq-cond-type').addEventListener('change', function () {
+				row.querySelector('.amq-cond-op').setAttribute('data-current', '');
+				sync(row);
+			});
+			sync(row);
+		});
+	})();
+	</script>
+	<?php
+}
+
+/** One plain Thai summary of the current Member Privilege rule, for the confirmation notice. */
+function amouriq_bogo_member_summary() {
+	$rule  = amouriq_bogo_member_rule();
+	$parts = array( ( '' !== $rule['label'] ? $rule['label'] : 'สิทธิพิเศษสมาชิก' ) . ' ลด ' . amouriq_bogo_member_number( $rule['percent'] ) . '% เมื่อยอดสินค้าครบ ฿' . amouriq_bogo_member_number( $rule['min_spend'] ) );
+	$parts[] = $rule['include_sale'] ? 'รวมสินค้าลดราคา' : 'เฉพาะสินค้าราคาปกติ';
+	if ( ! empty( $rule['scope'] ) ) {
+		$parts[] = 'ขอบเขต: ' . amouriq_bogo_scope_text( $rule['scope'] );
+	}
+	if ( ! empty( $rule['conditions'] ) ) {
+		$parts[] = amouriq_cond_describe( amouriq_bogo_conditions_for_form( $rule['conditions'] ) );
+	}
+	if ( $rule['valid_from'] || $rule['valid_to'] ) {
+		$parts[] = ( $rule['valid_from'] ? $rule['valid_from'] : '…' ) . ' ถึง ' . ( $rule['valid_to'] ? $rule['valid_to'] : '…' );
 	}
 	return implode( ' | ', array_filter( $parts ) );
 }
