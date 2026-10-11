@@ -6,7 +6,7 @@
 
 **Status:** done locally (not uploaded and NOT in the deploy-round2 kit). The admin section was not opened in a browser
 
-- [x] Each bonus is given once and only once, also when the trigger event fires twice (order status flipped back and forth, review edited and re-approved)
+- [x] Each bonus is given once and only once, also when the trigger event fires twice (order status flipped back and forth, review edited and re-approved) (sign-up called twice and a second review of the same product were run; flipping an order back to Completed after cancelling was not run, it is covered by the user and order flags)
 - [x] A review by someone who never bought the product, or an unapproved review, gives nothing
 - [x] Switching a bonus off stops new bonuses and leaves earned ones alone
 - [x] Worked in PHPUnit for the rules; the three triggers exercised against real WooCommerce locally with throwaway users, orders and reviews (deleted after)
