@@ -64,6 +64,7 @@ function amouriq_bogo_apply_deals( $cart ) {
 	foreach ( $deals as $index => $deal ) {
 		$one = $result['deals'][ $index ];
 		amouriq_bogo_notify_blocked( $deal, $one );
+		amouriq_bogo_notify_hint( $deal, $one );
 		if ( $one['discount'] <= 0 ) {
 			continue;
 		}
@@ -93,7 +94,30 @@ function amouriq_bogo_apply_deals( $cart ) {
 		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับสิทธิพิเศษสมาชิก 5% สำหรับสินค้าราคาปกติ', true );
 	} elseif ( 'coupon_larger' === $member['reason'] ) {
 		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับสิทธิพิเศษสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
+	} elseif ( 'deal_larger' === $member['reason'] ) {
+		amouriq_bogo_notice( 'สินค้าในตะกร้าได้ส่วนลดจากดีลซึ่งมากกว่าสิทธิพิเศษสมาชิก 5% จึงใช้ส่วนลดของดีล (ไม่ซ้อนกัน)', true );
 	}
+}
+
+/**
+ * Tell the shopper why a live Deal has not applied yet and what would trigger it
+ * (how much more to spend, or how many more pieces reach the next tier). Cart and
+ * checkout pages only.
+ */
+function amouriq_bogo_notify_hint( $deal, $result ) {
+	if ( empty( $result['hint'] ) ) {
+		return;
+	}
+	$label = ! empty( $deal['label'] ) ? $deal['label'] : 'ดีลพิเศษ';
+	$hint  = $result['hint'];
+
+	if ( 'spend' === $hint['kind'] ) {
+		$what    = ( isset( $deal['type'] ) && 'spend_gift' === $deal['type'] ) ? 'เลือกของแถมฟรี' : 'รับส่วนลด';
+		$message = sprintf( 'ซื้อเพิ่มอีก ฿%s เพื่อ%s ("%s")', number_format( $hint['remaining'], 2 ), $what, $label );
+	} else {
+		$message = sprintf( 'เพิ่มสินค้าในดีล "%s" อีก %d ชิ้น เพื่อรับส่วนลด %s%%', $label, $hint['remaining'], rtrim( rtrim( number_format( $hint['percent'], 2 ), '0' ), '.' ) );
+	}
+	amouriq_bogo_notice( $message, true );
 }
 
 /**
@@ -150,8 +174,12 @@ add_action(
  * notice about a half-built cart is not queued and shown on a later page.
  */
 function amouriq_bogo_notice( $message, $cart_pages_only = false ) {
-	if ( $cart_pages_only && ! ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() ) ) ) {
-		return;
+	if ( $cart_pages_only ) {
+		// Not during an AJAX refresh (the checkout refreshes its totals by AJAX and would show it again next to the one the page already printed).
+		$on_cart_page = function_exists( 'is_cart' ) && ( is_cart() || is_checkout() ) && ! wp_doing_ajax() && ! defined( 'WC_DOING_AJAX' );
+		if ( ! $on_cart_page ) {
+			return;
+		}
 	}
 	if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
 		wc_add_notice( $message, 'notice' );

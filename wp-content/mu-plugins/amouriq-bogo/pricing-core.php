@@ -15,7 +15,8 @@
  *
  * Returns array( 'discount' => float, 'per_line' => array, 'reason' => string|null,
  * 'choices_left' => int ), `choices_left` being how many more items the customer
- * may pick for a buy-A-choose-B Deal (0 for every other Deal).
+ * may pick for a buy-A-choose-B Deal (0 for every other Deal). `hint` is why a live
+ * Deal did not apply yet, for the cart to say (see amouriq_bogo_core_hint()).
  * `per_line` splits the discount over the cart lines (line index => amount; the
  * amounts add up to `discount`). `reason` says why a Deal gave nothing when it was
  * stopped before the maths:
@@ -33,7 +34,7 @@ defined( 'ABSPATH' ) || exit;
 function amouriq_bogo_price( $deal, $lines, $ctx ) {
 	$reason = amouriq_bogo_core_stop_reason( $deal, $ctx );
 	if ( null !== $reason ) {
-		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => $reason, 'choices_left' => 0, 'allowed' => 0 );
+		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => $reason, 'choices_left' => 0, 'allowed' => 0, 'hint' => null );
 	}
 	// A callable, so the caller only builds the cart lines for a deal that got this far.
 	$lines = is_callable( $lines ) ? call_user_func( $lines ) : $lines;
@@ -49,13 +50,13 @@ function amouriq_bogo_price( $deal, $lines, $ctx ) {
 
 	if ( isset( $deal['type'] ) && 'spend_gift' === $deal['type'] ) {
 		$gift = amouriq_bogo_core_gift( $deal, $lines, $gifts );
-		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => null, 'choices_left' => $gift['left'], 'allowed' => $gift['allowed'] );
+		return array( 'discount' => 0.0, 'per_line' => array(), 'reason' => null, 'choices_left' => $gift['left'], 'allowed' => $gift['allowed'], 'hint' => amouriq_bogo_core_hint( $deal, $lines ) );
 	}
 
 	// A buy-A-choose-B Deal also says how many B the customer may still pick.
 	if ( amouriq_bogo_core_is_pair_choice( $deal ) ) {
 		$pair = amouriq_bogo_core_pair_choice( $deal, $lines );
-		return array( 'discount' => $pair['discount'], 'per_line' => $pair['per_line'], 'reason' => null, 'choices_left' => $pair['left'], 'allowed' => 0 );
+		return array( 'discount' => $pair['discount'], 'per_line' => $pair['per_line'], 'reason' => null, 'choices_left' => $pair['left'], 'allowed' => 0, 'hint' => null );
 	}
 
 	$discount = (float) amouriq_bogo_core_discount( $deal, $lines, $ctx );
@@ -65,7 +66,52 @@ function amouriq_bogo_price( $deal, $lines, $ctx ) {
 		'reason'       => null,
 		'choices_left' => 0,
 		'allowed'      => 0,
+		'hint'         => amouriq_bogo_core_hint( $deal, $lines ),
 	);
+}
+
+/**
+ * Why a live Deal gives nothing yet, for the cart to tell the shopper. Only for a
+ * spend-threshold discount, a gift Deal and a quantity-tier Deal; null otherwise,
+ * or when the Deal is already met. `$lines` are the paid lines.
+ * - array( 'kind' => 'spend', 'remaining' => baht still to spend )
+ * - array( 'kind' => 'pieces', 'remaining' => pieces to add, 'percent' => the tier they reach )
+ */
+function amouriq_bogo_core_hint( $deal, $lines ) {
+	$type = isset( $deal['type'] ) ? $deal['type'] : '';
+
+	if ( 'spend_threshold' === $type || 'spend_gift' === $type ) {
+		$spend = 0.0;
+		foreach ( $lines as $line ) {
+			$spend += $line['quantity'] * amouriq_bogo_core_shown_price( $line );
+		}
+		$remaining = round( (float) $deal['min_spend'] - $spend, 2 );
+		return ( $spend > 0 && $remaining > 0 ) ? array( 'kind' => 'spend', 'remaining' => $remaining ) : null;
+	}
+
+	if ( 'quantity_tier' === $type && ! empty( $deal['tiers'] ) ) {
+		$qty = 0;
+		foreach ( $lines as $line ) {
+			$counts = ! empty( $deal['product_ids'] )
+				? amouriq_bogo_core_threshold_eligible( $line, $deal )
+				: ( ! empty( $deal['product_id'] ) && amouriq_bogo_core_line_is_any_of( $line, array( $deal['product_id'] ) ) && ! amouriq_bogo_core_excluded( $line, $deal ) );
+			if ( $counts ) {
+				$qty += $line['quantity'];
+			}
+		}
+		if ( $qty < 1 ) {
+			return null;
+		}
+		$next = null;
+		foreach ( $deal['tiers'] as $tier ) {
+			if ( (int) $tier['min'] > $qty && ( null === $next || (int) $tier['min'] < (int) $next['min'] ) ) {
+				$next = $tier;
+			}
+		}
+		return $next ? array( 'kind' => 'pieces', 'remaining' => (int) $next['min'] - $qty, 'percent' => (float) $next['percent'] ) : null;
+	}
+
+	return null;
 }
 
 function amouriq_bogo_core_is_gift( $line ) {
