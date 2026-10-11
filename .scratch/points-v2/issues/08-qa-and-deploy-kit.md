@@ -7,7 +7,7 @@
 **Status:** kit built (`D:\Local\app\deploy-round3\`); the browser pass and a single end-to-end lifecycle run are NOT done
 
 - [ ] Ledger totals agree with the reports after the lifecycle test (each piece was checked on its own: the report's outstanding total equals the sum of the balances; no single run chained earn, bonus, redeem, use, refund, expire, adjust and report)
-- [x] Switching the programme off hides every box and tab and gives no points, with balances kept (the bonus and plan hooks check `amouriq_points_enabled()`; the admin tabs stay visible to the owner on purpose)
+- [ ] Switching the programme off hides every box and tab and gives no points, with balances kept (by reading the code, not run: the bonus and plan hooks check `amouriq_points_enabled()`; the admin tabs stay visible to the owner on purpose)
 - [x] The kit lists every new or changed file and the order; the owner uploads, Claude only verifies read-only
 - [ ] The real-checkout and Omise-retry paths that the first round could not test are listed as the owner's live checks (listed in `test-checklist.md`; still untested)
 
