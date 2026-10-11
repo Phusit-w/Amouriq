@@ -7,10 +7,10 @@
 **Status:** done locally (not uploaded). Browser pass of the admin screen still to do
 
 - [x] Only users with `manage_woocommerce` can see or change it; the form is nonce-protected
-- [x] Add and deduct update the balance and show in the customer's My Account ledger with the reason
+- [ ] Add and deduct update the balance and show in the customer's My Account ledger with the reason (My Account display not yet checked)
 - [x] A deduction larger than the balance is refused with a clear message
 - [x] Deducting takes the points that expire first, like a normal use
-- [x] PHPUnit for the rule; list, search and the form checked in a browser against the local site
+- [ ] PHPUnit for the rule; list, search and the form checked in a browser against the local site (browser part not done)
 
 ## Notes (implementation)
 
