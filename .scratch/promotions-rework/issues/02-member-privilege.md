@@ -21,7 +21,7 @@
 ## Notes (implementation)
 
 - Core: `amouriq_bogo_price()` now also returns `per_line`; `amouriq_bogo_cart_discounts()` runs all Deals plus `amouriq_bogo_member_privilege()`. Member Privilege is a separate fee, equal to the part of 5% that exceeds the Deal's discount on each Regular Price line. Tests: `tests/BogoMemberPrivilegeTest.php`.
-- Minimum spend is judged on the displayed price (`price_incl_tax`), the discount on the tax-exclusive price. Unverified: that ฿299 is meant tax-inclusive (matches the free-shipping threshold).
+- Minimum spend is judged on the displayed price (`price_incl_tax`), the discount on the tax-exclusive price. Confirmed by the owner: ฿299 is tax-inclusive.
 - "Registers during checkout": member if logged in or `createaccount` is ticked (form or refresh post_data). A logged-out visitor is not a member before that. Needs a browser check.
 - **Not yet done (ticket 03)**: Member Privilege still stacks with native Coupons; whole-cart larger-wins comes later.
 - **Launch gate**: any Points & Rewards membership levels active on the live site must be switched off before this goes live, otherwise customers get both.
