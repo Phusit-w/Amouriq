@@ -17,6 +17,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/amouriq-bogo/pricing-core.php';
+
+
 function amouriq_bogo_deals() {
 	static $deals = null;
 	if ( null === $deals ) {
@@ -60,82 +63,79 @@ function amouriq_bogo_apply_deals( $cart ) {
 	}
 }
 
+
 /**
  * Discount this deal gives for the current cart, or 0 when it does not apply
  * right now (outside its date window, coupon missing, customer limit reached).
+ * The maths lives in amouriq-bogo/pricing-core.php; this turns the WooCommerce
+ * cart into plain data for it and says why a deal was held back.
  */
 function amouriq_bogo_deal_discount( $deal, $cart ) {
-	// A deal saved before the on/off switch existed has no `enabled` key and stays on.
-	if ( isset( $deal['enabled'] ) && ! $deal['enabled'] ) {
-		return 0.0;
-	}
-	if ( ! amouriq_bogo_deal_in_window( $deal ) ) {
-		return 0.0;
-	}
-	if ( ! amouriq_bogo_deal_active( $deal, $cart ) ) {
-		return 0.0;
-	}
-	if ( ! amouriq_bogo_deal_within_customer_limit( $deal ) ) {
-		return 0.0;
-	}
-	if ( amouriq_bogo_blocked_by_other_coupon( $deal, $cart ) ) {
-		return 0.0;
-	}
-	return amouriq_bogo_calculate_discount( $deal, $cart );
-}
+	$result = amouriq_bogo_price(
+		$deal,
+		static function () use ( $cart ) {
+			return amouriq_bogo_cart_lines( $cart );
+		},
+		amouriq_bogo_price_context( $deal, $cart )
+	);
 
-/**
- * A deal marked `no_combine` gives nothing while the cart holds a coupon other
- * than the one that triggers it. The cart says why, once per page.
- */
-function amouriq_bogo_blocked_by_other_coupon( $deal, $cart ) {
-	if ( empty( $deal['no_combine'] ) ) {
-		return false;
-	}
-	$own = ( isset( $deal['trigger'] ) && 'coupon' === $deal['trigger'] && ! empty( $deal['coupon_code'] ) )
-		? wc_format_coupon_code( $deal['coupon_code'] ) : '';
-
-	foreach ( $cart->get_applied_coupons() as $applied ) {
-		if ( $own && wc_is_same_coupon( $applied, $own ) ) {
-			continue;
-		}
+	if ( 'blocked_by_other_coupon' === $result['reason'] ) {
 		$message = sprintf( 'ดีล "%s" ไม่ใช้ร่วมกับคูปองอื่น จึงยังไม่ได้ส่วนลดดีลนี้', ! empty( $deal['label'] ) ? $deal['label'] : 'Deal discount' );
 		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
 			wc_add_notice( $message, 'notice' );
 		}
-		return true;
 	}
-	return false;
+
+	return $result['discount'];
 }
 
-function amouriq_bogo_deal_in_window( $deal ) {
-	$today = current_time( 'Y-m-d' );
-	if ( ! empty( $deal['valid_from'] ) && $today < $deal['valid_from'] ) {
-		return false;
+/**
+ * Cart lines as plain data: ids, quantity, tax-exclusive unit price, whether the
+ * item is on sale and its product_cat slugs and term IDs (a deal's `category`
+ * may be either).
+ */
+function amouriq_bogo_cart_lines( $cart ) {
+	$lines = array();
+	foreach ( $cart->get_cart() as $cart_item ) {
+		$item_id = $cart_item['variation_id'] ? $cart_item['variation_id'] : $cart_item['product_id'];
+		$product = wc_get_product( $item_id );
+		$terms   = wp_get_post_terms( $cart_item['product_id'], 'product_cat' );
+		$terms   = is_array( $terms ) ? $terms : array();
+
+		$lines[] = array(
+			'product_id'   => (int) $cart_item['product_id'],
+			'variation_id' => (int) $cart_item['variation_id'],
+			'quantity'     => (int) $cart_item['quantity'],
+			'unit_price'   => amouriq_bogo_unit_price( $item_id ),
+			'on_sale'      => $product && $product->is_on_sale(),
+			'categories'   => array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) ),
+		);
 	}
-	if ( ! empty( $deal['valid_to'] ) && $today > $deal['valid_to'] ) {
-		return false;
-	}
-	return true;
+	return $lines;
 }
 
-function amouriq_bogo_deal_active( $deal, $cart ) {
-	$trigger = isset( $deal['trigger'] ) ? $deal['trigger'] : 'auto';
-	if ( 'coupon' !== $trigger ) {
-		return true;
-	}
-
-	$code = ! empty( $deal['coupon_code'] ) ? wc_format_coupon_code( $deal['coupon_code'] ) : '';
-	if ( ! $code ) {
-		return false;
-	}
-
-	foreach ( $cart->get_applied_coupons() as $applied ) {
-		if ( wc_is_same_coupon( $applied, $code ) ) {
-			return true;
+/**
+ * Everything besides the cart lines that the pricing core needs to decide: the
+ * date, the coupons in the cart, how to look up how often this customer used the
+ * deal (the core only calls it for a deal with a per-customer limit that is
+ * otherwise live) and the price of each product the deal names.
+ */
+function amouriq_bogo_price_context( $deal, $cart ) {
+	$prices = array();
+	foreach ( array( 'product_id', 'buy_product_id', 'get_product_id' ) as $key ) {
+		if ( ! empty( $deal[ $key ] ) ) {
+			$prices[ (int) $deal[ $key ] ] = amouriq_bogo_unit_price( $deal[ $key ] );
 		}
 	}
-	return false;
+
+	return array(
+		'today'           => current_time( 'Y-m-d' ),
+		'applied_coupons' => $cart->get_applied_coupons(),
+		'customer_uses'   => static function () use ( $deal ) {
+			return amouriq_bogo_customer_uses( $deal['id'] );
+		},
+		'prices'          => $prices,
+	);
 }
 
 /**
@@ -144,22 +144,6 @@ function amouriq_bogo_deal_active( $deal, $cart ) {
  */
 function amouriq_bogo_counted_statuses() {
 	return array( 'pending', 'on-hold', 'processing', 'completed' );
-}
-
-function amouriq_bogo_deal_within_customer_limit( $deal ) {
-	$max = isset( $deal['max_uses_per_customer'] ) ? (int) $deal['max_uses_per_customer'] : 0;
-	if ( $max <= 0 ) {
-		return true;
-	}
-
-	// Guest checkout is off, so every buyer ends up with an account. Until they
-	// log in the count follows the billing email entered at checkout; the deal
-	// waits until that email is known.
-	$used = amouriq_bogo_customer_uses( $deal['id'] );
-	if ( null === $used ) {
-		return false;
-	}
-	return $used < $max;
 }
 
 /**
@@ -231,58 +215,6 @@ function amouriq_bogo_record_usage( $order ) {
 	}
 }
 
-function amouriq_bogo_calculate_discount( $deal, $cart ) {
-	switch ( isset( $deal['type'] ) ? $deal['type'] : '' ) {
-		case 'same_product':
-			return amouriq_bogo_discount_same_product( $deal, $cart );
-		case 'product_pair':
-			return amouriq_bogo_discount_product_pair( $deal, $cart );
-		case 'category_cheapest_free':
-		case 'cheapest_free':
-			return amouriq_bogo_discount_category_cheapest( $deal, $cart );
-		case 'quantity_tier':
-			return amouriq_bogo_discount_quantity_tier( $deal, $cart );
-	}
-	return 0.0;
-}
-
-/**
- * True when this cart line must be left out of the deal because the deal is set
- * to skip products already on sale.
- */
-function amouriq_bogo_item_excluded( $cart_item, $deal ) {
-	if ( empty( $deal['exclude_sale'] ) ) {
-		return false;
-	}
-	$product = wc_get_product( $cart_item['variation_id'] ? $cart_item['variation_id'] : $cart_item['product_id'] );
-	return $product && $product->is_on_sale();
-}
-
-/**
- * Cap on how many times a deal can apply to one cart (0 = no cap).
- */
-function amouriq_bogo_cap_groups( $count, $deal ) {
-	$max = isset( $deal['max_per_order'] ) ? (int) $deal['max_per_order'] : 0;
-	return $max > 0 ? min( $count, $max ) : $count;
-}
-
-/**
- * Total quantity of a given product (or a specific variation) in the cart.
- */
-function amouriq_bogo_qty_in_cart( $cart, $product_id, $deal = array() ) {
-	$qty = 0;
-	foreach ( $cart->get_cart() as $cart_item ) {
-		if ( (int) $cart_item['product_id'] === (int) $product_id
-			|| (int) $cart_item['variation_id'] === (int) $product_id ) {
-			if ( amouriq_bogo_item_excluded( $cart_item, $deal ) ) {
-				continue;
-			}
-			$qty += $cart_item['quantity'];
-		}
-	}
-	return $qty;
-}
-
 /**
  * Tax-exclusive unit price, for feeding into WC_Cart::add_fee().
  *
@@ -298,112 +230,6 @@ function amouriq_bogo_qty_in_cart( $cart, $product_id, $deal = array() ) {
 function amouriq_bogo_unit_price( $product_id ) {
 	$product = wc_get_product( $product_id );
 	return $product ? (float) wc_get_price_excluding_tax( $product ) : 0.0;
-}
-
-function amouriq_bogo_discount_same_product( $deal, $cart ) {
-	if ( empty( $deal['product_id'] ) ) {
-		return 0.0;
-	}
-
-	$buy_qty = max( 1, (int) ( $deal['buy_qty'] ?? 1 ) );
-	$get_qty = max( 1, (int) ( $deal['get_qty'] ?? 1 ) );
-	$percent = isset( $deal['get_discount_percent'] ) ? (float) $deal['get_discount_percent'] : 100.0;
-
-	$group_size  = $buy_qty + $get_qty;
-	$qty_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['product_id'], $deal );
-	$groups      = amouriq_bogo_cap_groups( intdiv( $qty_in_cart, $group_size ), $deal );
-	if ( $groups <= 0 ) {
-		return 0.0;
-	}
-
-	$free_units = $groups * $get_qty;
-	return $free_units * amouriq_bogo_unit_price( $deal['product_id'] ) * ( $percent / 100 );
-}
-
-function amouriq_bogo_discount_product_pair( $deal, $cart ) {
-	if ( empty( $deal['buy_product_id'] ) || empty( $deal['get_product_id'] ) ) {
-		return 0.0;
-	}
-
-	$buy_qty = max( 1, (int) ( $deal['buy_qty'] ?? 1 ) );
-	$get_qty = max( 1, (int) ( $deal['get_qty'] ?? 1 ) );
-	$percent = isset( $deal['get_discount_percent'] ) ? (float) $deal['get_discount_percent'] : 100.0;
-
-	$buy_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['buy_product_id'], $deal );
-	$get_in_cart = amouriq_bogo_qty_in_cart( $cart, $deal['get_product_id'], $deal );
-
-	$triggers         = amouriq_bogo_cap_groups( intdiv( $buy_in_cart, $buy_qty ), $deal );
-	$discounted_units = min( $triggers * $get_qty, $get_in_cart );
-	if ( $discounted_units <= 0 ) {
-		return 0.0;
-	}
-
-	return $discounted_units * amouriq_bogo_unit_price( $deal['get_product_id'] ) * ( $percent / 100 );
-}
-
-/**
- * Cheapest item of each group of buy_qty free. Limited to one category when
- * the deal sets `category`; otherwise any item in the cart counts.
- */
-function amouriq_bogo_discount_category_cheapest( $deal, $cart ) {
-	$buy_qty = max( 1, (int) ( $deal['buy_qty'] ?? 1 ) );
-	$percent = isset( $deal['get_discount_percent'] ) ? (float) $deal['get_discount_percent'] : 100.0;
-
-	$unit_prices = array();
-	foreach ( $cart->get_cart() as $cart_item ) {
-		$parent_id = $cart_item['product_id'];
-		if ( ! empty( $deal['category'] ) && ! has_term( $deal['category'], 'product_cat', $parent_id ) ) {
-			continue;
-		}
-		if ( amouriq_bogo_item_excluded( $cart_item, $deal ) ) {
-			continue;
-		}
-		$unit_price = amouriq_bogo_unit_price(
-			$cart_item['variation_id'] ? $cart_item['variation_id'] : $cart_item['product_id']
-		);
-		for ( $i = 0; $i < $cart_item['quantity']; $i++ ) {
-			$unit_prices[] = $unit_price;
-		}
-	}
-
-	$groups = amouriq_bogo_cap_groups( intdiv( count( $unit_prices ), $buy_qty ), $deal );
-	if ( $groups <= 0 ) {
-		return 0.0;
-	}
-
-	// Sort most expensive first and cut into groups of buy_qty. The cheapest
-	// item of each complete group is the last one in that group, so it sits at
-	// index (group + 1) * buy_qty - 1. A leftover partial group gets nothing.
-	rsort( $unit_prices );
-	$discount = 0.0;
-	for ( $g = 0; $g < $groups; $g++ ) {
-		$discount += $unit_prices[ ( $g + 1 ) * $buy_qty - 1 ] * ( $percent / 100 );
-	}
-	return $discount;
-}
-
-/**
- * Tiered quantity discount on one product: the highest tier reached gives its
- * percent off every unit of that product in the cart. Tiers look like
- * array( array( 'min' => 6, 'percent' => 10 ), array( 'min' => 12, 'percent' => 15 ) ).
- */
-function amouriq_bogo_discount_quantity_tier( $deal, $cart ) {
-	if ( empty( $deal['product_id'] ) || empty( $deal['tiers'] ) || ! is_array( $deal['tiers'] ) ) {
-		return 0.0;
-	}
-
-	$qty     = amouriq_bogo_qty_in_cart( $cart, $deal['product_id'], $deal );
-	$percent = 0.0;
-	foreach ( $deal['tiers'] as $tier ) {
-		if ( isset( $tier['min'], $tier['percent'] ) && $qty >= (int) $tier['min'] ) {
-			$percent = max( $percent, (float) $tier['percent'] );
-		}
-	}
-	if ( $percent <= 0 ) {
-		return 0.0;
-	}
-
-	return $qty * amouriq_bogo_unit_price( $deal['product_id'] ) * ( $percent / 100 );
 }
 
 /**
