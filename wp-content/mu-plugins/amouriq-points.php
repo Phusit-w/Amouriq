@@ -410,6 +410,8 @@ function amouriq_points_account_page() {
 		$settings['expiry_months'] ? sprintf( ' แต้มมีอายุ %d เดือนนับจากวันที่ได้รับ', (int) $settings['expiry_months'] ) : ''
 	);
 
+	amouriq_points_account_rewards( $user_id, $balance['points'] );
+
 	$ledger = array_reverse( amouriq_points_ledger( $user_id ) );
 	if ( ! $ledger ) {
 		echo '<p>ยังไม่มีรายการแต้มสะสม</p>';
@@ -463,6 +465,8 @@ function amouriq_points_admin_handle() {
 		}
 		update_option( 'amouriq_points_settings', amouriq_points_core_settings( $in ), false );
 		$notice = 'บันทึกการตั้งค่าแล้ว';
+	} elseif ( in_array( $action, array( 'reward_add', 'reward_toggle', 'reward_delete' ), true ) ) {
+		$notice = amouriq_points_admin_reward_action( $action );
 	} elseif ( 'bonus_save' === $action ) {
 		$notice = amouriq_points_admin_bonus_save();
 	} elseif ( in_array( $action, array( 'earn_add', 'earn_delete', 'earn_toggle', 'earn_limits' ), true ) ) {
@@ -542,6 +546,7 @@ function amouriq_points_admin_page() {
 
 	amouriq_points_admin_earning_section();
 	amouriq_points_admin_bonus_section();
+	amouriq_points_admin_rewards_section();
 	amouriq_points_admin_report_section();
 
 	amouriq_points_admin_customer_list();
@@ -1091,4 +1096,274 @@ function amouriq_points_csv_export() {
 		}
 	}
 	exit;
+}
+
+/* ------------------------------------------------------------------ rewards */
+
+/** The owner's Rewards catalogue (cleaned). */
+function amouriq_points_rewards() {
+	return amouriq_points_core_rewards_clean( get_option( 'amouriq_points_rewards', array() ) );
+}
+
+/** The customer's redemptions, newest last: time, reward_id, label, cost, coupon_id, code. */
+function amouriq_points_redemptions( $user_id ) {
+	$list = get_user_meta( (int) $user_id, 'amouriq_points_redemptions', true );
+	return is_array( $list ) ? $list : array();
+}
+
+/** "฿100 off" or "10% off" for a reward, in Thai. */
+function amouriq_points_reward_text( $reward ) {
+	$what = 'percent' === $reward['type'] ? amouriq_bogo_member_number( $reward['value'] ) . '%' : '฿' . amouriq_bogo_member_number( $reward['value'] );
+	$text = 'ส่วนลด ' . $what;
+	if ( $reward['min_spend'] > 0 ) {
+		$text .= ' เมื่อซื้อครบ ฿' . amouriq_bogo_member_number( $reward['min_spend'] );
+	}
+	return $text . ' · ใช้ได้ ' . (int) $reward['days_valid'] . ' วัน · ใช้ได้ 1 ครั้ง';
+}
+
+/**
+ * Redeem a Reward for a member: take the points and create a single-use coupon only they can
+ * use. All or nothing: the coupon is made first and the points are taken only when it exists.
+ * `$token` is the form's one-time token so a double click or a second tab cannot redeem twice.
+ * Returns array( 'ok' => bool, 'message' => Thai text, 'code' => coupon code when ok ).
+ */
+function amouriq_points_redeem( $user_id, $reward_id, $token ) {
+	$fail = static function ( $message ) {
+		return array( 'ok' => false, 'message' => $message, 'code' => '' );
+	};
+	$user = get_userdata( $user_id );
+	if ( ! $user || ! amouriq_points_enabled() ) {
+		return $fail( 'ระบบแต้มสะสมยังไม่เปิดใช้งาน' );
+	}
+	$reward = null;
+	foreach ( amouriq_points_rewards() as $candidate ) {
+		if ( $candidate['id'] === $reward_id ) {
+			$reward = $candidate;
+		}
+	}
+	if ( ! $reward ) {
+		return $fail( 'ไม่พบของรางวัลนี้' );
+	}
+
+	// One redemption at a time per member, and one per form.
+	$lock = get_user_meta( $user_id, '_amouriq_points_redeem_lock', true );
+	if ( $lock && (int) $lock > time() - 30 ) {
+		return $fail( 'กำลังดำเนินการแลกแต้มอยู่ กรุณารอสักครู่' );
+	}
+	update_user_meta( $user_id, '_amouriq_points_redeem_lock', time() );
+	$release = static function () use ( $user_id ) {
+		delete_user_meta( $user_id, '_amouriq_points_redeem_lock' );
+	};
+	$token_key = 'amouriq_points_tok_' . md5( $user_id . '|' . $token );
+	if ( '' === (string) $token || get_transient( $token_key ) ) {
+		$release();
+		return $fail( 'รายการนี้ถูกดำเนินการไปแล้ว กรุณาดูคูปองในรายการด้านล่าง' );
+	}
+
+	$problem = amouriq_points_core_check_redeem( $reward, amouriq_points_balance( $user_id )['points'] );
+	if ( $problem ) {
+		$release();
+		return $fail( $problem );
+	}
+
+	$code = '';
+	do {
+		$code = 'PTS-' . strtoupper( wp_generate_password( 8, false, false ) );
+	} while ( wc_get_coupon_id_by_code( $code ) );
+	$spec   = amouriq_points_core_coupon_spec( $reward, time(), $user->user_email, $code );
+	$coupon = new WC_Coupon();
+	$coupon->set_code( $spec['code'] );
+	$coupon->set_discount_type( $spec['discount_type'] );
+	$coupon->set_amount( $spec['amount'] );
+	$coupon->set_minimum_amount( $spec['minimum_amount'] );
+	$coupon->set_usage_limit( $spec['usage_limit'] );
+	$coupon->set_usage_limit_per_user( $spec['usage_limit_per_user'] );
+	$coupon->set_email_restrictions( $spec['email_restrictions'] );
+	$coupon->set_date_expires( $spec['date_expires'] );
+	$coupon->set_free_shipping( $spec['free_shipping'] );
+	$coupon->set_description( sprintf( 'แลกด้วยแต้มสะสม: %s (สมาชิก #%d)', $reward['label'], $user_id ) );
+	$coupon_id = $coupon->save();
+	if ( ! $coupon_id ) {
+		$release();
+		return $fail( 'สร้างคูปองไม่สำเร็จ ไม่ได้หักแต้ม กรุณาลองใหม่' );
+	}
+	update_post_meta( $coupon_id, 'amouriq_points_user', $user_id );
+	update_post_meta( $coupon_id, 'amouriq_points_reward', $reward['id'] );
+
+	amouriq_points_record( $user_id, -$reward['cost'], 'redeem', 0, 'แลก: ' . $reward['label'] . ' (' . $code . ')', 0, $coupon_id );
+	$list   = amouriq_points_redemptions( $user_id );
+	$list[] = array( 'time' => time(), 'reward_id' => $reward['id'], 'label' => $reward['label'], 'cost' => $reward['cost'], 'coupon_id' => $coupon_id, 'code' => $code );
+	update_user_meta( $user_id, 'amouriq_points_redemptions', $list );
+	set_transient( $token_key, 1, HOUR_IN_SECONDS );
+	$release();
+
+	return array( 'ok' => true, 'message' => sprintf( 'แลกสำเร็จ รหัสคูปองของคุณคือ %s (ใช้ได้ถึงวันที่ %s)', $code, wp_date( 'j M Y', $spec['date_expires'] ) ), 'code' => $code );
+}
+
+add_action( 'wp_loaded', 'amouriq_points_handle_redeem' );
+
+function amouriq_points_handle_redeem() {
+	if ( empty( $_POST['amouriq_points_redeem'] ) || ! function_exists( 'wc_add_notice' ) || ! is_user_logged_in() ) {
+		return;
+	}
+	if ( ! isset( $_POST['amouriq_points_redeem_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['amouriq_points_redeem_nonce'] ) ), 'amouriq_points_redeem' ) ) {
+		return;
+	}
+	$result = amouriq_points_redeem(
+		get_current_user_id(),
+		sanitize_text_field( wp_unslash( $_POST['amouriq_points_redeem'] ) ),
+		isset( $_POST['amouriq_points_token'] ) ? sanitize_text_field( wp_unslash( $_POST['amouriq_points_token'] ) ) : ''
+	);
+	wc_add_notice( $result['message'], $result['ok'] ? 'success' : 'error' );
+	wp_safe_redirect( wc_get_account_endpoint_url( 'points' ) );
+	exit;
+}
+
+/** My Account: the Rewards the member can redeem and the coupons they already redeemed. */
+function amouriq_points_account_rewards( $user_id, $balance ) {
+	$rewards = array_filter(
+		amouriq_points_rewards(),
+		static function ( $reward ) {
+			return $reward['enabled'];
+		}
+	);
+	if ( $rewards ) {
+		echo '<h3>แลกแต้มเป็นคูปอง</h3><div class="amq-rewards" style="display:grid;gap:12px;max-width:640px">';
+		foreach ( $rewards as $reward ) {
+			$can = $balance >= $reward['cost'];
+			echo '<form method="post" style="border:1px solid #ddd;padding:12px;border-radius:6px" onsubmit="return confirm(' . esc_attr( wp_json_encode( amouriq_points_core_redeem_confirm( $reward ) ) ) . ');">';
+			wp_nonce_field( 'amouriq_points_redeem', 'amouriq_points_redeem_nonce' );
+			echo '<input type="hidden" name="amouriq_points_redeem" value="' . esc_attr( $reward['id'] ) . '">';
+			echo '<input type="hidden" name="amouriq_points_token" value="' . esc_attr( wp_generate_password( 16, false, false ) ) . '">';
+			echo '<strong>' . esc_html( $reward['label'] ) . '</strong> · ' . esc_html( number_format_i18n( $reward['cost'] ) ) . ' แต้ม<br><small>' . esc_html( amouriq_points_reward_text( $reward ) ) . '</small><br>';
+			if ( $can ) {
+				echo '<button type="submit" class="button" style="margin-top:6px">แลกเลย</button>';
+			} else {
+				echo '<button type="button" class="button" disabled style="margin-top:6px">แต้มไม่พอ (ขาดอีก ' . esc_html( number_format_i18n( $reward['cost'] - $balance ) ) . ' แต้ม)</button>';
+			}
+			echo '</form>';
+		}
+		echo '</div>';
+	}
+
+	$redeemed = array_reverse( amouriq_points_redemptions( $user_id ) );
+	if ( $redeemed ) {
+		echo '<h3>คูปองที่แลกแล้ว</h3><table class="shop_table shop_table_responsive"><thead><tr><th>วันที่</th><th>ของรางวัล</th><th>รหัสคูปอง</th><th>สถานะ</th></tr></thead><tbody>';
+		foreach ( array_slice( $redeemed, 0, 20 ) as $row ) {
+			$coupon  = new WC_Coupon( (int) $row['coupon_id'] );
+			$expires = $coupon->get_date_expires();
+			if ( $coupon->get_usage_count() > 0 ) {
+				$status = 'ใช้แล้ว';
+			} elseif ( $expires && $expires->getTimestamp() < time() ) {
+				$status = 'หมดอายุแล้ว';
+			} else {
+				$status = 'ใช้ได้' . ( $expires ? ' ถึง ' . wp_date( 'j M Y', $expires->getTimestamp() ) : '' );
+			}
+			printf(
+				'<tr><td>%s</td><td>%s</td><td><code>%s</code></td><td>%s</td></tr>',
+				esc_html( wp_date( 'j M Y', $row['time'] ) ),
+				esc_html( $row['label'] ),
+				esc_html( $row['code'] ),
+				esc_html( $status )
+			);
+		}
+		echo '</tbody></table>';
+	}
+}
+
+/** Admin: add / toggle / delete a Reward. Returns the notice. */
+function amouriq_points_admin_reward_action( $action ) {
+	$rewards = amouriq_points_rewards();
+	// phpcs:disable WordPress.Security.NonceVerification -- checked in amouriq_points_admin_handle()
+	$post   = wp_unslash( $_POST );
+	$index  = isset( $post['index'] ) ? (int) $post['index'] : -1;
+	$notice = '';
+	if ( 'reward_delete' === $action && isset( $rewards[ $index ] ) ) {
+		array_splice( $rewards, $index, 1 );
+		$notice = 'ลบของรางวัลแล้ว (คูปองที่ลูกค้าแลกไปแล้วยังใช้ได้ตามเดิม)';
+	} elseif ( 'reward_toggle' === $action && isset( $rewards[ $index ] ) ) {
+		$rewards[ $index ]['enabled'] = ! $rewards[ $index ]['enabled'];
+		$notice                       = $rewards[ $index ]['enabled'] ? 'เปิดของรางวัลแล้ว' : 'ปิดของรางวัลแล้ว';
+	} elseif ( 'reward_add' === $action ) {
+		$new   = array(
+			'label'      => isset( $post['label'] ) ? sanitize_text_field( $post['label'] ) : '',
+			'cost'       => isset( $post['cost'] ) ? $post['cost'] : 0,
+			'kind'       => 'coupon',
+			'type'       => isset( $post['type'] ) && 'percent' === $post['type'] ? 'percent' : 'fixed',
+			'value'      => isset( $post['value'] ) ? $post['value'] : 0,
+			'min_spend'  => isset( $post['min_spend'] ) ? $post['min_spend'] : 0,
+			'days_valid' => isset( $post['days_valid'] ) ? $post['days_valid'] : 30,
+			'enabled'    => true,
+		);
+		$check = amouriq_points_core_rewards_clean( array( $new ) );
+		if ( ! $check ) {
+			$notice = 'ไม่ได้เพิ่มของรางวัล: ใส่ชื่อ แต้มที่ใช้ (มากกว่า 0) และมูลค่าส่วนลด (มากกว่า 0 ถ้าเป็น % ต้องไม่เกิน 100)';
+		} else {
+			$rewards[] = $check[0];
+			$notice    = 'เพิ่มของรางวัลแล้ว';
+		}
+	}
+	// phpcs:enable
+	update_option( 'amouriq_points_rewards', amouriq_points_core_rewards_clean( $rewards ), false );
+	return $notice;
+}
+
+function amouriq_points_admin_rewards_section() {
+	$rewards = amouriq_points_rewards();
+	echo '<h2>ของรางวัล (แลกแต้มเป็นคูปอง)</h2><p>ลูกค้าแลกในหน้าบัญชีของฉัน > แต้มสะสม แต้มถูกหักทันที ระบบสร้างคูปองใช้ครั้งเดียวที่ใช้ได้เฉพาะอีเมลของลูกค้าคนนั้น ถ้าคูปองหมดอายุโดยไม่ได้ใช้ ไม่คืนแต้ม (ข้อความนี้แสดงบนปุ่มยืนยัน) คูปองที่ได้เป็นคูปอง WooCommerce ธรรมดา จึงเทียบกับสิทธิพิเศษสมาชิกตามกติกา "ส่วนลดที่มากกว่าชนะ"</p>';
+	echo '<table class="widefat striped" style="max-width:900px"><thead><tr><th>ของรางวัล</th><th>ใช้แต้ม</th><th>รายละเอียด</th><th>สถานะ</th><th></th></tr></thead><tbody>';
+	if ( ! $rewards ) {
+		echo '<tr><td colspan="5">ยังไม่มีของรางวัล</td></tr>';
+	}
+	foreach ( $rewards as $i => $reward ) {
+		echo '<tr><td><strong>' . esc_html( $reward['label'] ) . '</strong></td><td>' . esc_html( number_format_i18n( $reward['cost'] ) ) . '</td><td>' . esc_html( amouriq_points_reward_text( $reward ) ) . '</td><td>' . ( $reward['enabled'] ? 'เปิดอยู่' : 'ปิดอยู่' ) . '</td><td>';
+		$hidden = '<input type="hidden" name="index" value="' . (int) $i . '">';
+		amouriq_points_admin_form( 'reward_toggle', $hidden, $reward['enabled'] ? 'ปิด' : 'เปิด', 'button' );
+		amouriq_points_admin_form( 'reward_delete', $hidden, 'ลบ', 'button button-link-delete', 'ลบของรางวัลนี้?' );
+		echo '</td></tr>';
+	}
+	echo '</tbody></table>';
+
+	$inner = '<table class="form-table"><tr><th>ชื่อของรางวัล</th><td><input type="text" name="label" class="regular-text" placeholder="เช่น คูปองส่วนลด ฿100"></td></tr>'
+		. '<tr><th>ใช้กี่แต้ม</th><td><input type="number" min="1" name="cost" style="width:8em"> แต้ม</td></tr>'
+		. '<tr><th>ส่วนลด</th><td><input type="number" step="any" min="0" name="value" style="width:8em"> <select name="type"><option value="fixed">บาท</option><option value="percent">%</option></select></td></tr>'
+		. '<tr><th>ยอดซื้อขั้นต่ำ</th><td><input type="number" step="any" min="0" name="min_spend" value="0" style="width:8em"> บาท (0 = ไม่มี)</td></tr>'
+		. '<tr><th>คูปองใช้ได้กี่วัน</th><td><input type="number" min="1" max="365" name="days_valid" value="30" style="width:6em"> วัน นับจากวันที่แลก</td></tr></table>';
+	echo '<h3>เพิ่มของรางวัล</h3>';
+	amouriq_points_admin_form( 'reward_add', $inner, 'เพิ่มของรางวัล' );
+
+	// Which coupon belongs to which redemption.
+	$rows  = array();
+	$query = new WP_User_Query( array( 'number' => -1, 'fields' => 'ID', 'meta_key' => 'amouriq_points_redemptions', 'meta_compare' => 'EXISTS' ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+	foreach ( $query->get_results() as $user_id ) {
+		foreach ( amouriq_points_redemptions( $user_id ) as $row ) {
+			$row['user_id'] = (int) $user_id;
+			$rows[]         = $row;
+		}
+	}
+	usort(
+		$rows,
+		static function ( $a, $b ) {
+			return $b['time'] <=> $a['time'];
+		}
+	);
+	echo '<h3>การแลกล่าสุด</h3><table class="widefat striped" style="max-width:900px"><thead><tr><th>วันที่</th><th>สมาชิก</th><th>ของรางวัล</th><th>แต้ม</th><th>คูปอง</th><th>สถานะ</th></tr></thead><tbody>';
+	if ( ! $rows ) {
+		echo '<tr><td colspan="6">ยังไม่มีการแลก</td></tr>';
+	}
+	foreach ( array_slice( $rows, 0, 20 ) as $row ) {
+		$user   = get_userdata( $row['user_id'] );
+		$coupon = new WC_Coupon( (int) $row['coupon_id'] );
+		printf(
+			'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="%s"><code>%s</code></a></td><td>%s</td></tr>',
+			esc_html( wp_date( 'j M Y H:i', $row['time'] ) ),
+			$user ? '<a href="' . esc_url( amouriq_points_admin_url( array( 'email' => $user->user_email ) ) ) . '">' . esc_html( $user->user_email ) . '</a>' : esc_html( '#' . $row['user_id'] ),
+			esc_html( $row['label'] ),
+			esc_html( number_format_i18n( $row['cost'] ) ),
+			esc_url( get_edit_post_link( (int) $row['coupon_id'] ) ),
+			esc_html( $row['code'] ),
+			esc_html( $coupon->get_usage_count() > 0 ? 'ใช้แล้ว' : 'ยังไม่ได้ใช้' )
+		);
+	}
+	echo '</tbody></table>';
 }

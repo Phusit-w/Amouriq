@@ -369,6 +369,7 @@ function amouriq_points_core_type_names() {
 		'bonus_signup' => 'โบนัสสมัครสมาชิก',
 		'bonus_first'  => 'โบนัสออเดอร์แรก',
 		'bonus_review' => 'โบนัสรีวิวสินค้า',
+		'redeem'       => 'แลกของรางวัล',
 	);
 }
 
@@ -463,7 +464,7 @@ function amouriq_points_core_report( $ledgers, $now, $offset = 0 ) {
 			if ( 'earn' === $type || 0 === strpos( $type, 'bonus_' ) ) {
 				$months[ $key ]['earned'] += $points;
 				$earners[ $user_id ]       = ( isset( $earners[ $user_id ] ) ? $earners[ $user_id ] : 0 ) + $points;
-			} elseif ( 'use' === $type ) {
+			} elseif ( 'use' === $type || 'redeem' === $type ) {
 				$months[ $key ]['used'] += -$points;
 			} elseif ( 'adjust' === $type ) {
 				$months[ $key ]['adjusted'] += $points;
@@ -509,4 +510,83 @@ function amouriq_points_core_csv_line( $fields ) {
 	$line = stream_get_contents( $handle );
 	fclose( $handle );
 	return $line;
+}
+
+/* ------------------------------------------------------------------ rewards */
+
+/**
+ * The Rewards catalogue as safe data. A reward: id, label, cost (points, above 0), kind
+ * (`coupon`), type (`fixed` baht off the cart or `percent`), value (above 0, at most 100
+ * for percent), min_spend (baht, 0 = none), days_valid (1 to 365, default 30), enabled.
+ * Anything else is dropped; a missing id is generated.
+ */
+function amouriq_points_core_rewards_clean( $raw ) {
+	$out = array();
+	foreach ( is_array( $raw ) ? $raw : array() as $reward ) {
+		if ( ! is_array( $reward ) ) {
+			continue;
+		}
+		$label = isset( $reward['label'] ) ? trim( strip_tags( (string) $reward['label'] ) ) : '';
+		$cost  = isset( $reward['cost'] ) && is_numeric( $reward['cost'] ) ? (int) $reward['cost'] : 0;
+		$kind  = isset( $reward['kind'] ) ? (string) $reward['kind'] : 'coupon';
+		$type  = isset( $reward['type'] ) && 'percent' === $reward['type'] ? 'percent' : 'fixed';
+		$value = isset( $reward['value'] ) && is_numeric( $reward['value'] ) ? (float) $reward['value'] : 0.0;
+		if ( '' === $label || $cost <= 0 || 'coupon' !== $kind || $value <= 0 || ( 'percent' === $type && $value > 100 ) ) {
+			continue;
+		}
+		$days = isset( $reward['days_valid'] ) && is_numeric( $reward['days_valid'] ) ? (int) $reward['days_valid'] : 30;
+		$id   = isset( $reward['id'] ) ? preg_replace( '/[^a-z0-9]/i', '', (string) $reward['id'] ) : '';
+		$out[] = array(
+			'id'         => '' !== $id ? $id : 'r' . substr( md5( $label . $cost . microtime( true ) . count( $out ) ), 0, 8 ),
+			'label'      => mb_substr( $label, 0, 100 ),
+			'cost'       => $cost,
+			'kind'       => 'coupon',
+			'type'       => $type,
+			'value'      => $value,
+			'min_spend'  => isset( $reward['min_spend'] ) && is_numeric( $reward['min_spend'] ) ? max( 0.0, (float) $reward['min_spend'] ) : 0.0,
+			'days_valid' => ( $days >= 1 && $days <= 365 ) ? $days : 30,
+			'enabled'    => ! isset( $reward['enabled'] ) || (bool) $reward['enabled'],
+		);
+	}
+	return $out;
+}
+
+/** Null when this reward can be redeemed with `$balance` points, otherwise the Thai reason. */
+function amouriq_points_core_check_redeem( $reward, $balance ) {
+	if ( empty( $reward['enabled'] ) ) {
+		return 'ของรางวัลนี้ปิดอยู่';
+	}
+	if ( (int) $balance < (int) $reward['cost'] ) {
+		return sprintf( 'แต้มสะสมไม่พอ ต้องใช้ %d แต้ม (คุณมี %d แต้ม)', (int) $reward['cost'], (int) $balance );
+	}
+	return null;
+}
+
+/**
+ * The coupon a redeemed reward becomes: one use, only for this customer's email, expiring
+ * at the end of the day `days_valid` days from `$now`. Plain data for WC_Coupon.
+ */
+function amouriq_points_core_coupon_spec( $reward, $now, $email, $code ) {
+	$day = gmdate( 'Y-m-d', $now + (int) $reward['days_valid'] * 86400 );
+	return array(
+		'code'                 => $code,
+		'discount_type'        => 'percent' === $reward['type'] ? 'percent' : 'fixed_cart',
+		'amount'               => $reward['value'],
+		'minimum_amount'       => $reward['min_spend'],
+		'usage_limit'          => 1,
+		'usage_limit_per_user' => 1,
+		'email_restrictions'   => array( strtolower( trim( (string) $email ) ) ),
+		'date_expires'         => strtotime( $day . ' 23:59:59 UTC' ),
+		'free_shipping'        => false,
+	);
+}
+
+/** What the confirm button asks, so the customer knows before the points are taken. */
+function amouriq_points_core_redeem_confirm( $reward ) {
+	return sprintf(
+		'แลก "%s" ด้วย %d แต้มใช่ไหม? แต้มจะถูกหักทันที คูปองใช้ได้ %d วัน ถ้าไม่ได้ใช้ภายในเวลานั้น ไม่คืนแต้ม',
+		$reward['label'],
+		(int) $reward['cost'],
+		(int) $reward['days_valid']
+	);
 }
