@@ -65,3 +65,7 @@ _Avoid_: First-time visitor
 **Free-shipping threshold**:
 The cart subtotal at which the Flexible Shipping method ships free automatically. Owned by Flexible Shipping (Thailand zone), not by any Deal. Deals and coupons do not change it.
 _Avoid_: Deal, promotion
+
+**Points**:
+The store's loyalty currency, kept in our own ledger (ADR-0007), not by the Points & Rewards plugin. Earned when an order is Completed (default 1 point per ฿100 of paid item total, shipping excluded) and spent at the cart or checkout (default 1 point = ฿1, at most 20% of the item total after every other discount, at least 50 at a time). Expire 12 months after they are earned. Off until switched on under WooCommerce > แต้มสะสม. In Thai screens: **แต้มสะสม**.
+_Avoid_: Reward points, credit, cashback; "Member Privilege" (a different, percentage-based discount)
