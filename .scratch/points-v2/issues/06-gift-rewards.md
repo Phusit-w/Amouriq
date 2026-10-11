@@ -7,7 +7,7 @@
 **Status:** done locally (not uploaded, not in any kit yet). The cart pick in a browser was not run
 
 - [x] Redeeming adds exactly one free gift entitlement; it disappears with the coupon, as a gift does today when its trigger is gone
-- [x] An out-of-stock gift cannot be redeemed (the button is disabled with the reason), and one that sells out before checkout is refused with a message
+- [x] An out-of-stock gift cannot be redeemed (refused when the button is clicked, with a message and no points taken; the card does not grey the button out), and one that sells out before checkout is dropped from the cart with a notice
 - [x] The gift line shows ฿0 and is tagged like other gifts, and the order note says it came from points (the gift pick was simulated through the cart like the choice box does it; the choice box itself was not clicked in a browser)
 - [x] No points are lost if the gift cannot be added (the redeem is all-or-nothing)
 
