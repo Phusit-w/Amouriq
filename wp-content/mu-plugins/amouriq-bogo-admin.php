@@ -464,10 +464,13 @@ function amouriq_bogo_build_deal( array $in ) {
 	if ( ! empty( $in['new_customer_only'] ) ) {
 		$deal['new_customer_only'] = true;
 	}
+	if ( ! empty( $in['exclusive'] ) ) {
+		$deal['exclusive'] = true;
+	}
 
 	if ( 'spend_gift' === $type ) {
 		// A gift is a free line, not a discount: sale items, per-customer and per-order limits do not apply to it.
-		unset( $deal['exclude_sale'], $deal['max_uses_per_customer'], $deal['max_per_order'] );
+		unset( $deal['exclude_sale'], $deal['max_uses_per_customer'], $deal['max_per_order'], $deal['exclusive'] );
 	}
 
 	if ( '' === $label ) {
@@ -490,7 +493,7 @@ function amouriq_bogo_admin_handle() {
 	$back   = admin_url( 'admin.php?page=amouriq-bogo' );
 
 	// A second browser tab can hold an older list: act only on the Deal the page showed.
-	if ( in_array( $action, array( 'delete', 'toggle_deal', 'update' ), true ) && isset( $_POST['deal_id'] ) ) {
+	if ( in_array( $action, array( 'delete', 'toggle_deal', 'update', 'duplicate', 'move_up', 'move_down' ), true ) && isset( $_POST['deal_id'] ) ) {
 		if ( ! isset( $deals[ $index ] ) || ( isset( $deals[ $index ]['id'] ) ? $deals[ $index ]['id'] : '' ) !== sanitize_text_field( wp_unslash( $_POST['deal_id'] ) ) ) {
 			set_transient( 'amouriq_bogo_error_' . $uid, 'รายการดีลเปลี่ยนไปแล้ว (อาจมีการแก้ไขหรือลบจากหน้าอื่น) ไม่ได้ทำรายการ กรุณาดูรายการล่าสุดแล้วลองใหม่', 60 );
 			wp_safe_redirect( $back );
@@ -508,6 +511,21 @@ function amouriq_bogo_admin_handle() {
 			$on = ! isset( $deals[ $index ]['enabled'] ) || $deals[ $index ]['enabled'];
 			$deals[ $index ]['enabled'] = ! $on;
 			set_transient( 'amouriq_bogo_notice_' . $uid, $on ? 'ปิดดีลแล้ว' : 'เปิดดีลแล้ว', 60 );
+		}
+	} elseif ( 'duplicate' === $action && isset( $deals[ $index ] ) ) {
+		$copy            = $deals[ $index ];
+		$copy['id']      = 'b' . wp_generate_password( 10, false, false );
+		$copy['label']   = ( isset( $copy['label'] ) ? $copy['label'] : '' ) . ' (สำเนา)';
+		$copy['enabled'] = false; // a copy starts off, so it cannot change prices before it is checked
+		array_splice( $deals, $index + 1, 0, array( $copy ) );
+		set_transient( 'amouriq_bogo_notice_' . $uid, 'ทำสำเนาดีลแล้ว (ปิดอยู่ ตรวจแล้วค่อยเปิด)', 60 );
+	} elseif ( in_array( $action, array( 'move_up', 'move_down' ), true ) && isset( $deals[ $index ] ) ) {
+		$to = 'move_up' === $action ? $index - 1 : $index + 1;
+		if ( isset( $deals[ $to ] ) ) {
+			$swap             = $deals[ $to ];
+			$deals[ $to ]     = $deals[ $index ];
+			$deals[ $index ]  = $swap;
+			set_transient( 'amouriq_bogo_notice_' . $uid, 'เปลี่ยนลำดับดีลแล้ว', 60 );
 		}
 	} elseif ( 'toggle_member' === $action ) {
 		$turn_on = ! amouriq_member_privilege_enabled();
@@ -545,7 +563,7 @@ function amouriq_bogo_admin_handle() {
 		}
 		$result['id'] = 'b' . wp_generate_password( 10, false, false );
 		$deals[]      = $result;
-		set_transient( 'amouriq_bogo_notice_' . $uid, 'เพิ่มดีลแล้ว', 60 );
+		set_transient( 'amouriq_bogo_notice_' . $uid, 'เพิ่มดีลแล้ว: ' . amouriq_bogo_summary( $result ), 60 );
 	} elseif ( 'update' === $action ) {
 		if ( ! isset( $deals[ $index ] ) ) {
 			set_transient( 'amouriq_bogo_error_' . $uid, 'ไม่พบดีลที่จะแก้ไข', 60 );
@@ -563,7 +581,7 @@ function amouriq_bogo_admin_handle() {
 			$result['enabled'] = $deals[ $index ]['enabled'];
 		}
 		$deals[ $index ] = $result;
-		set_transient( 'amouriq_bogo_notice_' . $uid, 'บันทึกการแก้ไขแล้ว', 60 );
+		set_transient( 'amouriq_bogo_notice_' . $uid, 'บันทึกการแก้ไขแล้ว: ' . amouriq_bogo_summary( $result ), 60 );
 	}
 
 	update_option( 'amouriq_bogo_deals', array_values( $deals ), false );
@@ -698,6 +716,9 @@ function amouriq_bogo_chips( $deal ) {
 	}
 	if ( ! empty( $deal['new_customer_only'] ) ) {
 		$chips[] = 'ลูกค้าใหม่เท่านั้น';
+	}
+	if ( ! empty( $deal['exclusive'] ) ) {
+		$chips[] = 'Exclusive: ดีลถัดไปไม่ซ้อนบนสินค้าเดียวกัน';
 	}
 	if ( ! empty( $deal['scope'] ) ) {
 		$chips[] = 'ขอบเขต: ' . amouriq_bogo_scope_text( $deal['scope'] );
@@ -956,8 +977,17 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 				</td>
 				<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
 				<td><?php echo esc_html( $rep['orders'] ); ?> ออเดอร์<br><small>ลดรวม ฿<?php echo esc_html( number_format( $rep['total'], 2 ) ); ?></small></td>
-				<td style="white-space:nowrap">
+				<td style="white-space:normal">
+					<?php
+					if ( $i > 0 ) {
+						amouriq_bogo_action_form( 'move_up', 'index', $i, '↑', 'button', '', isset( $deal['id'] ) ? $deal['id'] : '' );
+					}
+					if ( $i < count( $deals ) - 1 ) {
+						amouriq_bogo_action_form( 'move_down', 'index', $i, '↓', 'button', '', isset( $deal['id'] ) ? $deal['id'] : '' );
+					}
+					?>
 					<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
+					<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'button', '', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
 					<a class="button" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
 					<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-link-delete', 'ลบดีลนี้?', isset( $deal['id'] ) ? $deal['id'] : '' ); ?>
 				</td>
@@ -1337,14 +1367,15 @@ function amouriq_bogo_admin_page() {
 				</div>
 				<script type="application/json" id="amq-cond-catalog"><?php echo wp_json_encode( $catalog ); // phpcs:ignore WordPress.Security.EscapeOutput ?></script>
 
-				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
+				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['exclusive'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
 					<summary>4. ตัวเลือกเพิ่มเติม (วันที่ จำกัดสิทธิ์ ไม่ใช้ร่วมกับคูปอง)</summary>
 					<div class="amq-grid">
 						<span class="k" style="font-weight:600">เงื่อนไขพิเศษ</span>
 						<div class="v">
 							<label class="amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price"><input type="checkbox" name="exclude_sale" value="1" <?php checked( $editing ? ! empty( $editing['exclude_sale'] ) : true ); ?>> ไม่รวมสินค้าที่ลดราคาอยู่แล้ว (ไม่ได้ส่วนลด; ยังนับในยอดขั้นต่ำ)</label><br>
 							<label><input type="checkbox" name="no_combine" value="1" <?php checked( ! empty( $editing['no_combine'] ) ); ?>> ไม่ใช้ร่วมกับคูปองอื่น (คูปองที่เปิดดีลนี้เองไม่นับ)</label><br>
-							<label><input type="checkbox" name="new_customer_only" value="1" <?php checked( ! empty( $editing['new_customer_only'] ) ); ?>> ลูกค้าใหม่เท่านั้น (ยังไม่เคยมีออเดอร์ที่นับ ตรวจตามบัญชีหรืออีเมล)</label>
+							<label><input type="checkbox" name="new_customer_only" value="1" <?php checked( ! empty( $editing['new_customer_only'] ) ); ?>> ลูกค้าใหม่เท่านั้น (ยังไม่เคยมีออเดอร์ที่นับ ตรวจตามบัญชีหรืออีเมล)</label><br>
+							<label class="amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price"><input type="checkbox" name="exclusive" value="1" <?php checked( ! empty( $editing['exclusive'] ) ); ?>> Exclusive: สินค้าที่ดีลนี้ลดแล้ว ดีลที่อยู่ถัดลงไปในรายการจะไม่ลดซ้ำ (ลำดับในรายการสำคัญ ไม่กระทบสิทธิพิเศษสมาชิกและคูปอง)</label>
 						</div>
 						<label class="k" for="bogo_from">ใช้ได้ตั้งแต่</label>
 						<div class="v"><input type="datetime-local" name="valid_from" id="bogo_from" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_from' ), false ) ); ?>"> <span class="description">เว้นว่าง = ใช้ได้ทันที</span></div>
@@ -1438,4 +1469,19 @@ function amouriq_bogo_admin_page() {
 		<?php endif; ?>
 	</div>
 	<?php
+}
+
+/** One plain Thai summary of a saved Deal (what it does, who for, which products), for the confirmation notice. */
+function amouriq_bogo_summary( $deal ) {
+	$parts = array( amouriq_bogo_detail( $deal ) );
+	if ( ! empty( $deal['scope'] ) ) {
+		$parts[] = 'ขอบเขต: ' . amouriq_bogo_scope_text( $deal['scope'] );
+	}
+	if ( ! empty( $deal['conditions'] ) ) {
+		$parts[] = amouriq_cond_describe( amouriq_bogo_conditions_for_form( $deal['conditions'] ) );
+	}
+	if ( ! empty( $deal['new_customer_only'] ) ) {
+		$parts[] = 'ลูกค้าใหม่เท่านั้น';
+	}
+	return implode( ' | ', array_filter( $parts ) );
 }

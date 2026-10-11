@@ -205,10 +205,21 @@ function amouriq_bogo_cart_discounts( $deals, $lines, $ctx ) {
 
 	$results  = array();
 	$per_line = array();
+	// Lines an Exclusive Deal discounted: later Deals in the list do not see them at all.
+	$claimed = array();
 	foreach ( $deals as $index => $deal ) {
-		$results[ $index ] = amouriq_bogo_price( $deal, $get, $ctx );
+		$seen = $get;
+		if ( $claimed ) {
+			$seen = static function () use ( $get, $claimed ) {
+				return array_diff_key( $get(), $claimed );
+			};
+		}
+		$results[ $index ] = amouriq_bogo_price( $deal, $seen, $ctx );
 		foreach ( $results[ $index ]['per_line'] as $i => $amount ) {
 			$per_line[ $i ] = ( isset( $per_line[ $i ] ) ? $per_line[ $i ] : 0.0 ) + $amount;
+			if ( ! empty( $deal['exclusive'] ) && $amount > 0 ) {
+				$claimed[ $i ] = true;
+			}
 		}
 	}
 
