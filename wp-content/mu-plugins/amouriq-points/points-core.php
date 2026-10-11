@@ -531,8 +531,19 @@ function amouriq_points_core_rewards_clean( $raw ) {
 		$kind  = isset( $reward['kind'] ) ? (string) $reward['kind'] : 'coupon';
 		$type  = isset( $reward['type'] ) && 'percent' === $reward['type'] ? 'percent' : 'fixed';
 		$value = isset( $reward['value'] ) && is_numeric( $reward['value'] ) ? (float) $reward['value'] : 0.0;
-		if ( '' === $label || $cost <= 0 || 'coupon' !== $kind || $value <= 0 || ( 'percent' === $type && $value > 100 ) ) {
+		$product = isset( $reward['product_id'] ) && is_numeric( $reward['product_id'] ) ? (int) $reward['product_id'] : 0;
+		if ( '' === $label || $cost <= 0 || ! in_array( $kind, array( 'coupon', 'gift' ), true ) ) {
 			continue;
+		}
+		if ( 'coupon' === $kind && ( $value <= 0 || ( 'percent' === $type && $value > 100 ) ) ) {
+			continue;
+		}
+		if ( 'gift' === $kind ) {
+			if ( $product <= 0 ) {
+				continue;
+			}
+			$type  = 'fixed';
+			$value = 0.0;
 		}
 		$days = isset( $reward['days_valid'] ) && is_numeric( $reward['days_valid'] ) ? (int) $reward['days_valid'] : 30;
 		$id   = isset( $reward['id'] ) ? preg_replace( '/[^a-z0-9]/i', '', (string) $reward['id'] ) : '';
@@ -540,7 +551,8 @@ function amouriq_points_core_rewards_clean( $raw ) {
 			'id'         => '' !== $id ? $id : 'r' . substr( md5( $label . $cost . microtime( true ) . count( $out ) ), 0, 8 ),
 			'label'      => mb_substr( $label, 0, 100 ),
 			'cost'       => $cost,
-			'kind'       => 'coupon',
+			'kind'       => $kind,
+			'product_id' => 'gift' === $kind ? $product : 0,
 			'type'       => $type,
 			'value'      => $value,
 			'min_spend'  => isset( $reward['min_spend'] ) && is_numeric( $reward['min_spend'] ) ? max( 0.0, (float) $reward['min_spend'] ) : 0.0,
@@ -567,12 +579,13 @@ function amouriq_points_core_check_redeem( $reward, $balance ) {
  * at the end of the day `days_valid` days from `$now`. Plain data for WC_Coupon.
  */
 function amouriq_points_core_coupon_spec( $reward, $now, $email, $code ) {
+	$gift = isset( $reward['kind'] ) && 'gift' === $reward['kind']; // a gift reward is a coupon worth nothing that unlocks the gift in the cart
 	$day = gmdate( 'Y-m-d', $now + (int) $reward['days_valid'] * 86400 );
 	return array(
 		'code'                 => $code,
 		'discount_type'        => 'percent' === $reward['type'] ? 'percent' : 'fixed_cart',
-		'amount'               => $reward['value'],
-		'minimum_amount'       => $reward['min_spend'],
+		'amount'               => $gift ? 0 : $reward['value'],
+		'minimum_amount'       => $gift ? 0 : $reward['min_spend'],
 		'usage_limit'          => 1,
 		'usage_limit_per_user' => 1,
 		'email_restrictions'   => array( strtolower( trim( (string) $email ) ) ),

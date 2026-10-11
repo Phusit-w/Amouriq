@@ -84,4 +84,26 @@ final class PointsRewardsTest extends TestCase {
 		$this->assertStringContainsString('30 วัน', $text);
 		$this->assertStringContainsString('ไม่คืนแต้ม', $text);
 	}
+
+	public function test_a_gift_reward_needs_a_product_and_becomes_a_zero_value_coupon(): void {
+		$gift  = ['id' => 'g1', 'label' => 'แถมสบู่ 30 ml', 'cost' => 150, 'kind' => 'gift', 'product_id' => '2278', 'days_valid' => 20, 'enabled' => true];
+		$clean = amouriq_points_core_rewards_clean([$gift, array_merge($gift, ['id' => 'g2', 'product_id' => 0])]);
+
+		$this->assertCount(1, $clean); // the one without a product is dropped
+		$this->assertSame('gift', $clean[0]['kind']);
+		$this->assertSame(2278, $clean[0]['product_id']);
+		$this->assertEquals(0, $clean[0]['value']);
+
+		$spec = amouriq_points_core_coupon_spec($clean[0], strtotime('2026-10-12 10:00:00 UTC'), 'a@b.co', 'PTS-GIFT');
+		$this->assertEquals(0, $spec['amount']);
+		$this->assertEquals(0, $spec['minimum_amount']);
+		$this->assertSame(1, $spec['usage_limit']);
+		$this->assertSame(['a@b.co'], $spec['email_restrictions']);
+	}
+
+	public function test_a_coupon_reward_still_needs_a_value_and_has_no_product(): void {
+		$clean = amouriq_points_core_rewards_clean([$this->reward(['product_id' => 55])]);
+		$this->assertSame(0, $clean[0]['product_id']);
+		$this->assertSame([], amouriq_points_core_rewards_clean([$this->reward(['value' => 0])]));
+	}
 }

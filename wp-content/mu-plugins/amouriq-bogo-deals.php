@@ -20,7 +20,8 @@ defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/amouriq-bogo/pricing-core.php';
 
 
-function amouriq_bogo_deals() {
+/** The Deals the owner saved (or config.php before the first save), never changed by other code: what the admin screen lists and saves. */
+function amouriq_bogo_deals_stored() {
 	static $deals = null;
 	if ( null === $deals ) {
 		$stored = get_option( 'amouriq_bogo_deals', null );
@@ -39,6 +40,14 @@ function amouriq_bogo_deals() {
 		}
 	}
 	return $deals;
+}
+
+/**
+ * The Deals in force for this request: the stored ones plus any that other code adds for the
+ * cart (the points programme adds a gift Deal while a gift-reward coupon is in the cart).
+ */
+function amouriq_bogo_deals() {
+	return apply_filters( 'amouriq_bogo_deals_runtime', amouriq_bogo_deals_stored() );
 }
 
 add_action( 'woocommerce_cart_calculate_fees', 'amouriq_bogo_apply_deals' );

@@ -498,7 +498,7 @@ function amouriq_bogo_admin_handle() {
 	}
 	check_admin_referer( 'amouriq_bogo_save' );
 
-	$deals  = amouriq_bogo_deals();
+	$deals  = amouriq_bogo_deals_stored();
 	$action = sanitize_key( $_POST['amouriq_bogo_action'] );
 	$uid    = get_current_user_id();
 	$index  = isset( $_POST['index'] ) ? (int) $_POST['index'] : -1;
@@ -1106,7 +1106,7 @@ function amouriq_bogo_admin_page() {
 	delete_transient( 'amouriq_bogo_notice_' . $uid );
 	delete_transient( 'amouriq_bogo_error_' . $uid );
 
-	$deals   = amouriq_bogo_deals();
+	$deals   = amouriq_bogo_deals_stored();
 	$types   = amouriq_bogo_type_labels();
 	$report  = amouriq_bogo_report();
 	$back    = amouriq_bogo_page_url();

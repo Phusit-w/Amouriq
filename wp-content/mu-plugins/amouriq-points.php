@@ -1113,6 +1113,10 @@ function amouriq_points_redemptions( $user_id ) {
 
 /** "฿100 off" or "10% off" for a reward, in Thai. */
 function amouriq_points_reward_text( $reward ) {
+	if ( isset( $reward['kind'] ) && 'gift' === $reward['kind'] ) {
+		$product = wc_get_product( $reward['product_id'] );
+		return 'ของแถมฟรี: ' . ( $product ? $product->get_name() : 'สินค้า #' . (int) $reward['product_id'] ) . ' (เลือกในตะกร้า) · ใช้ได้ ' . (int) $reward['days_valid'] . ' วัน · ใช้ได้ 1 ครั้ง';
+	}
 	$what = 'percent' === $reward['type'] ? amouriq_bogo_member_number( $reward['value'] ) . '%' : '฿' . amouriq_bogo_member_number( $reward['value'] );
 	$text = 'ส่วนลด ' . $what;
 	if ( $reward['min_spend'] > 0 ) {
@@ -1143,6 +1147,12 @@ function amouriq_points_redeem( $user_id, $reward_id, $token ) {
 	}
 	if ( ! $reward ) {
 		return $fail( 'ไม่พบของรางวัลนี้' );
+	}
+	if ( 'gift' === $reward['kind'] ) {
+		$gift_product = wc_get_product( $reward['product_id'] );
+		if ( ! $gift_product || ! $gift_product->is_purchasable() || ! $gift_product->is_in_stock() ) {
+			return $fail( 'ของแถมนี้หมดสต็อกชั่วคราว ยังไม่หักแต้ม กรุณาลองใหม่ภายหลัง' );
+		}
 	}
 
 	// One redemption at a time per member, and one per form.
@@ -1189,6 +1199,10 @@ function amouriq_points_redeem( $user_id, $reward_id, $token ) {
 	}
 	update_post_meta( $coupon_id, 'amouriq_points_user', $user_id );
 	update_post_meta( $coupon_id, 'amouriq_points_reward', $reward['id'] );
+	if ( 'gift' === $reward['kind'] ) {
+		update_post_meta( $coupon_id, 'amouriq_points_gift_product', (int) $reward['product_id'] );
+		update_post_meta( $coupon_id, 'amouriq_points_gift_label', $reward['label'] );
+	}
 
 	amouriq_points_record( $user_id, -$reward['cost'], 'redeem', 0, 'แลก: ' . $reward['label'] . ' (' . $code . ')', 0, $coupon_id );
 	$list   = amouriq_points_redemptions( $user_id );
@@ -1288,7 +1302,8 @@ function amouriq_points_admin_reward_action( $action ) {
 		$new   = array(
 			'label'      => isset( $post['label'] ) ? sanitize_text_field( $post['label'] ) : '',
 			'cost'       => isset( $post['cost'] ) ? $post['cost'] : 0,
-			'kind'       => 'coupon',
+			'kind'       => ( isset( $post['kind'] ) && 'gift' === $post['kind'] ) ? 'gift' : 'coupon',
+			'product_id' => isset( $post['product_id'] ) ? $post['product_id'] : 0,
 			'type'       => isset( $post['type'] ) && 'percent' === $post['type'] ? 'percent' : 'fixed',
 			'value'      => isset( $post['value'] ) ? $post['value'] : 0,
 			'min_spend'  => isset( $post['min_spend'] ) ? $post['min_spend'] : 0,
@@ -1296,8 +1311,10 @@ function amouriq_points_admin_reward_action( $action ) {
 			'enabled'    => true,
 		);
 		$check = amouriq_points_core_rewards_clean( array( $new ) );
-		if ( ! $check ) {
-			$notice = 'ไม่ได้เพิ่มของรางวัล: ใส่ชื่อ แต้มที่ใช้ (มากกว่า 0) และมูลค่าส่วนลด (มากกว่า 0 ถ้าเป็น % ต้องไม่เกิน 100)';
+		if ( 'gift' === $new['kind'] && ! wc_get_product( (int) $new['product_id'] ) ) {
+			$notice = 'ไม่ได้เพิ่มของรางวัล: ไม่พบสินค้ารหัสนี้ (ดูรหัสได้ในหน้ารายการสินค้า รหัสของตัวเลือกก็ใช้ได้)';
+		} elseif ( ! $check ) {
+			$notice = 'ไม่ได้เพิ่มของรางวัล: ใส่ชื่อ แต้มที่ใช้ (มากกว่า 0) และสำหรับคูปองใส่มูลค่าส่วนลด (มากกว่า 0 ถ้าเป็น % ต้องไม่เกิน 100) หรือสำหรับของแถมใส่รหัสสินค้า';
 		} else {
 			$rewards[] = $check[0];
 			$notice    = 'เพิ่มของรางวัลแล้ว';
@@ -1324,8 +1341,10 @@ function amouriq_points_admin_rewards_section() {
 	}
 	echo '</tbody></table>';
 
-	$inner = '<table class="form-table"><tr><th>ชื่อของรางวัล</th><td><input type="text" name="label" class="regular-text" placeholder="เช่น คูปองส่วนลด ฿100"></td></tr>'
+	$inner = '<table class="form-table"><tr><th>ชนิด</th><td><select name="kind"><option value="coupon">คูปองส่วนลด</option><option value="gift">ของแถมฟรี 1 ชิ้น</option></select></td></tr>'
+		. '<tr><th>ชื่อของรางวัล</th><td><input type="text" name="label" class="regular-text" placeholder="เช่น คูปองส่วนลด ฿100"></td></tr>'
 		. '<tr><th>ใช้กี่แต้ม</th><td><input type="number" min="1" name="cost" style="width:8em"> แต้ม</td></tr>'
+		. '<tr><th>รหัสสินค้าที่แถม</th><td><input type="number" min="1" name="product_id" style="width:8em"> (ใช้กับ "ของแถมฟรี" เท่านั้น: รหัสสินค้าหรือตัวเลือก ดูได้ในหน้ารายการสินค้า ลูกค้าเลือกรับในตะกร้า ตัดสต็อกจริง)</td></tr>'
 		. '<tr><th>ส่วนลด</th><td><input type="number" step="any" min="0" name="value" style="width:8em"> <select name="type"><option value="fixed">บาท</option><option value="percent">%</option></select></td></tr>'
 		. '<tr><th>ยอดซื้อขั้นต่ำ</th><td><input type="number" step="any" min="0" name="min_spend" value="0" style="width:8em"> บาท (0 = ไม่มี)</td></tr>'
 		. '<tr><th>คูปองใช้ได้กี่วัน</th><td><input type="number" min="1" max="365" name="days_valid" value="30" style="width:6em"> วัน นับจากวันที่แลก</td></tr></table>';
@@ -1366,4 +1385,55 @@ function amouriq_points_admin_rewards_section() {
 		);
 	}
 	echo '</tbody></table>';
+}
+
+/* ------------------------------------------------------- gift reward in the cart */
+
+add_filter( 'amouriq_bogo_deals_runtime', 'amouriq_points_gift_deals' );
+
+/**
+ * While a coupon from a gift Reward is in the cart (and its owner is the signed-in member), the
+ * Deal engine gets a gift Deal for it: the customer picks the gift in the cart with the same choice
+ * box as any gift Deal, the line is free and takes real stock. A paid item must be in the cart
+ * (minimum spend ฿1), so the gift is never the whole order. When the coupon leaves the cart the
+ * Deal disappears and the gift line is dropped with a notice, as for any gift Deal.
+ */
+function amouriq_points_gift_deals( $deals ) {
+	if ( ! function_exists( 'WC' ) || ! WC()->cart || ! amouriq_points_enabled() ) {
+		return $deals;
+	}
+	foreach ( WC()->cart->get_applied_coupons() as $code ) {
+		$coupon_id = wc_get_coupon_id_by_code( $code );
+		$product   = $coupon_id ? (int) get_post_meta( $coupon_id, 'amouriq_points_gift_product', true ) : 0;
+		if ( ! $product ) {
+			continue;
+		}
+		$deals[] = array(
+			'id'          => 'pts' . $coupon_id,
+			'type'        => 'spend_gift',
+			'label'       => 'ของรางวัลจากแต้ม: ' . get_post_meta( $coupon_id, 'amouriq_points_gift_label', true ),
+			'trigger'     => 'coupon',
+			'coupon_code' => $code,
+			'min_spend'   => 1,
+			'gift_ids'    => array( $product ),
+			'gift_qty'    => 1,
+		);
+	}
+	return $deals;
+}
+
+add_action( 'woocommerce_checkout_order_processed', 'amouriq_points_note_gift_reward', 30, 1 );
+
+/** Say on the order that a gift came from points. */
+function amouriq_points_note_gift_reward( $order_id ) {
+	$order = wc_get_order( $order_id );
+	if ( ! $order ) {
+		return;
+	}
+	foreach ( $order->get_coupon_codes() as $code ) {
+		$coupon_id = wc_get_coupon_id_by_code( $code );
+		if ( $coupon_id && get_post_meta( $coupon_id, 'amouriq_points_gift_product', true ) ) {
+			$order->add_order_note( sprintf( 'ลูกค้าใช้ของรางวัลที่แลกด้วยแต้มสะสม: %s (คูปอง %s) ของแถมอยู่ในรายการสินค้าเป็นสินค้าราคา ฿0', get_post_meta( $coupon_id, 'amouriq_points_gift_label', true ), $code ) );
+		}
+	}
 }
