@@ -48,9 +48,21 @@ function amouriq_bogo_apply_deals( $cart ) {
 		return;
 	}
 
-	foreach ( amouriq_bogo_deals() as $index => $deal ) {
-		$discount = amouriq_bogo_deal_discount( $deal, $cart );
-		if ( $discount <= 0 ) {
+	$deals                = amouriq_bogo_deals();
+	$context              = amouriq_bogo_price_context( $deals, $cart );
+	$context['is_member'] = amouriq_bogo_is_member();
+	$result               = amouriq_bogo_cart_discounts(
+		$deals,
+		static function () use ( $cart ) {
+			return amouriq_bogo_cart_lines( $cart );
+		},
+		$context
+	);
+
+	foreach ( $deals as $index => $deal ) {
+		$one = $result['deals'][ $index ];
+		amouriq_bogo_notify_blocked( $deal, $one );
+		if ( $one['discount'] <= 0 ) {
 			continue;
 		}
 
@@ -59,7 +71,62 @@ function amouriq_bogo_apply_deals( $cart ) {
 		// fee's auto-generated ID (WooCommerce derives it from this name).
 		// `taxable` here only matters for a positive fee, never a discount —
 		// see the note on amouriq_bogo_unit_price() above.
-		$cart->add_fee( $label . ' #' . ( $index + 1 ), -$discount, false );
+		$cart->add_fee( $label . ' #' . ( $index + 1 ), -$one['discount'], false );
+	}
+
+	// Member Privilege is its own fee line. The core already took off whatever a
+	// larger Deal gives on the same item, so the two never add up (ADR-0006).
+	$member = $result['member'];
+	if ( $member['discount'] > 0 ) {
+		$label = 'ส่วนลดสมาชิก 5% (สินค้าราคาปกติ)';
+		if ( $member['deal_won'] ) {
+			$label .= ' – สินค้าในดีลได้ส่วนลดของดีลที่มากกว่า';
+		}
+		$cart->add_fee( $label, -$member['discount'], false );
+	}
+}
+
+/**
+ * Member Privilege is for a customer with an account: logged in, or creating one
+ * in the checkout being filled in (or placed). A shop that requires an account
+ * to check out makes every checkout one.
+ */
+function amouriq_bogo_is_member() {
+	if ( is_user_logged_in() || amouriq_bogo_checkout_creates_account() ) {
+		return true;
+	}
+	return function_exists( 'WC' ) && WC()->checkout() && WC()->checkout()->is_registration_required();
+}
+
+/** Whether the checkout form being refreshed or placed ticks "create an account". */
+function amouriq_bogo_checkout_creates_account( $set = null ) {
+	static $creates = false;
+	if ( null !== $set ) {
+		$creates = (bool) $set;
+	}
+	// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce verifies the checkout nonce.
+	return $creates || ! empty( $_POST['createaccount'] );
+}
+
+// A checkout refresh sends the form as post_data, not as $_POST fields.
+add_action(
+	'woocommerce_checkout_update_order_review',
+	static function ( $post_data ) {
+		if ( is_string( $post_data ) ) {
+			parse_str( $post_data, $fields );
+			amouriq_bogo_checkout_creates_account( ! empty( $fields['createaccount'] ) );
+		}
+	},
+	5
+);
+
+/** Tell the shopper why a Deal was held back by another coupon. */
+function amouriq_bogo_notify_blocked( $deal, $result ) {
+	if ( 'blocked_by_other_coupon' === $result['reason'] ) {
+		$message = sprintf( 'ดีล "%s" ไม่ใช้ร่วมกับคูปองอื่น จึงยังไม่ได้ส่วนลดดีลนี้', ! empty( $deal['label'] ) ? $deal['label'] : 'Deal discount' );
+		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
+			wc_add_notice( $message, 'notice' );
+		}
 	}
 }
 
@@ -76,15 +143,10 @@ function amouriq_bogo_deal_discount( $deal, $cart ) {
 		static function () use ( $cart ) {
 			return amouriq_bogo_cart_lines( $cart );
 		},
-		amouriq_bogo_price_context( $deal, $cart )
+		amouriq_bogo_price_context( array( $deal ), $cart )
 	);
 
-	if ( 'blocked_by_other_coupon' === $result['reason'] ) {
-		$message = sprintf( 'ดีล "%s" ไม่ใช้ร่วมกับคูปองอื่น จึงยังไม่ได้ส่วนลดดีลนี้', ! empty( $deal['label'] ) ? $deal['label'] : 'Deal discount' );
-		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
-			wc_add_notice( $message, 'notice' );
-		}
-	}
+	amouriq_bogo_notify_blocked( $deal, $result );
 
 	return $result['discount'];
 }
@@ -107,6 +169,8 @@ function amouriq_bogo_cart_lines( $cart ) {
 			'variation_id' => (int) $cart_item['variation_id'],
 			'quantity'     => (int) $cart_item['quantity'],
 			'unit_price'   => amouriq_bogo_unit_price( $item_id ),
+			// What the shopper sees per item (tax included when the shop shows it so); the minimum spend is judged on this.
+			'price_incl_tax' => $product ? (float) wc_get_price_to_display( $product ) : 0.0,
 			'on_sale'      => $product && $product->is_on_sale(),
 			'categories'   => array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) ),
 		);
@@ -120,18 +184,20 @@ function amouriq_bogo_cart_lines( $cart ) {
  * deal (the core only calls it for a deal with a per-customer limit that is
  * otherwise live) and the price of each product the deal names.
  */
-function amouriq_bogo_price_context( $deal, $cart ) {
+function amouriq_bogo_price_context( $deals, $cart ) {
 	$prices = array();
-	foreach ( array( 'product_id', 'buy_product_id', 'get_product_id' ) as $key ) {
-		if ( ! empty( $deal[ $key ] ) ) {
-			$prices[ (int) $deal[ $key ] ] = amouriq_bogo_unit_price( $deal[ $key ] );
+	foreach ( $deals as $deal ) {
+		foreach ( array( 'product_id', 'buy_product_id', 'get_product_id' ) as $key ) {
+			if ( ! empty( $deal[ $key ] ) ) {
+				$prices[ (int) $deal[ $key ] ] = amouriq_bogo_unit_price( $deal[ $key ] );
+			}
 		}
 	}
 
 	return array(
 		'today'           => current_time( 'Y-m-d' ),
 		'applied_coupons' => $cart->get_applied_coupons(),
-		'customer_uses'   => static function () use ( $deal ) {
+		'customer_uses'   => static function ( $deal ) {
 			return amouriq_bogo_customer_uses( $deal['id'] );
 		},
 		'prices'          => $prices,
