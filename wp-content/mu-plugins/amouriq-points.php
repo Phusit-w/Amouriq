@@ -442,6 +442,10 @@ function amouriq_points_admin_menu() {
 add_action( 'admin_init', 'amouriq_points_admin_handle' );
 
 function amouriq_points_admin_url( $args = array() ) {
+	if ( ! isset( $args['tab'] ) ) {
+		// A member, a search or a page number belongs to the Members tab; anything else stays on the tab being shown.
+		$args['tab'] = ( isset( $args['email'] ) || isset( $args['q'] ) || isset( $args['paged'] ) ) ? 'members' : amouriq_points_admin_tab();
+	}
 	return add_query_arg( array_merge( array( 'page' => 'amouriq-points' ), $args ), admin_url( 'admin.php' ) );
 }
 
@@ -493,6 +497,7 @@ function amouriq_points_admin_handle() {
 	}
 
 	set_transient( 'amouriq_points_notice_' . get_current_user_id(), $notice, 60 );
+	$args['tab'] = isset( $args['email'] ) ? 'members' : amouriq_points_admin_tab();
 	wp_safe_redirect( amouriq_points_admin_url( $args ) );
 	exit;
 }
@@ -500,32 +505,148 @@ function amouriq_points_admin_handle() {
 function amouriq_points_admin_form( $action, $inner, $button, $class = 'button button-primary', $confirm = '' ) {
 	echo '<form method="post" style="display:inline"' . ( $confirm ? ' onsubmit="return confirm(' . esc_attr( wp_json_encode( $confirm ) ) . ')"' : '' ) . '>';
 	wp_nonce_field( 'amouriq_points_admin', 'amouriq_points_admin_nonce' );
+	echo '<input type="hidden" name="amouriq_points_tab" value="' . esc_attr( amouriq_points_admin_tab() ) . '">';
 	echo '<input type="hidden" name="amouriq_points_admin" value="' . esc_attr( $action ) . '">' . $inner; // phpcs:ignore WordPress.Security.EscapeOutput
 	echo '<button type="submit" class="' . esc_attr( $class ) . '">' . esc_html( $button ) . '</button></form>';
+}
+
+/** The tabs of the points screen: key => Thai label. */
+function amouriq_points_admin_tabs() {
+	return array(
+		'overview' => 'ภาพรวม',
+		'settings' => 'ตั้งค่า',
+		'rules'    => 'กติกาและโบนัส',
+		'rewards'  => 'ของรางวัล',
+		'members'  => 'สมาชิก',
+		'report'   => 'รายงาน',
+	);
+}
+
+/** The tab being shown (from the address, or from the form just posted). */
+function amouriq_points_admin_tab() {
+	// phpcs:disable WordPress.Security.NonceVerification -- read-only; a posted form is checked in amouriq_points_admin_handle()
+	$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : ( isset( $_POST['amouriq_points_tab'] ) ? sanitize_key( wp_unslash( $_POST['amouriq_points_tab'] ) ) : 'overview' );
+	// phpcs:enable
+	return isset( amouriq_points_admin_tabs()[ $tab ] ) ? $tab : 'overview';
+}
+
+/** A plain sentence for each current rule, so the owner reads what the customer gets. */
+function amouriq_points_admin_summary_lines() {
+	$s       = amouriq_points_settings();
+	$earning = amouriq_points_earning();
+	$bonus   = amouriq_points_bonus();
+	$mail    = amouriq_points_expiry_mail_settings();
+	$n       = static function ( $v ) {
+		return amouriq_bogo_member_number( $v );
+	};
+	$lines   = array();
+	$lines[] = sprintf( 'ลูกค้าได้ 1 แต้มทุก ฿%s ที่จ่ายค่าสินค้า (ไม่รวมค่าส่ง) เมื่อออเดอร์เสร็จสมบูรณ์', $n( $s['earn_baht'] ) );
+	$lines[] = sprintf( 'ใช้แต้มเป็นส่วนลดได้ 1 แต้ม = ฿%s ครั้งละอย่างน้อย %d แต้ม และไม่เกิน %s%% ของยอดสินค้า', $n( $s['redeem_baht'] ), (int) $s['min_redeem'], $n( $s['max_percent'] ) );
+	$lines[] = $s['expiry_months'] ? sprintf( 'แต้มหมดอายุหลังได้รับ %d เดือน', (int) $s['expiry_months'] ) : 'แต้มไม่หมดอายุ';
+	$rules   = count( array_filter( $earning['rules'], static function ( $r ) {
+		return $r['enabled'];
+	} ) );
+	$lines[] = $rules ? sprintf( 'มีกติกาการได้แต้มพิเศษที่เปิดอยู่ %d ข้อ', $rules ) : 'ยังไม่มีกติกาการได้แต้มพิเศษ (ใช้กติกาพื้นฐานอย่างเดียว)';
+	$on      = array();
+	foreach ( array( 'signup' => 'สมัครสมาชิก', 'first_order' => 'ออเดอร์แรก', 'review' => 'รีวิวสินค้า' ) as $key => $label ) {
+		if ( $bonus[ $key ]['enabled'] ) {
+			$on[] = $label . ' ' . $bonus[ $key ]['points'] . ' แต้ม';
+		}
+	}
+	$lines[] = $on ? 'โบนัสที่เปิดอยู่: ' . implode(', ', $on ) : 'ยังไม่เปิดโบนัสใด ๆ';
+	$active_rewards = count( array_filter( amouriq_points_rewards(), static function ( $r ) {
+		return $r['enabled'];
+	} ) );
+	$lines[] = $active_rewards ? sprintf( 'ลูกค้าแลกแต้มเป็นของรางวัลได้ %d รายการ', $active_rewards ) : 'ยังไม่มีของรางวัลให้แลก';
+	$lines[] = $mail['enabled'] ? sprintf( 'ส่งอีเมลเตือนก่อนแต้มหมดอายุ %d วัน', $mail['days'] ) : 'ไม่ส่งอีเมลเตือนแต้มใกล้หมดอายุ';
+	return $lines;
 }
 
 function amouriq_points_admin_page() {
 	if ( ! current_user_can( 'manage_woocommerce' ) ) {
 		return;
 	}
-	$settings = amouriq_points_settings();
-	$on       = amouriq_points_enabled();
-	$notice   = get_transient( 'amouriq_points_notice_' . get_current_user_id() );
+	$tab    = amouriq_points_admin_tab();
+	$on     = amouriq_points_enabled();
+	$notice = get_transient( 'amouriq_points_notice_' . get_current_user_id() );
 	delete_transient( 'amouriq_points_notice_' . get_current_user_id() );
-	$email = isset( $_GET['email'] ) ? sanitize_email( wp_unslash( $_GET['email'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-	$found = $email ? get_user_by( 'email', $email ) : false;
 
-	echo '<div class="wrap"><h1>แต้มสะสม</h1>';
+	echo '<style>
+		.amq-pts-card { background:#fff; border:1px solid #c3c4c7; border-radius:4px; padding:12px 18px; margin:14px 0; max-width:900px; }
+		.amq-pts-card h2 { margin-top:4px; }
+		.amq-pts-state { display:inline-block; padding:2px 12px; border-radius:12px; font-weight:600; }
+		.amq-pts-state.on { background:#d6f5d6; color:#0a5c0a; } .amq-pts-state.off { background:#f0f0f1; color:#50575e; }
+		.amq-pts-help { color:#50575e; max-width:900px; }
+		.amq-pts-wrap h2 { margin-top:28px; } .amq-pts-wrap .form-table th { width:260px; }
+		.amq-pts-stats { display:flex; gap:12px; flex-wrap:wrap; margin:10px 0; }
+		.amq-pts-stat { background:#f6f7f7; border-radius:4px; padding:10px 16px; min-width:150px; } .amq-pts-stat b { display:block; font-size:22px; }
+		@media (max-width:782px) { .amq-pts-wrap .form-table th { width:auto; } }
+	</style>';
+	echo '<div class="wrap amq-pts-wrap"><h1>แต้มสะสม <span class="amq-pts-state ' . ( $on ? 'on' : 'off' ) . '">' . ( $on ? 'เปิดอยู่' : 'ปิดอยู่' ) . '</span></h1>';
 	if ( $notice ) {
 		echo '<div class="notice notice-info is-dismissible"><p>' . esc_html( $notice ) . '</p></div>';
 	}
 
-	echo '<h2>สถานะระบบ</h2><p>ตอนนี้ระบบ<strong>' . ( $on ? 'เปิดอยู่' : 'ปิดอยู่' ) . '</strong> ';
-	echo $on ? '(ลูกค้าได้แต้มเมื่อออเดอร์เสร็จสมบูรณ์ และใช้แต้มได้ที่ตะกร้า/ชำระเงิน)' : '(ยังไม่มีใครได้หรือใช้แต้ม ปิดอยู่จนกว่าจะกดเปิด)';
+	echo '<nav class="nav-tab-wrapper" style="margin-bottom:12px">';
+	foreach ( amouriq_points_admin_tabs() as $key => $label ) {
+		echo '<a class="nav-tab' . ( $key === $tab ? ' nav-tab-active' : '' ) . '" href="' . esc_url( amouriq_points_admin_url( array( 'tab' => $key ) ) ) . '">' . esc_html( $label ) . '</a>';
+	}
+	echo '</nav>';
+
+	switch ( $tab ) {
+		case 'settings':
+			amouriq_points_admin_tab_settings();
+			break;
+		case 'rules':
+			echo '<p class="amq-pts-help">กำหนดว่าลูกค้าจะได้แต้มเท่าไรและเมื่อไร นอกเหนือจากกติกาพื้นฐานในแท็บ "ตั้งค่า"</p>';
+			amouriq_points_admin_earning_section();
+			amouriq_points_admin_bonus_section();
+			break;
+		case 'rewards':
+			echo '<p class="amq-pts-help">ของที่ลูกค้าเอาแต้มมาแลกได้ในหน้า "บัญชีของฉัน"</p>';
+			amouriq_points_admin_rewards_section();
+			break;
+		case 'members':
+			amouriq_points_admin_tab_members();
+			break;
+		case 'report':
+			echo '<p class="amq-pts-help">ดูว่าแจกแต้มไปเท่าไร ใช้ไปเท่าไร และมีแต้มค้างอยู่เท่าไร</p>';
+			amouriq_points_admin_report_section();
+			break;
+		default:
+			amouriq_points_admin_tab_overview( $on );
+	}
+	echo '</div>';
+}
+
+function amouriq_points_admin_tab_overview( $on ) {
+	echo '<div class="amq-pts-card"><h2>สถานะระบบ</h2><p>ตอนนี้ระบบ<strong>' . ( $on ? 'เปิดอยู่' : 'ปิดอยู่' ) . '</strong> ';
+	echo $on ? '(ลูกค้าได้แต้มเมื่อออเดอร์เสร็จสมบูรณ์ และใช้แต้มได้ที่ตะกร้าและหน้าชำระเงิน)' : '(ยังไม่มีใครได้หรือใช้แต้ม ปิดอยู่จนกว่าจะกดเปิด)';
 	echo '</p>';
 	amouriq_points_admin_form( 'toggle', '', $on ? 'ปิดระบบแต้มสะสม' : 'เปิดระบบแต้มสะสม', $on ? 'button' : 'button button-primary', $on ? '' : 'เปิดระบบแต้มสะสมให้ลูกค้าทุกคนทันที ใช่ไหม?' );
+	if ( ! $on ) {
+		echo '<p class="description">ก่อนเปิด: ตรวจกติกาด้านล่าง และทดสอบสั่งซื้อจริงด้วยบัญชีทดสอบหนึ่งบัญชี (สั่งซื้อ > เปลี่ยนสถานะเป็นเสร็จสมบูรณ์ > ดูแต้มในบัญชีของฉัน)</p>';
+	}
+	echo '</div>';
 
-	echo '<h2>การตั้งค่า</h2>';
+	$report = amouriq_points_core_report( amouriq_points_all_ledgers(), time(), amouriq_points_site_offset() );
+	$redeem = amouriq_points_settings()['redeem_baht'];
+	echo '<div class="amq-pts-stats">';
+	printf( '<div class="amq-pts-stat">แต้มคงเหลือของสมาชิกทั้งหมด<b>%s</b>มูลค่า ฿%s</div>', esc_html( number_format_i18n( $report['outstanding'] ) ), esc_html( number_format_i18n( $report['outstanding'] * $redeem, 2 ) ) );
+	printf( '<div class="amq-pts-stat">จะหมดอายุภายใน 30 วัน<b>%s</b>แต้ม</div>', esc_html( number_format_i18n( $report['expiring_soon'] ) ) );
+	printf( '<div class="amq-pts-stat">สมาชิกที่มีรายการแต้ม<b>%s</b>คน</div>', esc_html( number_format_i18n( count( amouriq_points_all_ledgers() ) ) ) );
+	echo '</div>';
+
+	echo '<div class="amq-pts-card"><h2>กติกาตอนนี้ (อ่านแบบที่ลูกค้าเห็น)</h2><ul style="list-style:disc;margin-left:22px">';
+	foreach ( amouriq_points_admin_summary_lines() as $line ) {
+		echo '<li>' . esc_html( $line ) . '</li>';
+	}
+	echo '</ul><p><a class="button" href="' . esc_url( amouriq_points_admin_url( array( 'tab' => 'settings' ) ) ) . '">แก้ตัวเลขพื้นฐาน</a> <a class="button" href="' . esc_url( amouriq_points_admin_url( array( 'tab' => 'rules' ) ) ) . '">แก้กติกาและโบนัส</a> <a class="button" href="' . esc_url( amouriq_points_admin_url( array( 'tab' => 'rewards' ) ) ) . '">แก้ของรางวัล</a></p></div>';
+}
+
+function amouriq_points_admin_tab_settings() {
+	$settings = amouriq_points_settings();
+	echo '<p class="amq-pts-help">ตัวเลขพื้นฐานของระบบ ใช้กับทุกออเดอร์ ถ้าอยากให้บางหมวดหรือบางช่วงเวลาได้แต้มต่างออกไป ไปที่แท็บ "กติกาและโบนัส"</p>';
 	$fields = array(
 		'earn_baht'     => array( 'ซื้อสินค้ากี่บาท ได้ 1 แต้ม', 'บาท (ยอดสินค้าที่จ่ายจริง ไม่รวมค่าส่ง)' ),
 		'redeem_baht'   => array( '1 แต้มใช้เป็นส่วนลดกี่บาท', 'บาท' ),
@@ -538,29 +659,32 @@ function amouriq_points_admin_page() {
 		$inner .= '<tr><th>' . esc_html( $meta[0] ) . '</th><td><input type="number" step="any" min="0" name="' . esc_attr( $key ) . '" value="' . esc_attr( $settings[ $key ] ) . '" style="width:8em"> ' . esc_html( $meta[1] ) . '</td></tr>';
 	}
 	$inner .= '</table>';
+	echo '<div class="amq-pts-card"><h2>ตัวเลขพื้นฐาน</h2>';
 	amouriq_points_admin_form( 'save', $inner, 'บันทึกการตั้งค่า' );
-
-	echo '<h2>ปรับแต้มด้วยมือ</h2><p>เพิ่มแต้มให้สมาชิก (หรือใส่เลขลบเพื่อหัก) เช่น ชดเชยหรือแก้ไขข้อผิดพลาด</p>';
-	$inner = '<p><label>อีเมลสมาชิก <input type="email" name="email" value="' . esc_attr( $email ) . '" required></label> '
-		. '<label>แต้ม <input type="number" name="points" style="width:7em" required></label> '
-		. '<label>เหตุผล (จำเป็น) <input type="text" name="note" style="width:18em" required></label></p>';
-	amouriq_points_admin_form( 'adjust', $inner, 'ปรับแต้ม' );
-
-	amouriq_points_admin_earning_section();
-	amouriq_points_admin_bonus_section();
+	echo '</div>';
+	echo '<div class="amq-pts-card">';
 	amouriq_points_admin_expiry_mail_section();
-	amouriq_points_admin_rewards_section();
-	amouriq_points_admin_report_section();
+	echo '</div>';
+}
 
-	amouriq_points_admin_customer_list();
+function amouriq_points_admin_tab_members() {
+	// phpcs:disable WordPress.Security.NonceVerification -- read-only
+	$email = isset( $_GET['email'] ) ? sanitize_email( wp_unslash( $_GET['email'] ) ) : '';
+	// phpcs:enable
+	$found = $email ? get_user_by( 'email', $email ) : false;
 
-	echo '<h2>ดูแต้มของสมาชิก</h2><form method="get"><input type="hidden" name="page" value="amouriq-points"><input type="email" name="email" value="' . esc_attr( $email ) . '" placeholder="อีเมลสมาชิก"> <button class="button">ค้นหา</button></form>';
 	if ( $email && ! $found ) {
-		echo '<p>ไม่พบสมาชิกที่ใช้อีเมลนี้</p>';
-	} elseif ( $found ) {
+		echo '<div class="notice notice-warning inline"><p>ไม่พบสมาชิกที่ใช้อีเมลนี้</p></div>';
+	}
+	if ( $found ) {
 		$balance = amouriq_points_balance( $found->ID );
-		printf( '<p><strong>%s</strong>: %s แต้ม%s</p>', esc_html( $email ), esc_html( number_format_i18n( $balance['points'] ) ), $balance['soonest_expiry'] ? esc_html( ' (ชุดที่หมดอายุเร็วสุด: ' . wp_date( 'j M Y', $balance['soonest_expiry'] ) . ')' ) : '' );
-		echo '<table class="widefat striped" style="max-width:800px"><thead><tr><th>วันที่</th><th>ประเภท</th><th>ออเดอร์</th><th>แต้ม</th><th>หมดอายุ</th><th>หมายเหตุ</th><th>โดย</th></tr></thead><tbody>';
+		echo '<div class="amq-pts-card"><h2>' . esc_html( $found->display_name ) . ' <small>(' . esc_html( $email ) . ')</small></h2>';
+		printf( '<p style="font-size:16px"><strong>แต้มคงเหลือ %s แต้ม</strong>%s</p>', esc_html( number_format_i18n( $balance['points'] ) ), $balance['soonest_expiry'] ? esc_html( ' · ชุดที่หมดอายุเร็วสุดหมดวันที่ ' . wp_date( 'j M Y', $balance['soonest_expiry'] ) ) : '' );
+		echo '<h3>เพิ่มหรือหักแต้มให้สมาชิกคนนี้</h3><p class="description">ใส่เลขบวกเพื่อเพิ่ม เลขลบเพื่อหัก เช่น ชดเชยหรือแก้ไขข้อผิดพลาด ต้องใส่เหตุผลทุกครั้ง และบันทึกชื่อผู้ปรับไว้</p>';
+		$inner = '<input type="hidden" name="email" value="' . esc_attr( $email ) . '"><p><label>แต้ม <input type="number" name="points" style="width:7em" required></label> '
+			. '<label>เหตุผล (จำเป็น) <input type="text" name="note" style="width:20em" required></label></p>';
+		amouriq_points_admin_form( 'adjust', $inner, 'ปรับแต้ม' );
+		echo '<h3>ประวัติแต้ม</h3><table class="widefat striped"><thead><tr><th>วันที่</th><th>รายการ</th><th>ออเดอร์</th><th>แต้ม</th><th>หมดอายุ</th><th>หมายเหตุ</th><th>โดย</th></tr></thead><tbody>';
 		foreach ( array_reverse( amouriq_points_ledger( $found->ID ) ) as $row ) {
 			printf(
 				'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
@@ -573,9 +697,12 @@ function amouriq_points_admin_page() {
 				! empty( $row['by'] ) ? esc_html( ( get_userdata( $row['by'] ) ? get_userdata( $row['by'] )->display_name : '#' . $row['by'] ) ) : ''
 			);
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table><p><a href="' . esc_url( amouriq_points_admin_url( array( 'tab' => 'members' ) ) ) . '">&larr; กลับไปรายชื่อสมาชิก</a></p></div>';
+		return;
 	}
-	echo '</div>';
+
+	echo '<p class="amq-pts-help">เลือกสมาชิกจากรายชื่อเพื่อดูประวัติแต้ม และเพิ่มหรือหักแต้มให้เป็นรายคน (ค้นหาด้วยชื่อหรืออีเมลได้)</p>';
+	amouriq_points_admin_customer_list();
 }
 
 /**
@@ -606,7 +733,7 @@ function amouriq_points_admin_customer_list() {
 	$total = (int) $query->get_total();
 
 	echo '<h2>สมาชิกที่มีแต้ม</h2>';
-	echo '<form method="get"><input type="hidden" name="page" value="amouriq-points"><input type="search" name="q" value="' . esc_attr( $search ) . '" placeholder="ค้นหาชื่อหรืออีเมล"> <button class="button">ค้นหา</button></form>';
+	echo '<form method="get"><input type="hidden" name="page" value="amouriq-points"><input type="hidden" name="tab" value="members"><input type="search" name="q" value="' . esc_attr( $search ) . '" placeholder="ค้นหาชื่อหรืออีเมล"> <button class="button">ค้นหา</button></form>';
 	echo '<table class="widefat striped" style="max-width:800px;margin-top:8px"><thead><tr><th>สมาชิก</th><th>อีเมล</th><th>แต้มคงเหลือ</th><th>ชุดที่หมดอายุเร็วสุด</th><th></th></tr></thead><tbody>';
 	$rows = $query->get_results();
 	if ( ! $rows ) {
@@ -829,11 +956,11 @@ function amouriq_points_admin_earning_section() {
 	}
 	$inner = '<table class="form-table"><tr><th>ชนิด</th><td><select name="kind"><option value="rate">อัตราพิเศษ (ซื้อกี่บาทได้ 1 แต้ม)</option><option value="exclude">ไม่ให้แต้ม</option><option value="multiplier">ตัวคูณแต้ม</option></select></td></tr>'
 		. '<tr><th>ชื่อกติกา</th><td><input type="text" name="label" class="regular-text" placeholder="เช่น สบู่ได้แต้มเพิ่ม"></td></tr>'
-		. '<tr><th>ซื้อกี่บาทได้ 1 แต้ม</th><td><input type="number" step="any" min="0" name="baht" style="width:8em"> บาท (ใช้กับอัตราพิเศษ)</td></tr>'
-		. '<tr><th>หมวดสินค้า</th><td><select name="categories[]" multiple size="5" style="min-width:16em">' . $opts . '</select><br><small>ใช้กับอัตราพิเศษและไม่ให้แต้ม (กด Ctrl เพื่อเลือกหลายหมวด)</small></td></tr>'
-		. '<tr><th>รหัสสินค้า</th><td><input type="text" name="product_ids" class="regular-text" placeholder="เช่น 2278, 2285"><br><small>คั่นด้วยจุลภาค ถ้าเลือกทั้งหมวดและรหัส สินค้าต้องอยู่ในทั้งสองอย่าง</small></td></tr>'
-		. '<tr><th>ตัวคูณ</th><td>x <input type="number" step="any" min="1" max="10" name="factor" style="width:6em"> (ใช้กับตัวคูณแต้ม ระหว่าง 1 ถึง 10)</td></tr>'
-		. '<tr><th>ช่วงวันที่</th><td><input type="date" name="from"> ถึง <input type="date" name="to"> <small>เว้นว่าง = ไม่จำกัด (ใช้กับตัวคูณแต้ม)</small></td></tr></table>';
+		. '<tr data-for="rate"><th>ซื้อกี่บาทได้ 1 แต้ม</th><td><input type="number" step="any" min="0" name="baht" style="width:8em"> บาท (ใช้กับอัตราพิเศษ)</td></tr>'
+		. '<tr data-for="rate exclude"><th>หมวดสินค้า</th><td><select name="categories[]" multiple size="5" style="min-width:16em">' . $opts . '</select><br><small>ใช้กับอัตราพิเศษและไม่ให้แต้ม (กด Ctrl เพื่อเลือกหลายหมวด)</small></td></tr>'
+		. '<tr data-for="rate exclude"><th>รหัสสินค้า</th><td><input type="text" name="product_ids" class="regular-text" placeholder="เช่น 2278, 2285"><br><small>คั่นด้วยจุลภาค ถ้าเลือกทั้งหมวดและรหัส สินค้าต้องอยู่ในทั้งสองอย่าง</small></td></tr>'
+		. '<tr data-for="multiplier"><th>ตัวคูณ</th><td>x <input type="number" step="any" min="1" max="10" name="factor" style="width:6em"> (ใช้กับตัวคูณแต้ม ระหว่าง 1 ถึง 10)</td></tr>'
+		. '<tr data-for="multiplier"><th>ช่วงวันที่</th><td><input type="date" name="from"> ถึง <input type="date" name="to"> <small>เว้นว่าง = ไม่จำกัด (ใช้กับตัวคูณแต้ม)</small></td></tr></table>';
 	echo '<h3>เพิ่มกติกา</h3>';
 	amouriq_points_admin_form( 'earn_add', $inner, 'เพิ่มกติกา' );
 
@@ -1347,9 +1474,9 @@ function amouriq_points_admin_rewards_section() {
 	$inner = '<table class="form-table"><tr><th>ชนิด</th><td><select name="kind"><option value="coupon">คูปองส่วนลด</option><option value="gift">ของแถมฟรี 1 ชิ้น</option></select></td></tr>'
 		. '<tr><th>ชื่อของรางวัล</th><td><input type="text" name="label" class="regular-text" placeholder="เช่น คูปองส่วนลด ฿100"></td></tr>'
 		. '<tr><th>ใช้กี่แต้ม</th><td><input type="number" min="1" name="cost" style="width:8em"> แต้ม</td></tr>'
-		. '<tr><th>รหัสสินค้าที่แถม</th><td><input type="number" min="1" name="product_id" style="width:8em"> (ใช้กับ "ของแถมฟรี" เท่านั้น: รหัสสินค้าหรือตัวเลือก ดูได้ในหน้ารายการสินค้า ลูกค้าเลือกรับในตะกร้า ตัดสต็อกจริง)</td></tr>'
-		. '<tr><th>ส่วนลด</th><td><input type="number" step="any" min="0" name="value" style="width:8em"> <select name="type"><option value="fixed">บาท</option><option value="percent">%</option></select></td></tr>'
-		. '<tr><th>ยอดซื้อขั้นต่ำ</th><td><input type="number" step="any" min="0" name="min_spend" value="0" style="width:8em"> บาท (0 = ไม่มี)</td></tr>'
+		. '<tr data-for="gift"><th>รหัสสินค้าที่แถม</th><td><input type="number" min="1" name="product_id" style="width:8em"> (ใช้กับ "ของแถมฟรี" เท่านั้น: รหัสสินค้าหรือตัวเลือก ดูได้ในหน้ารายการสินค้า ลูกค้าเลือกรับในตะกร้า ตัดสต็อกจริง)</td></tr>'
+		. '<tr data-for="coupon"><th>ส่วนลด</th><td><input type="number" step="any" min="0" name="value" style="width:8em"> <select name="type"><option value="fixed">บาท</option><option value="percent">%</option></select></td></tr>'
+		. '<tr data-for="coupon"><th>ยอดซื้อขั้นต่ำ</th><td><input type="number" step="any" min="0" name="min_spend" value="0" style="width:8em"> บาท (0 = ไม่มี)</td></tr>'
 		. '<tr><th>คูปองใช้ได้กี่วัน</th><td><input type="number" min="1" max="365" name="days_valid" value="30" style="width:6em"> วัน นับจากวันที่แลก</td></tr></table>';
 	echo '<h3>เพิ่มของรางวัล</h3>';
 	amouriq_points_admin_form( 'reward_add', $inner, 'เพิ่มของรางวัล' );
@@ -1514,3 +1641,36 @@ function amouriq_points_admin_expiry_mail_section() {
 	$inner = '<p><label><input type="checkbox" name="expiry_mail_on" value="1" ' . checked( $s['enabled'], true, false ) . '> เปิดอีเมลเตือน</label> เตือนล่วงหน้า <input type="number" min="1" max="90" name="expiry_mail_days" value="' . esc_attr( $s['days'] ) . '" style="width:5em"> วัน</p>';
 	amouriq_points_admin_form( 'expiry_mail_save', $inner, 'บันทึก' );
 }
+
+add_action(
+	'admin_footer',
+	static function () {
+		// phpcs:ignore WordPress.Security.NonceVerification -- read-only
+		if ( ! isset( $_GET['page'] ) || 'amouriq-points' !== $_GET['page'] ) {
+			return;
+		}
+		?>
+		<script>
+		(function () {
+			// In the "add rule" and "add reward" forms show only the fields that belong to the chosen kind.
+			['earn_add', 'reward_add'].forEach(function (action) {
+				var marker = document.querySelector('input[name=amouriq_points_admin][value=' + action + ']');
+				if (!marker) { return; }
+				var form = marker.form;
+				var select = form.querySelector('select[name=kind]');
+				if (!select) { return; }
+				function sync() {
+					form.querySelectorAll('tr[data-for]').forEach(function (row) {
+						var show = row.getAttribute('data-for').split(' ').indexOf(select.value) !== -1;
+						row.hidden = !show;
+						row.querySelectorAll('input, select, textarea').forEach(function (field) { field.disabled = !show; });
+					});
+				}
+				select.addEventListener('change', sync);
+				sync();
+			});
+		})();
+		</script>
+		<?php
+	}
+);
