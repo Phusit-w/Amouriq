@@ -16,6 +16,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/amouriq-shipping-label/label-html.php';
+require_once __DIR__ . '/amouriq-shipping-label/settings.php';
 
 add_filter( 'wt_pklist_alter_final_order_template_html', 'amouriq_shipping_label_replace', 20, 6 );
 
@@ -65,12 +66,18 @@ function amouriq_shipping_label_data( WC_Order $order ) {
 	}
 
 	$state = $setting( 'sender_city' );
+	$opt   = amouriq_label_options();
+	// What the owner typed on the label settings page wins; an empty field falls back to the print plugin's setting.
+	$sender_lines = '' !== $opt['sender_address']
+		? explode( "\n", $opt['sender_address'] )
+		: array_filter( array( $setting( 'sender_address_line1' ), $setting( 'sender_address_line2' ), trim( $state . ' ' . $setting( 'sender_postalcode' ) ) ) );
 	return array(
-		'logo_url'     => $setting( 'logo' ),
+		'options'      => $opt,
+		'logo_url'     => '' !== $opt['logo_url'] ? $opt['logo_url'] : $setting( 'logo' ),
 		'sender'       => array(
-			'name'  => $setting( 'sender_name' ) ? $setting( 'sender_name' ) : $setting( 'companyname' ),
-			'lines' => array_filter( array( $setting( 'sender_address_line1' ), $setting( 'sender_address_line2' ), trim( $state . ' ' . $setting( 'sender_postalcode' ) ) ) ),
-			'phone' => $setting( 'sender_contact_number' ),
+			'name'  => '' !== $opt['sender_name'] ? $opt['sender_name'] : ( $setting( 'sender_name' ) ? $setting( 'sender_name' ) : $setting( 'companyname' ) ),
+			'lines' => $sender_lines,
+			'phone' => '' !== $opt['sender_phone'] ? $opt['sender_phone'] : $setting( 'sender_contact_number' ),
 		),
 		'recipient'    => array( 'lines' => $recipient, 'phone' => $phone ),
 		'order_number' => $order->get_order_number(),

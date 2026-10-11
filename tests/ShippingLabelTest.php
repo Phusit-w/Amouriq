@@ -83,4 +83,39 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertStringNotContainsString('<img', $html);
 		$this->assertStringContainsString('<tbody></tbody>', $html);
 	}
+
+	public function test_options_can_hide_the_option_column_logo_and_recipient_phone(): void {
+		$html = amouriq_label_html($this->label(['options' => ['show_option' => false, 'show_logo' => false, 'show_to_phone' => false]]));
+
+		$this->assertStringNotContainsString('ตัวเลือก', $html);
+		$this->assertStringNotContainsString('ปริมาณ: 250 ml', $html);
+		$this->assertStringNotContainsString('<img', $html);
+		$this->assertStringNotContainsString('0812345678', $html);
+		$this->assertStringContainsString('<td class="qty">2</td>', $html);
+	}
+
+	public function test_options_set_font_size_logo_width_and_a_footer_note(): void {
+		$html = amouriq_label_html($this->label(['options' => ['font_size' => 18, 'logo_width' => 120, 'note' => "สินค้าแตกหักง่าย\nโปรดระวัง <b>x</b>"]]));
+
+		$this->assertStringContainsString('font-size:18px', $html);
+		$this->assertStringContainsString('max-width:120px', $html);
+		$this->assertStringContainsString('สินค้าแตกหักง่าย<br>โปรดระวัง x', $html);
+	}
+
+	public function test_bad_option_values_fall_back_to_the_defaults(): void {
+		$o = amouriq_label_clean_options(['font_size' => 999, 'logo_width' => 'abc', 'logo_url' => 'javascript:alert(1)', 'unknown' => 'x']);
+
+		$this->assertSame(14, $o['font_size']);
+		$this->assertSame(220, $o['logo_width']);
+		$this->assertSame('', $o['logo_url']);
+		$this->assertArrayNotHasKey('unknown', $o);
+	}
+
+	public function test_without_options_the_label_is_unchanged(): void {
+		$html = amouriq_label_html($this->label());
+
+		$this->assertStringContainsString('font-size:14px', $html);
+		$this->assertStringContainsString('ตัวเลือก', $html);
+		$this->assertStringContainsString('โทร 0812345678', $html);
+	}
 }
