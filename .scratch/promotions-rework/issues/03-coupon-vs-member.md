@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** done (browser check on the local site still open)
+**Status:** ready-for-human (built and unit-tested; browser check on the local site still to do)
 
 - [x] A coupon worth more than the Member Privilege total replaces it; a smaller coupon is not applied (or Member Privilege is) so the customer always gets the better offer
 - [x] Removing the coupon brings Member Privilege back

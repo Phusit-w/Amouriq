@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** done (browser check on the local site still open)
+**Status:** ready-for-human (built and unit-tested; browser check on the local site still to do)
 
 - [x] 5% applies to Regular Price lines only, with no maximum, once the ฿299 minimum spend is met (boundary: 298 no, 299 yes)
 - [x] Sale Price lines are never discounted by it

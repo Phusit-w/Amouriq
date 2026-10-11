@@ -152,7 +152,7 @@ function amouriq_bogo_member_vs_coupon( $member, $coupon_discount ) {
 		return $member;
 	}
 	// The per-line split is no longer the amount charged; keep only the total.
-	$member['discount'] -= $coupon_discount;
+	$member['discount'] = round( $member['discount'] - $coupon_discount, 2 );
 	$member['per_line']  = array();
 	$member['winner']    = 'member';
 	return $member;

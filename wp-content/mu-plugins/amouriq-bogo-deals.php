@@ -92,7 +92,7 @@ function amouriq_bogo_apply_deals( $cart ) {
 	} elseif ( 'below_minimum' === $member['reason'] ) {
 		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ' );
 	} elseif ( 'coupon_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าส่วนลดสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)' );
+		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับส่วนลดสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)' );
 	}
 }
 
