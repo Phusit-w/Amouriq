@@ -113,13 +113,13 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 		}
 		$regular = true;
 		$member  = $line['quantity'] * $line['unit_price'] * $rule['percent'] / 100;
-		$deal    = isset( $deal_per_line[ $i ] ) ? $deal_per_line[ $i ] : 0.0;
-		if ( $deal >= $member ) {
+		$deal_amount = isset( $deal_per_line[ $i ] ) ? $deal_per_line[ $i ] : 0.0;
+		if ( $deal_amount >= $member ) {
 			$out['deal_won'][] = $i;
 			continue;
 		}
-		$out['per_line'][ $i ] = $member - $deal;
-		$out['discount']      += $member - $deal;
+		$out['per_line'][ $i ] = $member - $deal_amount;
+		$out['discount']      += $member - $deal_amount;
 	}
 
 	if ( ! $regular ) {

@@ -78,24 +78,26 @@ function amouriq_bogo_apply_deals( $cart ) {
 	// larger Deal gives on the same item, so the two never add up (ADR-0006).
 	$member = $result['member'];
 	if ( $member['discount'] > 0 ) {
-		$label = 'ส่วนลดสมาชิก 5% (สินค้าราคาปกติ)';
-		if ( $member['deal_won'] ) {
-			$label .= ' – สินค้าในดีลได้ส่วนลดของดีลที่มากกว่า';
-		}
+		// When a Deal gave more on some item, this fee is only the rest, so don't claim a flat 5%.
+		$label = $member['deal_won']
+			? 'ส่วนลดสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า 5%)'
+			: 'ส่วนลดสมาชิก 5% (สินค้าราคาปกติ)';
 		$cart->add_fee( $label, -$member['discount'], false );
+	} elseif ( 'below_minimum' === $member['reason'] ) {
+		$message = 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ';
+		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
+			wc_add_notice( $message, 'notice' );
+		}
 	}
 }
 
 /**
  * Member Privilege is for a customer with an account: logged in, or creating one
- * in the checkout being filled in (or placed). A shop that requires an account
- * to check out makes every checkout one.
+ * in the checkout being filled in (or placed). A logged-out visitor is not a
+ * member until then.
  */
 function amouriq_bogo_is_member() {
-	if ( is_user_logged_in() || amouriq_bogo_checkout_creates_account() ) {
-		return true;
-	}
-	return function_exists( 'WC' ) && WC()->checkout() && WC()->checkout()->is_registration_required();
+	return is_user_logged_in() || amouriq_bogo_checkout_creates_account();
 }
 
 /** Whether the checkout form being refreshed or placed ticks "create an account". */
@@ -168,9 +170,9 @@ function amouriq_bogo_cart_lines( $cart ) {
 			'product_id'   => (int) $cart_item['product_id'],
 			'variation_id' => (int) $cart_item['variation_id'],
 			'quantity'     => (int) $cart_item['quantity'],
-			'unit_price'   => amouriq_bogo_unit_price( $item_id ),
+			'unit_price'     => amouriq_bogo_unit_price( $item_id ),
 			// What the shopper sees per item (tax included when the shop shows it so); the minimum spend is judged on this.
-			'price_incl_tax' => $product ? (float) wc_get_price_to_display( $product ) : 0.0,
+			'price_incl_tax' =>$product ? (float) wc_get_price_to_display( $product ) : 0.0,
 			'on_sale'      => $product && $product->is_on_sale(),
 			'categories'   => array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) ),
 		);
