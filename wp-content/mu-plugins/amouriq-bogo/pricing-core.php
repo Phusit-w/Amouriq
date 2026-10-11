@@ -12,6 +12,7 @@
  *               customer_uses (int, or null when the customer is not yet known; may be
  *               a callable given the deal and returning either, so the lookup only runs when needed),
  *               prices (product or variation id => tax-exclusive unit price)
+ *               is_new_customer (bool or callable, optional; for Deals marked new_customer_only, default true)
  *
  * Returns array( 'discount' => float, 'per_line' => array, 'reason' => string|null,
  * 'choices_left' => int ), `choices_left` being how many more items the customer
@@ -20,7 +21,7 @@
  * `per_line` splits the discount over the cart lines (line index => amount; the
  * amounts add up to `discount`). `reason` says why a Deal gave nothing when it was
  * stopped before the maths:
- * disabled, outside_window, coupon_missing, customer_limit, blocked_by_other_coupon.
+ * disabled, outside_window, coupon_missing, not_new_customer, customer_limit, blocked_by_other_coupon.
  *
  * Member Privilege (ADR-0006) is amouriq_bogo_member_privilege() below; it
  * needs the per-line Deal discounts. amouriq_bogo_cart_discounts() runs every
@@ -166,7 +167,24 @@ function amouriq_bogo_core_gifts_to_remove( $lines, $allowed ) {
 
 /** Member Privilege's rule: percent off Regular Price lines once the item total reaches min_spend. */
 function amouriq_bogo_member_rule() {
-	return array( 'percent' => 5.0, 'min_spend' => 299.0 );
+	$rule = array( 'percent' => 5.0, 'min_spend' => 299.0 );
+	// The owner can change both in WooCommerce > ดีล BOGO; the defaults stand until then (and in plain-PHP tests).
+	if ( function_exists( 'get_option' ) ) {
+		$percent = get_option( 'amouriq_member_percent', '' );
+		$min     = get_option( 'amouriq_member_min_spend', '' );
+		if ( is_numeric( $percent ) && $percent > 0 && $percent <= 100 ) {
+			$rule['percent'] = (float) $percent;
+		}
+		if ( is_numeric( $min ) && $min >= 0 ) {
+			$rule['min_spend'] = (float) $min;
+		}
+	}
+	return $rule;
+}
+
+/** "5" for 5.0, "7.5" for 7.5: a percent or baht amount without trailing zeros, for shopper-facing text. */
+function amouriq_bogo_member_number( $value ) {
+	return rtrim( rtrim( number_format( (float) $value, 2, '.', '' ), '0' ), '.' );
 }
 
 /**
@@ -349,6 +367,16 @@ function amouriq_bogo_core_stop_reason( $deal, $ctx ) {
 		$own = amouriq_bogo_core_code( isset( $deal['coupon_code'] ) ? $deal['coupon_code'] : '' );
 		if ( '' === $own || ! in_array( $own, array_map( 'amouriq_bogo_core_code', $ctx['applied_coupons'] ), true ) ) {
 			return 'coupon_missing';
+		}
+	}
+
+	// "New customers only": a callable, so the order lookup only runs for a deal that got this far.
+	// An unknown customer (no email yet) counts as new; the cart is recalculated once the email is typed and again at checkout.
+	if ( ! empty($deal['new_customer_only']) ) {
+		$is_new = isset( $ctx['is_new_customer'] ) ? $ctx['is_new_customer'] : true;
+		$is_new = is_callable( $is_new ) ? call_user_func( $is_new, $deal ) : $is_new;
+		if ( ! $is_new ) {
+			return 'not_new_customer';
 		}
 	}
 

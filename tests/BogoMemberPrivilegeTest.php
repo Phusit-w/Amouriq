@@ -206,4 +206,25 @@ final class BogoMemberPrivilegeTest extends TestCase {
 
 		$this->assertEqualsWithDelta($result['discount'], array_sum($result['per_line']), 0.001);
 	}
+
+	protected function tearDown(): void {
+		$GLOBALS['amq_test_options'] = [];
+	}
+
+	public function test_owner_can_change_the_percent_and_the_minimum(): void {
+		$GLOBALS['amq_test_options'] = ['amouriq_member_percent' => '8', 'amouriq_member_min_spend' => '500'];
+
+		$m = $this->member([$this->line(self::SOAP, 2, 500)]);
+		$this->assertEqualsWithDelta(80.0, $m['discount'], 0.001); // 8% of 1000
+
+		$below = $this->member([$this->line(self::CANDLE, 1, 400)]);
+		$this->assertSame('below_minimum', $below['reason']); // 400 < 500 although above the default 299
+	}
+
+	public function test_a_bad_stored_value_falls_back_to_the_default(): void {
+		$GLOBALS['amq_test_options'] = ['amouriq_member_percent' => 'abc', 'amouriq_member_min_spend' => '-5'];
+
+		$m = $this->member([$this->line(self::SOAP, 1, 500)]);
+		$this->assertEqualsWithDelta(25.0, $m['discount'], 0.001); // 5% default
+	}
 }

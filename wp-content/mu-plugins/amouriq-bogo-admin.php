@@ -248,6 +248,9 @@ function amouriq_bogo_build_deal( array $in ) {
 	if ( ! empty( $in['no_combine'] ) ) {
 		$deal['no_combine'] = true;
 	}
+	if ( ! empty( $in['new_customer_only'] ) ) {
+		$deal['new_customer_only'] = true;
+	}
 
 	if ( 'spend_gift' === $type ) {
 		// A gift is a free line, not a discount: sale items, per-customer and per-order limits do not apply to it.
@@ -296,7 +299,19 @@ function amouriq_bogo_admin_handle() {
 	} elseif ( 'toggle_member' === $action ) {
 		$turn_on = ! amouriq_member_privilege_enabled();
 		update_option( 'amouriq_member_privilege', $turn_on ? 'yes' : 'no', false );
-		set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดสิทธิพิเศษสมาชิก 5% แล้ว' : 'ปิดสิทธิพิเศษสมาชิก 5% แล้ว', 60 );
+		set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดสิทธิพิเศษสมาชิกแล้ว' : 'ปิดสิทธิพิเศษสมาชิกแล้ว', 60 );
+		wp_safe_redirect( $back );
+		exit;
+	} elseif ( 'save_member' === $action ) {
+		$percent = isset( $_POST['member_percent'] ) ? str_replace( ',', '', sanitize_text_field( wp_unslash( $_POST['member_percent'] ) ) ) : '';
+		$min     = isset( $_POST['member_min_spend'] ) ? str_replace( ',', '', sanitize_text_field( wp_unslash( $_POST['member_min_spend'] ) ) ) : '';
+		if ( ! is_numeric( $percent ) || $percent <= 0 || $percent > 100 || ! is_numeric( $min ) || $min < 0 ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, 'สิทธิพิเศษสมาชิก: เปอร์เซ็นต์ต้องมากกว่า 0 ถึง 100 และยอดขั้นต่ำต้องไม่ติดลบ ไม่ได้บันทึก', 60 );
+		} else {
+			update_option( 'amouriq_member_percent', (string) round( (float) $percent, 2 ), false );
+			update_option( 'amouriq_member_min_spend', (string) round( (float) $min, 2 ), false );
+			set_transient( 'amouriq_bogo_notice_' . $uid, 'บันทึกสิทธิพิเศษสมาชิกแล้ว', 60 );
+		}
 		wp_safe_redirect( $back );
 		exit;
 	} elseif ( 'toggle_coupon' === $action ) {
@@ -444,6 +459,9 @@ function amouriq_bogo_chips( $deal ) {
 	}
 	if ( ! empty( $deal['no_combine'] ) ) {
 		$chips[] = 'ไม่ใช้ร่วมกับคูปองอื่น';
+	}
+	if ( ! empty( $deal['new_customer_only'] ) ) {
+		$chips[] = 'ลูกค้าใหม่เท่านั้น';
 	}
 	if ( ! empty( $deal['valid_from'] ) || ! empty( $deal['valid_to'] ) ) {
 		$chips[] = ( $deal['valid_from'] ?? '…' ) . ' ถึง ' . ( $deal['valid_to'] ?? '…' );
@@ -661,14 +679,26 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 			<td>—</td>
 			<td><a class="button" href="<?php echo esc_url( $ship_url ); ?>">แก้ที่หน้าการจัดส่ง</a></td>
 		</tr>
-		<?php $member_on = amouriq_member_privilege_enabled(); ?>
+		<?php
+		$member_on   = amouriq_member_privilege_enabled();
+		$member_rule = amouriq_bogo_member_rule();
+		$member_pct  = amouriq_bogo_member_number( $member_rule['percent'] );
+		$member_min  = amouriq_bogo_member_number( $member_rule['min_spend'] );
+		?>
 		<tr class="<?php echo $member_on ? '' : 'amq-dim'; ?>">
 			<td><span class="amq-kind amq-kind-member">สิทธิพิเศษสมาชิก</span></td>
-			<td><strong>สิทธิพิเศษสมาชิก 5%</strong><br>ลูกค้าที่มีบัญชี ลด 5% เฉพาะสินค้าราคาปกติ เมื่อยอดสินค้าครบ ฿299 ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า)<br>
+			<td><strong>สิทธิพิเศษสมาชิก <?php echo esc_html( $member_pct ); ?>%</strong><br>ลูกค้าที่มีบัญชี ลด <?php echo esc_html( $member_pct ); ?>% เฉพาะสินค้าราคาปกติ เมื่อยอดสินค้าครบ ฿<?php echo esc_html( $member_min ); ?> ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า)<br>
+				<form method="post" action="<?php echo esc_url( amouriq_bogo_page_url() ); ?>" style="margin:6px 0">
+					<?php wp_nonce_field( 'amouriq_bogo_save' ); ?>
+					<input type="hidden" name="amouriq_bogo_action" value="save_member">
+					<label>ส่วนลด <input type="number" name="member_percent" value="<?php echo esc_attr( $member_pct ); ?>" min="0.01" max="100" step="0.01" style="width:80px"> %</label>
+					&nbsp;<label>ยอดขั้นต่ำ ฿ <input type="number" name="member_min_spend" value="<?php echo esc_attr( $member_min ); ?>" min="0" step="0.01" style="width:100px"></label>
+					<button class="button">บันทึก</button>
+				</form>
 				<small>ตรวจ Discount Rules เดิมและ Points &amp; Rewards ก่อนเปิด เพื่อไม่ให้ลดซ้ำ</small></td>
 			<td><?php echo amouriq_bogo_badge( $member_on ? 'เปิดอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></td>
 			<td>—</td>
-			<td><?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $member_on ? 'ปิด' : 'เปิด', $member_on ? 'button' : 'button button-primary', $member_on ? '' : 'เปิดสิทธิพิเศษสมาชิก 5% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?></td>
+			<td><?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $member_on ? 'ปิด' : 'เปิด', $member_on ? 'button' : 'button button-primary', $member_on ? '' : 'เปิดสิทธิพิเศษสมาชิก ' . $member_pct . '% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?></td>
 		</tr>
 		<?php foreach ( $deals as $i => $deal ) :
 			$rep   = $report[ $deal['id'] ?? '' ] ?? array( 'orders' => 0, 'total' => 0 );
@@ -970,13 +1000,14 @@ function amouriq_bogo_admin_page() {
 						<p class="description">ต้องสร้างคูปองไว้แล้วที่ การตลาด &gt; คูปอง ระบบตรวจตอนบันทึก (สร้างเป็นส่วนลดคงที่ 0 ได้ถ้าใช้คูปองเป็นแค่ตัวเปิดดีล)</p></div>
 				</div>
 
-				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
+				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
 					<summary>4. ตัวเลือกเพิ่มเติม (วันที่ จำกัดสิทธิ์ ไม่ใช้ร่วมกับคูปอง)</summary>
 					<div class="amq-grid">
 						<span class="k" style="font-weight:600">เงื่อนไขพิเศษ</span>
 						<div class="v">
 							<label class="amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="checkbox" name="exclude_sale" value="1" <?php checked( $editing ? ! empty( $editing['exclude_sale'] ) : true ); ?>> ไม่รวมสินค้าที่ลดราคาอยู่แล้ว (ไม่ได้ส่วนลด; ยังนับในยอดขั้นต่ำ)</label><br>
-							<label><input type="checkbox" name="no_combine" value="1" <?php checked( ! empty( $editing['no_combine'] ) ); ?>> ไม่ใช้ร่วมกับคูปองอื่น (คูปองที่เปิดดีลนี้เองไม่นับ)</label>
+							<label><input type="checkbox" name="no_combine" value="1" <?php checked( ! empty( $editing['no_combine'] ) ); ?>> ไม่ใช้ร่วมกับคูปองอื่น (คูปองที่เปิดดีลนี้เองไม่นับ)</label><br>
+							<label><input type="checkbox" name="new_customer_only" value="1" <?php checked( ! empty( $editing['new_customer_only'] ) ); ?>> ลูกค้าใหม่เท่านั้น (ยังไม่เคยมีออเดอร์ที่นับ ตรวจตามบัญชีหรืออีเมล)</label>
 						</div>
 						<label class="k" for="bogo_from">ใช้ได้ตั้งแต่</label>
 						<div class="v"><input type="datetime-local" name="valid_from" id="bogo_from" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_from' ), false ) ); ?>"> <span class="description">เว้นว่าง = ใช้ได้ทันที</span></div>

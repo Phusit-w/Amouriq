@@ -80,22 +80,24 @@ function amouriq_bogo_apply_deals( $cart ) {
 	// Member Privilege is its own fee line. The core already took off whatever a
 	// larger Deal gives on the same item, so the two never add up (ADR-0006).
 	$member = $result['member'];
+	$rule   = amouriq_bogo_member_rule();
+	$pct    = amouriq_bogo_member_number( $rule['percent'] );
 	if ( $member['discount'] > 0 ) {
-		// When a Deal gave more on some item, this fee is only the rest, so don't claim a flat 5%.
+		// When a Deal gave more on some item, this fee is only the rest, so don't claim a flat percent.
 		if ( 'member' === $member['winner'] ) {
-			$label = 'สิทธิพิเศษสมาชิก 5% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
+			$label = 'สิทธิพิเศษสมาชิก ' . $pct . '% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
 		} elseif ( $member['deal_won'] ) {
-			$label = 'สิทธิพิเศษสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า 5%)';
+			$label = 'สิทธิพิเศษสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า ' . $pct . '%)';
 		} else {
-			$label = 'สิทธิพิเศษสมาชิก 5% (สินค้าราคาปกติ)';
+			$label = 'สิทธิพิเศษสมาชิก ' . $pct . '% (สินค้าราคาปกติ)';
 		}
 		$cart->add_fee( $label, -$member['discount'], false );
 	} elseif ( 'below_minimum' === $member['reason'] ) {
-		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับสิทธิพิเศษสมาชิก 5% สำหรับสินค้าราคาปกติ', true );
+		amouriq_bogo_notice( 'ซื้อครบ ฿' . amouriq_bogo_member_number( $rule['min_spend'] ) . ' รับสิทธิพิเศษสมาชิก ' . $pct . '% สำหรับสินค้าราคาปกติ', true );
 	} elseif ( 'coupon_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับสิทธิพิเศษสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
+		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าหรือเท่ากับสิทธิพิเศษสมาชิก ' . $pct . '% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)', true );
 	} elseif ( 'deal_larger' === $member['reason'] ) {
-		amouriq_bogo_notice( 'สินค้าในตะกร้าได้ส่วนลดจากดีลซึ่งมากกว่าสิทธิพิเศษสมาชิก 5% จึงใช้ส่วนลดของดีล (ไม่ซ้อนกัน)', true );
+		amouriq_bogo_notice( 'สินค้าในตะกร้าได้ส่วนลดจากดีลซึ่งมากกว่าสิทธิพิเศษสมาชิก ' . $pct . '% จึงใช้ส่วนลดของดีล (ไม่ซ้อนกัน)', true );
 	}
 }
 
@@ -268,6 +270,10 @@ function amouriq_bogo_price_context( $deals, $cart ) {
 		'applied_coupons' => $cart->get_applied_coupons(),
 		'customer_uses'   => static function ( $deal ) {
 			return amouriq_bogo_customer_uses( $deal['id'] );
+		},
+		'is_new_customer' => static function () {
+			// Without the first-order plugin there is no way to tell, so a "new customers only" Deal stays off.
+			return function_exists( 'amouriq_customer_has_previous_order' ) && ! amouriq_customer_has_previous_order();
 		},
 		'prices'          => $prices,
 	);
