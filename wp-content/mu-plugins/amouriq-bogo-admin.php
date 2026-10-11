@@ -278,6 +278,12 @@ function amouriq_bogo_admin_handle() {
 			$deals[ $index ]['enabled'] = ! $on;
 			set_transient( 'amouriq_bogo_notice_' . $uid, $on ? 'ปิดดีลแล้ว' : 'เปิดดีลแล้ว', 60 );
 		}
+	} elseif ( 'toggle_member' === $action ) {
+		$turn_on = ! amouriq_member_privilege_enabled();
+		update_option( 'amouriq_member_privilege', $turn_on ? 'yes' : 'no', false );
+		set_transient( 'amouriq_bogo_notice_' . $uid, $turn_on ? 'เปิดส่วนลดสมาชิก 5% แล้ว' : 'ปิดส่วนลดสมาชิก 5% แล้ว', 60 );
+		wp_safe_redirect( $back );
+		exit;
 	} elseif ( 'toggle_coupon' === $action ) {
 		$post = get_post( isset( $_POST['coupon_id'] ) ? (int) $_POST['coupon_id'] : 0 );
 		if ( $post && 'shop_coupon' === $post->post_type && in_array( $post->post_status, array( 'publish', 'draft' ), true ) ) {
@@ -638,6 +644,15 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 			<td><?php echo amouriq_bogo_badge( null === $threshold ? 'ตรวจไม่ได้' : 'ใช้งานอยู่' ); // phpcs:ignore ?></td>
 			<td>—</td>
 			<td><a class="button" href="<?php echo esc_url( $ship_url ); ?>">แก้ที่หน้าการจัดส่ง</a></td>
+		</tr>
+		<?php $member_on = amouriq_member_privilege_enabled(); ?>
+		<tr class="<?php echo $member_on ? '' : 'amq-dim'; ?>">
+			<td><span class="amq-kind amq-kind-deal">ส่วนลดสมาชิก</span></td>
+			<td><strong>ส่วนลดสมาชิก 5%</strong><br>ลูกค้าที่มีบัญชี ลด 5% เฉพาะสินค้าราคาปกติ เมื่อยอดสินค้าครบ ฿299 ไม่ซ้อนกับดีลหรือคูปอง (ใช้ส่วนลดที่มากกว่า)<br>
+				<small>ตรวจ Discount Rules เดิมและ Points &amp; Rewards ก่อนเปิด เพื่อไม่ให้ลดซ้ำ</small></td>
+			<td><?php echo amouriq_bogo_badge( $member_on ? 'ใช้งานอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></td>
+			<td>—</td>
+			<td><?php amouriq_bogo_action_form( 'toggle_member', 'noop', '1', $member_on ? 'ปิด' : 'เปิด', $member_on ? 'button' : 'button button-primary', $member_on ? '' : 'เปิดส่วนลดสมาชิก 5% ให้ลูกค้าทุกคนที่มีบัญชีทันที ใช่ไหม?' ); ?></td>
 		</tr>
 		<?php foreach ( $deals as $i => $deal ) :
 			$rep   = $report[ $deal['id'] ?? '' ] ?? array( 'orders' => 0, 'total' => 0 );

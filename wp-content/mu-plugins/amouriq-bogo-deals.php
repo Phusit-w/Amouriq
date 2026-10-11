@@ -102,6 +102,9 @@ function amouriq_bogo_apply_deals( $cart ) {
  * other page is not a member.
  */
 function amouriq_bogo_is_member() {
+	if ( ! amouriq_member_privilege_enabled() ) {
+		return false;
+	}
 	if ( is_user_logged_in() || amouriq_bogo_checkout_creates_account() ) {
 		return true;
 	}
@@ -109,6 +112,14 @@ function amouriq_bogo_is_member() {
 	// sends no "create account" field, so on the checkout (not the cart) a logged-out
 	// shopper is about to register.
 	return function_exists( 'is_checkout' ) && is_checkout() && WC()->checkout() && WC()->checkout()->is_registration_required();
+}
+
+/**
+ * The owner's switch for Member Privilege (WooCommerce > ดีล BOGO). It is off until
+ * switched on, so uploading these files never changes a customer's price by itself.
+ */
+function amouriq_member_privilege_enabled() {
+	return 'yes' === get_option( 'amouriq_member_privilege', 'no' );
 }
 
 /** Whether the checkout form being refreshed or placed ticks "create an account". */
