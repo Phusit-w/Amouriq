@@ -37,3 +37,4 @@ function wp_get_attachment_image_url($attachment_id, $size = 'thumbnail') {
 require __DIR__ . '/Fixtures/FakeWcProduct.php';
 require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-castile-resolver.php';
 require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-bogo/pricing-core.php';
+require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-coupon-first-order/new-customer.php';

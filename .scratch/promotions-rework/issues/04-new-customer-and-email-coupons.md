@@ -4,11 +4,18 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** ready-for-human (tested locally; per-person limit relies on native WooCommerce and was not exercised)
 
-- [ ] A "new customers only" coupon works for a customer with no counted order and is refused for one who has a pending, on-hold, processing or completed order; cancelled, failed and refunded orders do not count
-- [ ] A customer registering during checkout is matched by the billing email
-- [ ] A coupon limited to listed emails works only for those emails
-- [ ] Per-person and total usage limits, minimum spend, included and excluded products and dates behave as in the brief
-- [ ] The refusal message tells the customer why
-- [ ] PHPUnit covers the New customer rule; the rest is checked in the browser
+- [x] A "new customers only" coupon works for a customer with no counted order and is refused for one who has a pending, on-hold, processing or completed order; cancelled, failed and refunded orders do not count
+- [x] A customer registering during checkout is matched by the billing email
+- [x] A coupon limited to listed emails works only for those emails
+- [x] Per-person and total usage limits, minimum spend, included and excluded products and dates behave as in the brief
+- [x] The refusal message tells the customer why
+- [x] PHPUnit covers the New customer rule; the rest is checked in the browser
+
+## Notes (implementation)
+
+- The rule is `amouriq_is_new_customer()` in `wp-content/mu-plugins/amouriq-coupon-first-order/new-customer.php` (plain data, `tests/NewCustomerTest.php`). `amouriq-coupon-first-order.php` fetches the customer's orders by account and by billing email and asks it. Refusal message now says why.
+- Run locally with real WooCommerce (throwaway user/orders/coupons, deleted after): no orders -> applied; cancelled/failed/refunded only -> applied; pending/on-hold/processing/completed -> refused; a guest registering with the billing email of an earlier completed order -> refused, brand-new email -> applied; email-list coupon works for listed emails (case-insensitive) and refuses others; minimum spend, total usage limit, excluded/included products and expiry behave natively.
+- Native WooCommerce refusal messages for those limits are in English on this site (not changed here).
+- Live: `amouriq-coupon-first-order.php` is not uploaded yet and now needs its `amouriq-coupon-first-order/` folder uploaded with it.

@@ -11,6 +11,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/amouriq-coupon-first-order/new-customer.php';
+
 add_action( 'woocommerce_coupon_options_usage_restriction', 'amouriq_first_order_coupon_field' );
 
 function amouriq_first_order_coupon_field() {
@@ -37,20 +39,20 @@ function amouriq_first_order_coupon_check( $valid, $coupon ) {
 	}
 	if ( amouriq_customer_has_previous_order() ) {
 		// WooCommerce shows the message of the exception to the customer.
-		throw new Exception( 'คูปองนี้ใช้ได้เฉพาะลูกค้าใหม่' );
+		throw new Exception( 'คูปองนี้ใช้ได้เฉพาะลูกค้าใหม่ที่ยังไม่เคยสั่งซื้อ (บัญชีหรืออีเมลนี้เคยมีออเดอร์แล้ว)' );
 	}
 	return $valid;
 }
 
+
 /**
- * True when the current customer already has a counted order. Logged-in users
- * are checked by account and by billing email (covers earlier guest orders).
- * A guest with no email entered yet is not blocked here; the check runs again
- * when the order is placed.
+ * True when the current customer already has a counted order (see
+ * amouriq-coupon-first-order/new-customer.php for the rule). Matched by account
+ * and by billing email, which covers earlier guest orders and a shopper who is
+ * registering in this checkout. A guest with no email entered yet is not blocked
+ * here; the check runs again when the order is placed.
  */
 function amouriq_customer_has_previous_order() {
-	$statuses = array( 'pending', 'on-hold', 'processing', 'completed' );
-
 	$user_id = get_current_user_id();
 	$email   = WC()->customer ? WC()->customer->get_billing_email() : '';
 	if ( ! $email && $user_id ) {
@@ -58,17 +60,22 @@ function amouriq_customer_has_previous_order() {
 		$email = $user ? $user->user_email : '';
 	}
 
+	// Candidate orders by account and by email, then let the rule decide.
+	$found = array();
 	if ( $user_id ) {
-		$by_account = wc_get_orders( array( 'limit' => 1, 'return' => 'ids', 'status' => $statuses, 'customer' => $user_id ) );
-		if ( ! empty( $by_account ) ) {
-			return true;
-		}
+		$found = array_merge( $found, wc_get_orders( array( 'limit' => -1, 'customer' => $user_id, 'status' => amouriq_counted_order_statuses() ) ) );
 	}
 	if ( $email ) {
-		$by_email = wc_get_orders( array( 'limit' => 1, 'return' => 'ids', 'status' => $statuses, 'customer' => $email ) );
-		if ( ! empty( $by_email ) ) {
-			return true;
-		}
+		$found = array_merge( $found, wc_get_orders( array( 'limit' => -1, 'customer' => $email, 'status' => amouriq_counted_order_statuses() ) ) );
 	}
-	return false;
+
+	$orders = array();
+	foreach ( $found as $order ) {
+		$orders[] = array(
+			'status'        => $order->get_status(),
+			'customer_id'   => $order->get_customer_id(),
+			'billing_email' => $order->get_billing_email(),
+		);
+	}
+	return ! amouriq_is_new_customer( $orders, $user_id, $email );
 }
