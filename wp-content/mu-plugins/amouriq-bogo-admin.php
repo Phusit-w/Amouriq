@@ -36,6 +36,9 @@ function amouriq_bogo_type_labels() {
 		'quantity_tier'          => 'ซื้อตามจำนวน ลดเป็นขั้น (รวมหลายสินค้า)',
 		'spend_threshold'        => 'ซื้อครบ X บาท ลด Y% หรือ Y บาท',
 		'spend_gift'             => 'ซื้อครบ X บาท เลือกของแถมฟรี',
+		'fixed_price_item'       => 'ราคาต่อชิ้นคงที่ (สินค้าที่เลือกเหลือชิ้นละ ฿Y)',
+		'amount_off_item'        => 'ลดบาทต่อชิ้น (ทุกชิ้นที่เลือกลดชิ้นละ ฿Y)',
+		'bundle_price'           => 'ราคาชุด (ซื้อ N ชิ้นในราคา ฿Y)',
 	);
 }
 
@@ -116,6 +119,107 @@ function amouriq_bogo_conditions_for_form( $set ) {
 	return $set;
 }
 
+
+/** The Deal types whose lines are picked by a Product scope (and the ticked lists). */
+function amouriq_bogo_scope_types() {
+	return array( 'spend_threshold', 'quantity_tier', 'fixed_price_item', 'amount_off_item', 'bundle_price' );
+}
+
+/**
+ * The Product scope posted by the form as a stored scope, null when empty, or an error string.
+ * Include: categories, tags, one attribute with its values, SKUs, "only items on sale".
+ * Exclude: categories, tags, SKUs. (Ticked products are the separate product_ids / excluded_ids.)
+ */
+function amouriq_bogo_build_scope( array $in ) {
+	$include = array();
+	$exclude = array();
+
+	foreach ( array( 'include' => &$include, 'exclude' => &$exclude ) as $side => &$target ) {
+		$cats = isset( $in[ 'scope_' . $side . '_categories' ] ) ? array_map( 'sanitize_title', (array) wp_unslash( $in[ 'scope_' . $side . '_categories' ] ) ) : array();
+		foreach ( $cats as $slug ) {
+			if ( '' !== $slug && ! term_exists( $slug, 'product_cat' ) ) {
+				return 'ไม่พบหมวดสินค้า slug นี้: ' . $slug;
+			}
+		}
+		$cats = array_values( array_filter( $cats ) );
+		if ( $cats ) {
+			$target['categories'] = $cats;
+		}
+		$tags = isset( $in[ 'scope_' . $side . '_tags' ] ) ? array_map( 'sanitize_title', amouriq_cond_split( wp_unslash( $in[ 'scope_' . $side . '_tags' ] ) ) ) : array();
+		if ( array_filter( $tags ) ) {
+			$target['tags'] = array_values( array_filter( $tags ) );
+		}
+		$skus = isset( $in[ 'scope_' . $side . '_skus' ] ) ? array_map( 'sanitize_text_field', amouriq_cond_split( wp_unslash( $in[ 'scope_' . $side . '_skus' ] ) ) ) : array();
+		if ( $skus ) {
+			$target['skus'] = array_values( $skus );
+		}
+	}
+	unset( $target );
+
+	$taxonomy = isset( $in['scope_include_attribute'] ) ? sanitize_key( wp_unslash( $in['scope_include_attribute'] ) ) : '';
+	$values   = isset( $in['scope_include_attribute_values'] ) ? array_map( 'sanitize_title', amouriq_cond_split( wp_unslash( $in['scope_include_attribute_values'] ) ) ) : array();
+	if ( '' !== $taxonomy && array_filter( $values ) ) {
+		if ( ! taxonomy_exists( $taxonomy ) || 0 !== strpos( $taxonomy, 'pa_' ) ) {
+			return 'ไม่พบคุณสมบัติสินค้า (attribute) นี้: ' . $taxonomy;
+		}
+		$include['attributes'] = array( $taxonomy => array_values( array_filter( $values ) ) );
+	} elseif ( '' !== $taxonomy xor (bool) array_filter( $values ) ) {
+		return 'คุณสมบัติสินค้า: ต้องเลือกทั้งชนิดและใส่ค่า (เช่น 250-ml) ให้ครบ หรือเว้นว่างทั้งสองช่อง';
+	}
+	if ( ! empty( $in['scope_include_on_sale_only'] ) ) {
+		$include['on_sale_only'] = true;
+	}
+
+	$scope = array();
+	if ( $include ) {
+		$scope['include'] = $include;
+	}
+	if ( $exclude ) {
+		$scope['exclude'] = $exclude;
+	}
+	return $scope ? $scope : null;
+}
+
+/** A stored Product scope as short Thai text for the rule list ("" when none). */
+function amouriq_bogo_scope_text( $scope ) {
+	if ( empty( $scope ) ) {
+		return '';
+	}
+	$parts = array();
+	$names = static function ( $slugs ) {
+		return implode( ', ', array_map( 'amouriq_bogo_cat_name', (array) $slugs ) );
+	};
+	$inc = isset( $scope['include'] ) ? $scope['include'] : array();
+	$exc = isset( $scope['exclude'] ) ? $scope['exclude'] : array();
+	if ( ! empty( $inc['categories'] ) ) {
+		$parts[] = 'หมวด ' . $names( $inc['categories'] );
+	}
+	if ( ! empty( $inc['tags'] ) ) {
+		$parts[] = 'แท็ก ' . implode( ', ', $inc['tags'] );
+	}
+	if ( ! empty( $inc['attributes'] ) ) {
+		foreach ( $inc['attributes'] as $taxonomy => $values ) {
+			$parts[] = str_replace( 'pa_', '', $taxonomy ) . ' ' . implode( '/', $values );
+		}
+	}
+	if ( ! empty( $inc['skus'] ) ) {
+		$parts[] = 'SKU ' . implode( ', ', $inc['skus'] );
+	}
+	if ( ! empty( $inc['on_sale_only'] ) ) {
+		$parts[] = 'เฉพาะสินค้าลดราคา';
+	}
+	if ( ! empty( $exc['categories'] ) ) {
+		$parts[] = 'ยกเว้นหมวด ' . $names( $exc['categories'] );
+	}
+	if ( ! empty( $exc['tags'] ) ) {
+		$parts[] = 'ยกเว้นแท็ก ' . implode( ', ', $exc['tags'] );
+	}
+	if ( ! empty( $exc['skus'] ) ) {
+		$parts[] = 'ยกเว้น SKU ' . implode( ', ', $exc['skus'] );
+	}
+	return implode( ' · ', $parts );
+}
+
 /**
  * Validate the submitted form. Returns a clean deal array, or a string with
  * the error message to show the admin.
@@ -131,6 +235,11 @@ function amouriq_bogo_build_deal( array $in ) {
 	$label   = isset( $in['label'] ) ? sanitize_text_field( wp_unslash( $in['label'] ) ) : '';
 
 	$deal = array( 'type' => $type, 'label' => $label, 'trigger' => $trigger );
+
+	$scope = in_array( $type, amouriq_bogo_scope_types(), true ) ? amouriq_bogo_build_scope( $in ) : null;
+	if ( is_string( $scope ) ) {
+		return $scope;
+	}
 
 	if ( 'coupon' === $trigger ) {
 		$code = isset( $in['coupon_code'] ) ? wc_format_coupon_code( wp_unslash( $in['coupon_code'] ) ) : '';
@@ -235,8 +344,8 @@ function amouriq_bogo_build_deal( array $in ) {
 
 	if ( 'quantity_tier' === $type ) {
 		$product_ids = amouriq_bogo_posted_ids( $in, 'product_ids' );
-		if ( ! $product_ids ) {
-			return 'ติ๊กเลือกสินค้าที่ร่วมรายการอย่างน้อย 1 รายการ';
+		if ( ! $product_ids && ! $scope ) {
+			return 'ติ๊กเลือกสินค้าที่ร่วมรายการอย่างน้อย 1 รายการ หรือกำหนดขอบเขตสินค้า (หมวด แท็ก ขนาด SKU)';
 		}
 		$tiers = array();
 		for ( $n = 1; $n <= 5; $n++ ) {
@@ -254,8 +363,10 @@ function amouriq_bogo_build_deal( array $in ) {
 			return 'ต้องกรอกอย่างน้อย 1 ขั้น';
 		}
 		usort( $tiers, function ( $a, $b ) { return $a['min'] <=> $b['min']; } );
-		$deal['product_ids'] = $product_ids;
-		$deal['tiers']       = $tiers;
+		if ( $product_ids ) {
+			$deal['product_ids'] = $product_ids;
+		}
+		$deal['tiers'] = $tiers;
 		$excluded = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
 		if ( $excluded ) {
 			$deal['excluded_ids'] = $excluded;
@@ -300,6 +411,40 @@ function amouriq_bogo_build_deal( array $in ) {
 		}
 		// The percent field shared by the other types does not apply here.
 		unset( $deal['get_discount_percent'] );
+	}
+
+	if ( in_array( $type, array( 'fixed_price_item', 'amount_off_item', 'bundle_price' ), true ) ) {
+		$money = static function ( $key ) use ( $in ) {
+			return isset( $in[ $key ] ) && '' !== $in[ $key ] ? (float) $in[ $key ] : 0.0;
+		};
+		if ( 'amount_off_item' === $type ) {
+			if ( $money( 'off_value' ) <= 0 ) {
+				return 'ใส่จำนวนบาทที่ลดต่อชิ้นมากกว่า 0';
+			}
+			$deal['value'] = $money( 'off_value' );
+		} else {
+			if ( $money( 'price' ) <= 0 ) {
+				return 'ใส่ราคามากกว่า 0 บาท';
+			}
+			$deal['price'] = $money( 'price' );
+		}
+		if ( 'bundle_price' === $type ) {
+			$deal['bundle_qty'] = $int( 'bundle_qty', 0 );
+			if ( $deal['bundle_qty'] < 2 ) {
+				return 'ชุดต้องมีอย่างน้อย 2 ชิ้น';
+			}
+		}
+		if ( amouriq_bogo_posted_ids( $in, 'product_ids' ) ) {
+			$deal['product_ids'] = amouriq_bogo_posted_ids( $in, 'product_ids' );
+		}
+		if ( amouriq_bogo_posted_ids( $in, 'excluded_ids' ) ) {
+			$deal['excluded_ids'] = amouriq_bogo_posted_ids( $in, 'excluded_ids' );
+		}
+		unset( $deal['get_discount_percent'] );
+	}
+
+	if ( $scope ) {
+		$deal['scope'] = $scope;
 	}
 
 	$conditions = amouriq_bogo_build_conditions( $in );
@@ -510,7 +655,13 @@ function amouriq_bogo_detail( $deal ) {
 		foreach ( $deal['tiers'] ?? array() as $tier ) {
 			$steps[] = $tier['min'] . ' ชิ้นลด ' . $tier['percent'] . '%';
 		}
-		$what = ! empty( $deal['product_ids'] ) ? 'สินค้าที่เลือก ' . count( $deal['product_ids'] ) . ' รายการ (นับรวมกัน)' : amouriq_bogo_pname( $deal['product_id'] );
+		if ( ! empty( $deal['product_ids'] ) ) {
+			$what = 'สินค้าที่เลือก ' . count( $deal['product_ids'] ) . ' รายการ (นับรวมกัน)';
+		} elseif ( ! empty( $deal['scope'] ) ) {
+			$what = 'สินค้าตามขอบเขตที่กำหนด (นับรวมกัน)';
+		} else {
+			$what = amouriq_bogo_pname( isset( $deal['product_id'] ) ? $deal['product_id'] : 0 );
+		}
 		return $what . ': ' . implode( ' / ', $steps );
 	}
 	if ( 'fixed_price_item' === $type ) {
@@ -547,6 +698,9 @@ function amouriq_bogo_chips( $deal ) {
 	}
 	if ( ! empty( $deal['new_customer_only'] ) ) {
 		$chips[] = 'ลูกค้าใหม่เท่านั้น';
+	}
+	if ( ! empty( $deal['scope'] ) ) {
+		$chips[] = 'ขอบเขต: ' . amouriq_bogo_scope_text( $deal['scope'] );
 	}
 	if ( ! empty( $deal['conditions'] ) ) {
 		$chips[] = amouriq_cond_describe( amouriq_bogo_conditions_for_form( $deal['conditions'] ) );
@@ -928,6 +1082,9 @@ function amouriq_bogo_admin_page() {
 		'quantity_tier'          => 'นับจำนวนรวมของสินค้าที่ติ๊ก (ผสมกลิ่นได้) ยิ่งมากยิ่งลดเป็นขั้น ขั้นสูงสุดที่ถึงใช้กับทุกชิ้น',
 		'spend_threshold'        => 'ยอดสั่งซื้อครบเท่าไรลดกี่ % หรือกี่บาท เลือกสินค้าที่ร่วมรายการได้',
 		'spend_gift'             => 'ยอดสั่งซื้อครบเท่าไร ลูกค้าเลือกของแถมฟรีจากรายการในตะกร้า',
+		'fixed_price_item'       => 'สินค้าที่เลือกเหลือชิ้นละราคาที่ตั้ง (เช่น Castile Soap 250 ml ทุกกลิ่น ชิ้นละ ฿299) ชิ้นที่ถูกกว่านี้ไม่ถูกแตะ',
+		'amount_off_item'        => 'ทุกชิ้นที่เลือกลดชิ้นละกี่บาท (เช่น ลดชิ้นละ ฿20)',
+		'bundle_price'           => 'ซื้อครบ N ชิ้นในกลุ่มที่เลือก ได้ราคาชุดตามที่ตั้ง (เช่น 3 ชิ้น ฿999)',
 	);
 
 	$groups = $show ? amouriq_bogo_product_groups() : array();
@@ -1046,8 +1203,8 @@ function amouriq_bogo_admin_page() {
 						<select name="mode"><option value="percent" <?php selected( $v( 'mode', 'percent' ), 'percent' ); ?>>% ของสินค้าที่ร่วมรายการ</option><option value="baht" <?php selected( $v( 'mode' ), 'baht' ); ?>>บาท (ไม่เกินมูลค่าสินค้าที่ร่วมรายการ)</option></select>
 					</div>
 
-					<span class="k amq-row" data-types="spend_threshold" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
-					<div class="v amq-row" data-types="spend_threshold"><?php amouriq_bogo_product_checklist( 'product_ids', $v( 'product_ids', array() ), $groups, $stock, 'ไม่ติ๊กเลย = ทุกสินค้าร่วมรายการ' ); ?></div>
+					<span class="k amq-row" data-types="spend_threshold fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
+					<div class="v amq-row" data-types="spend_threshold fixed_price_item amount_off_item bundle_price"><?php amouriq_bogo_product_checklist( 'product_ids', $v( 'product_ids', array() ), $groups, $stock, 'ไม่ติ๊กเลย = ทุกสินค้าร่วมรายการ' ); ?></div>
 
 					<span class="k amq-row" data-types="quantity_tier" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
 					<?php
@@ -1059,8 +1216,8 @@ function amouriq_bogo_admin_page() {
 					?>
 					<div class="v amq-row" data-types="quantity_tier"><?php amouriq_bogo_product_checklist( 'product_ids', $tier_ids, $groups, $stock, 'ติ๊กหลายรายการได้ เช่น ทุกกลิ่นของ Castile Soap ขนาด 250 ml จำนวนนับรวมกันข้ามกลิ่น' ); ?></div>
 
-					<span class="k amq-row" data-types="spend_threshold quantity_tier" style="font-weight:600;padding-top:6px">สินค้าที่ยกเว้น</span>
-					<div class="v amq-row" data-types="spend_threshold quantity_tier"><?php amouriq_bogo_product_checklist( 'excluded_ids', $v( 'excluded_ids', array() ), $groups, $stock, 'สินค้าที่ติ๊กจะไม่ได้ส่วนลด แต่ยังนับรวมในยอดขั้นต่ำ' ); ?></div>
+					<span class="k amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">สินค้าที่ยกเว้น</span>
+					<div class="v amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price"><?php amouriq_bogo_product_checklist( 'excluded_ids', $v( 'excluded_ids', array() ), $groups, $stock, 'สินค้าที่ติ๊กจะไม่ได้ส่วนลด แต่ยังนับรวมในยอดขั้นต่ำ' ); ?></div>
 
 					<span class="k amq-row" data-types="quantity_tier" style="font-weight:600;padding-top:6px">ขั้นส่วนลด</span>
 					<div class="v amq-row" data-types="quantity_tier">
@@ -1073,6 +1230,64 @@ function amouriq_bogo_admin_page() {
 								<input type="number" name="tier_pct_<?php echo esc_attr( $n ); ?>" min="0" max="100" style="width:80px" value="<?php echo esc_attr( $tier['percent'] ?? '' ); ?>"> %</p>
 						<?php endfor; ?>
 						<p class="description">ใช้อย่างน้อย 1 ขั้น เว้นว่างขั้นที่ไม่ใช้</p>
+					</div>
+
+					<?php
+					$scope_inc  = isset( $editing['scope']['include'] ) ? $editing['scope']['include'] : array();
+					$scope_exc  = isset( $editing['scope']['exclude'] ) ? $editing['scope']['exclude'] : array();
+					$scope_attr = array();
+					if ( function_exists( 'wc_get_attribute_taxonomies' ) ) {
+						foreach ( wc_get_attribute_taxonomies() as $attribute ) {
+							$scope_attr[ 'pa_' . $attribute->attribute_name ] = $attribute->attribute_label;
+						}
+					}
+					$cur_attr_tax = '';
+					$cur_attr_val = '';
+					if ( ! empty( $scope_inc['attributes'] ) ) {
+						$cur_attr_tax = (string) key( $scope_inc['attributes'] );
+						$cur_attr_val = implode( ', ', (array) reset( $scope_inc['attributes'] ) );
+					}
+					?>
+					<label class="k amq-row" data-types="fixed_price_item bundle_price" for="bogo_price"><span data-only="fixed_price_item">ราคาต่อชิ้น (฿)</span><span data-only="bundle_price">ราคาชุด (฿)</span></label>
+					<div class="v amq-row" data-types="fixed_price_item bundle_price"><input type="number" name="price" id="bogo_price" min="0" step="any" value="<?php echo esc_attr( $v( 'price' ) ); ?>">
+						<p class="description">ราคาที่ลูกค้าเห็น (รวมภาษีถ้าร้านแสดงราคารวมภาษี) สินค้าที่ราคาต่ำกว่านี้ไม่ถูกแตะ ไม่มีการเพิ่มราคา</p></div>
+
+					<label class="k amq-row" data-types="bundle_price" for="bogo_bundleq">ซื้อกี่ชิ้นต่อชุด</label>
+					<div class="v amq-row" data-types="bundle_price"><input type="number" name="bundle_qty" id="bogo_bundleq" min="2" value="<?php echo esc_attr( $v( 'bundle_qty', 3 ) ); ?>">
+						<p class="description">ระบบจัดชุดจากชิ้นที่แพงที่สุดก่อน (เป็นผลดีกับลูกค้า) ชิ้นที่เหลือไม่ครบชุดคิดราคาเต็ม ใช้ "จำกัดต่อออเดอร์" เพื่อจำกัดจำนวนชุด</p></div>
+
+					<label class="k amq-row" data-types="amount_off_item" for="bogo_off">ลดต่อชิ้น (฿)</label>
+					<div class="v amq-row" data-types="amount_off_item"><input type="number" name="off_value" id="bogo_off" min="0" step="any" value="<?php echo esc_attr( $v( 'value' ) ); ?>">
+						<p class="description">ทุกชิ้นที่ร่วมรายการลดชิ้นละเท่านี้ (ไม่เกินราคาสินค้าชิ้นนั้น)</p></div>
+
+					<span class="k amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">ขอบเขตสินค้า</span>
+					<div class="v amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price">
+						<p class="description" style="margin-top:0">ใช้เลือกสินค้าที่ร่วมรายการด้วยหมวด แท็ก ขนาด หรือ SKU แทนการติ๊กทีละรายการ ถ้ากำหนดหลายข้อ สินค้าต้องตรงทุกข้อ (ภายในข้อเดียวกันตรงอย่างใดอย่างหนึ่งก็พอ) เว้นว่างทั้งหมด = ไม่จำกัดตามข้อนี้</p>
+						<p><strong>ร่วมรายการเฉพาะ</strong></p>
+						<p><label>หมวด<br><select name="scope_include_categories[]" multiple size="4" style="min-width:260px">
+							<?php if ( ! is_wp_error( $cats ) ) : foreach ( $cats as $cat ) : ?>
+								<option value="<?php echo esc_attr( $cat->slug ); ?>" <?php selected( in_array( $cat->slug, (array) ( $scope_inc['categories'] ?? array() ), true ) ); ?>><?php echo esc_html( $cat->name ); ?></option>
+							<?php endforeach; endif; ?>
+						</select></label></p>
+						<p><label>แท็กสินค้า (slug คั่นด้วยจุลภาค) <input type="text" name="scope_include_tags" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_inc['tags'] ?? array() ) ) ); ?>" class="regular-text"></label></p>
+						<p><label>คุณสมบัติสินค้า (เช่น ขนาด)
+							<select name="scope_include_attribute">
+								<option value="">— ไม่ใช้ —</option>
+								<?php foreach ( $scope_attr as $tax => $label_text ) : ?>
+									<option value="<?php echo esc_attr( $tax ); ?>" <?php selected( $cur_attr_tax, $tax ); ?>><?php echo esc_html( $label_text . ' (' . $tax . ')' ); ?></option>
+								<?php endforeach; ?>
+							</select></label>
+							ค่า (slug คั่นด้วยจุลภาค เช่น 250-ml) <input type="text" name="scope_include_attribute_values" value="<?php echo esc_attr( $cur_attr_val ); ?>"></p>
+						<p><label>SKU (คั่นด้วยจุลภาค) <input type="text" name="scope_include_skus" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_inc['skus'] ?? array() ) ) ); ?>" class="regular-text"></label></p>
+						<p><label><input type="checkbox" name="scope_include_on_sale_only" value="1" <?php checked( ! empty( $scope_inc['on_sale_only'] ) ); ?>> เฉพาะสินค้าที่ลดราคาอยู่</label></p>
+						<p><strong>ยกเว้น</strong></p>
+						<p><label>หมวด<br><select name="scope_exclude_categories[]" multiple size="4" style="min-width:260px">
+							<?php if ( ! is_wp_error( $cats ) ) : foreach ( $cats as $cat ) : ?>
+								<option value="<?php echo esc_attr( $cat->slug ); ?>" <?php selected( in_array( $cat->slug, (array) ( $scope_exc['categories'] ?? array() ), true ) ); ?>><?php echo esc_html( $cat->name ); ?></option>
+							<?php endforeach; endif; ?>
+						</select></label></p>
+						<p><label>แท็กสินค้า <input type="text" name="scope_exclude_tags" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_exc['tags'] ?? array() ) ) ); ?>" class="regular-text"></label>
+						&nbsp;<label>SKU <input type="text" name="scope_exclude_skus" value="<?php echo esc_attr( implode( ', ', (array) ( $scope_exc['skus'] ?? array() ) ) ); ?>"></label></p>
 					</div>
 				</div>
 
@@ -1127,7 +1342,7 @@ function amouriq_bogo_admin_page() {
 					<div class="amq-grid">
 						<span class="k" style="font-weight:600">เงื่อนไขพิเศษ</span>
 						<div class="v">
-							<label class="amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="checkbox" name="exclude_sale" value="1" <?php checked( $editing ? ! empty( $editing['exclude_sale'] ) : true ); ?>> ไม่รวมสินค้าที่ลดราคาอยู่แล้ว (ไม่ได้ส่วนลด; ยังนับในยอดขั้นต่ำ)</label><br>
+							<label class="amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price"><input type="checkbox" name="exclude_sale" value="1" <?php checked( $editing ? ! empty( $editing['exclude_sale'] ) : true ); ?>> ไม่รวมสินค้าที่ลดราคาอยู่แล้ว (ไม่ได้ส่วนลด; ยังนับในยอดขั้นต่ำ)</label><br>
 							<label><input type="checkbox" name="no_combine" value="1" <?php checked( ! empty( $editing['no_combine'] ) ); ?>> ไม่ใช้ร่วมกับคูปองอื่น (คูปองที่เปิดดีลนี้เองไม่นับ)</label><br>
 							<label><input type="checkbox" name="new_customer_only" value="1" <?php checked( ! empty( $editing['new_customer_only'] ) ); ?>> ลูกค้าใหม่เท่านั้น (ยังไม่เคยมีออเดอร์ที่นับ ตรวจตามบัญชีหรืออีเมล)</label>
 						</div>
@@ -1135,11 +1350,11 @@ function amouriq_bogo_admin_page() {
 						<div class="v"><input type="datetime-local" name="valid_from" id="bogo_from" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_from' ), false ) ); ?>"> <span class="description">เว้นว่าง = ใช้ได้ทันที</span></div>
 						<label class="k" for="bogo_to">ใช้ได้ถึง</label>
 						<div class="v"><input type="datetime-local" name="valid_to" id="bogo_to" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_to' ), true ) ); ?>"> <span class="description">เว้นว่าง = ไม่มีวันหมด</span></div>
-						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold" for="bogo_maxc">จำกัดต่อลูกค้า (ครั้ง)</label>
-						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="number" name="max_uses_per_customer" id="bogo_maxc" min="0" value="<?php echo esc_attr( $v( 'max_uses_per_customer', 0 ) ); ?>">
+						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price" for="bogo_maxc">จำกัดต่อลูกค้า (ครั้ง)</label>
+						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price"><input type="number" name="max_uses_per_customer" id="bogo_maxc" min="0" value="<?php echo esc_attr( $v( 'max_uses_per_customer', 0 ) ); ?>">
 							<p class="description">0 = ไม่จำกัด ลูกค้าที่ล็อกอินนับตามบัญชี ที่ยังไม่ล็อกอินนับตามอีเมลตอนชำระเงิน</p></div>
-						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold" for="bogo_maxo">จำกัดต่อออเดอร์ (ครั้ง)</label>
-						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold"><input type="number" name="max_per_order" id="bogo_maxo" min="0" value="<?php echo esc_attr( $v( 'max_per_order', 0 ) ); ?>">
+						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold bundle_price" for="bogo_maxo">จำกัดต่อออเดอร์ (ครั้ง)</label>
+						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold bundle_price"><input type="number" name="max_per_order" id="bogo_maxo" min="0" value="<?php echo esc_attr( $v( 'max_per_order', 0 ) ); ?>">
 							<p class="description">0 = ไม่จำกัด</p></div>
 					</div>
 				</details>
@@ -1169,6 +1384,9 @@ function amouriq_bogo_admin_page() {
 				}
 				form.querySelectorAll('[data-types]').forEach(function (el) {
 					show(el, el.getAttribute('data-types').split(' ').indexOf(type) !== -1);
+				});
+				form.querySelectorAll('[data-only]').forEach(function (el) {
+					el.hidden = el.getAttribute('data-only') !== type;
 				});
 				form.querySelectorAll('[data-trigger]').forEach(function (el) {
 					show(el, el.getAttribute('data-trigger') === trig);
