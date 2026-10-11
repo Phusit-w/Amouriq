@@ -308,6 +308,10 @@ function amouriq_bogo_core_split( $deal, $lines, $discount ) {
 		return amouriq_bogo_core_cheapest_split( $deal, $lines );
 	}
 
+	if ( in_array( $type, array( 'fixed_price_item', 'amount_off_item', 'bundle_price' ), true ) ) {
+		return amouriq_bogo_core_price_type_split( $deal, $lines );
+	}
+
 	if ( 'spend_threshold' === $type || ( 'quantity_tier' === $type && amouriq_bogo_core_uses_ticked( $deal ) ) ) {
 		$weights = array();
 		foreach ( $lines as $i => $line ) {
@@ -447,6 +451,10 @@ function amouriq_bogo_core_discount( $deal, $lines, $ctx ) {
 			return amouriq_bogo_core_quantity_tier( $deal, $lines, $ctx );
 		case 'spend_threshold':
 			return amouriq_bogo_core_spend_threshold( $deal, $lines );
+		case 'fixed_price_item':
+		case 'amount_off_item':
+		case 'bundle_price':
+			return array_sum( amouriq_bogo_core_price_type_split( $deal, $lines ) );
 	}
 	return 0.0;
 }
@@ -807,4 +815,84 @@ function amouriq_bogo_core_scope_hit( $line, $dimension, $wanted ) {
 			return false;
 	}
 	return false;
+}
+
+/**
+ * Fixed price per item, baht off per item and bundle price, over the lines the
+ * Deal covers (Product scope, ticked products, sale skipping). Returns the
+ * discount per line (line index => tax-exclusive amount); the total is its sum.
+ *
+ * Prices are what the shopper sees (tax included when the shop shows it so) and
+ * are converted to the tax-exclusive amount a cart fee needs by each unit's own
+ * ratio. Nothing ever exceeds the shelf price, so a price above it gives no
+ * discount rather than a charge.
+ *   fixed_price_item  `price`: every covered unit dearer than this costs `price`.
+ *   amount_off_item   `value`: `value` off every covered unit (at most its price).
+ *   bundle_price      `bundle_qty` N and `price` Y: the dearest units are taken N
+ *                     at a time, each complete group costing Y in all (a group
+ *                     already cheaper than Y gets nothing). `max_per_order` limits groups.
+ */
+function amouriq_bogo_core_price_type_split( $deal, $lines ) {
+	$type = isset( $deal['type'] ) ? $deal['type'] : '';
+
+	// One entry per unit: array( shown price, tax-exclusive price, line index ).
+	$units = array();
+	foreach ( $lines as $i => $line ) {
+		if ( ! amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
+			continue;
+		}
+		$shown = amouriq_bogo_core_shown_price( $line );
+		if ( $shown <= 0 ) {
+			continue;
+		}
+		for ( $n = 0; $n < $line['quantity']; $n++ ) {
+			$units[] = array( $shown, (float) $line['unit_price'], $i );
+		}
+	}
+
+	$split = array();
+	$add   = static function ( $line_index, $amount ) use ( &$split ) {
+		if ( $amount > 0 ) {
+			$split[ $line_index ] = ( isset( $split[ $line_index ] ) ? $split[ $line_index ] : 0.0 ) + $amount;
+		}
+	};
+
+	if ( 'bundle_price' === $type ) {
+		$size  = isset( $deal['bundle_qty'] ) ? (int) $deal['bundle_qty'] : 0;
+		$price = isset( $deal['price'] ) ? (float) $deal['price'] : 0.0;
+		if ( $size < 2 || $price < 0 ) {
+			return array();
+		}
+		usort(
+			$units,
+			static function ( $a, $b ) {
+				return $b[0] <=> $a[0];
+			}
+		);
+		$groups = amouriq_bogo_core_cap( intdiv( count( $units ), $size ), $deal );
+		for ( $g = 0; $g < $groups; $g++ ) {
+			$group = array_slice( $units, $g * $size, $size );
+			$shown = array_sum( array_column( $group, 0 ) );
+			$ex    = array_sum( array_column( $group, 1 ) );
+			if ( $shown <= $price ) {
+				continue;
+			}
+			$off_ex = ( $shown - $price ) * $ex / $shown; // the shown saving as a tax-exclusive amount
+			foreach ( $group as $unit ) {
+				$add( $unit[2], $off_ex * $unit[1] / $ex );
+			}
+		}
+		return $split;
+	}
+
+	foreach ( $units as $unit ) {
+		if ( 'fixed_price_item' === $type ) {
+			$off_shown = $unit[0] - ( isset( $deal['price'] ) ? (float) $deal['price'] : $unit[0] );
+		} else {
+			$off_shown = isset( $deal['value'] ) ? (float) $deal['value'] : 0.0;
+		}
+		$off_shown = min( max( 0.0, $off_shown ), $unit[0] );
+		$add( $unit[2], $off_shown * $unit[1] / $unit[0] );
+	}
+	return $split;
 }

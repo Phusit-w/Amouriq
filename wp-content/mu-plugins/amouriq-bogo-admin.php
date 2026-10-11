@@ -445,7 +445,24 @@ function amouriq_bogo_detail( $deal ) {
 		$what = ! empty( $deal['product_ids'] ) ? 'สินค้าที่เลือก ' . count( $deal['product_ids'] ) . ' รายการ (นับรวมกัน)' : amouriq_bogo_pname( $deal['product_id'] );
 		return $what . ': ' . implode( ' / ', $steps );
 	}
+	if ( 'fixed_price_item' === $type ) {
+		return 'ราคาต่อชิ้นเหลือ ฿' . ( $deal['price'] ?? 0 ) . ' (สินค้าที่แพงกว่านี้เท่านั้น)' . amouriq_bogo_scope_note( $deal );
+	}
+	if ( 'amount_off_item' === $type ) {
+		return 'ลดชิ้นละ ฿' . ( $deal['value'] ?? 0 ) . amouriq_bogo_scope_note( $deal );
+	}
+	if ( 'bundle_price' === $type ) {
+		return 'ซื้อ ' . ( $deal['bundle_qty'] ?? 0 ) . ' ชิ้น ในราคา ฿' . ( $deal['price'] ?? 0 ) . ' (คิดจากชิ้นที่แพงที่สุดก่อน)' . amouriq_bogo_scope_note( $deal );
+	}
 	return 'ไม่รู้จักประเภทนี้';
+}
+
+/** " · ทุกสินค้า" or a short note that the Deal covers a chosen scope, for the list. */
+function amouriq_bogo_scope_note( $deal ) {
+	if ( ! empty( $deal['scope'] ) || ! empty( $deal['product_ids'] ) ) {
+		return ' · เฉพาะสินค้าที่กำหนด';
+	}
+	return ' · ทุกสินค้า';
 }
 
 /**
