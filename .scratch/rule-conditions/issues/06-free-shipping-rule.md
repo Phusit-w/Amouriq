@@ -6,7 +6,7 @@
 
 **Status:** done locally (not uploaded). The browser check of the new admin fields is still open
 
-- [x] A rule with a spend condition makes shipping free at the threshold and not below it (browser check on the local cart)
+- [x] A rule with a spend condition makes shipping free at the threshold and not below it (checked by CLI against real Flexible Shipping in the local cart, not in a browser)
 - [x] A rule triggered by a coupon code makes shipping free only while that code is in the cart
 - [x] Shown in the rule list (the list text and "used" count are built; the list was not opened in a browser)
 - [x] Does not touch the ฿299 Flexible Shipping rule unless the owner chooses to move it here
