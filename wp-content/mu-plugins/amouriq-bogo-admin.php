@@ -947,7 +947,7 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 	$threshold = is_array( $settings ) && isset( $settings['method_free_shipping'] ) ? $settings['method_free_shipping'] : null;
 	$ship_url  = admin_url( 'admin.php?page=wc-settings&tab=shipping&instance_id=3' );
 	?>
-	<table class="widefat amq-table">
+	<div class="amq-scroll"><table class="widefat amq-table">
 		<thead><tr><th style="width:150px">ประเภท</th><th>รายละเอียด</th><th style="width:130px">สถานะ</th><th style="width:110px">ใช้แล้ว</th><th style="width:230px">จัดการ</th></tr></thead>
 		<tbody>
 		<tr>
@@ -1044,7 +1044,7 @@ function amouriq_bogo_overview( $deals, $report, $types ) {
 			</tr>
 		<?php endforeach; ?>
 		</tbody>
-	</table>
+	</table></div>
 	<p class="description">ปิดคูปอง = เปลี่ยนเป็นฉบับร่าง (ยังเปิดกลับได้) ส่วนลดรวมนับเฉพาะออเดอร์ที่ไม่ถูกยกเลิก/ล้มเหลว/คืนเงิน ขั้นต่ำส่งฟรีแก้ที่หน้าการจัดส่ง</p>
 	<?php
 }
@@ -1054,6 +1054,7 @@ function amouriq_bogo_admin_css() {
 	<style>
 		.amq-bogo .amq-top { display:flex; align-items:center; gap:12px; margin:8px 0 16px; }
 		.amq-bogo h1 { margin:0; }
+		.amq-scroll { overflow-x:auto; max-width:100%; }
 		.amq-table { max-width:1250px; }
 		.amq-table td { vertical-align:top; padding:12px 10px; line-height:1.55; }
 		.amq-table tr.amq-dim td { background:#f6f7f7; color:#787c82; }

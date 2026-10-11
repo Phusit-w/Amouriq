@@ -28,22 +28,29 @@ function amouriq_coupon_conditions_panel( $coupon_id ) {
 	$set     = amouriq_bogo_conditions_for_form( get_post_meta( $coupon_id, 'amouriq_conditions', true ) );
 	$rows    = array_values( $set['rows'] );
 	?>
-	<div class="options_group amq-coupon-conditions" style="padding:0 12px 12px">
-		<h4 style="margin:12px 0 4px">เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่</h4>
-		<p class="description">ไม่ใส่เลย = ไม่จำกัดเพิ่ม ข้อมูลที่ยังไม่ทราบ (เช่น ยังไม่กรอกอีเมล) ถือว่ายังไม่ตรงเงื่อนไข ลูกค้าจะเห็นข้อความบอกว่าต้องทำอะไร</p>
-		<p>
-			<label>ต้องตรง
-				<select name="cond_match">
-					<option value="all" <?php selected( $set['match'], 'all' ); ?>>ครบทุกข้อ</option>
-					<option value="any" <?php selected( $set['match'], 'any' ); ?>>ข้อใดข้อหนึ่ง</option>
-				</select>
-			</label>
+	<div class="options_group amq-coupon-conditions">
+		<style>
+		.amq-coupon-conditions h4 { margin:12px 12px 4px; }
+		.amq-coupon-conditions p.amq-note { padding:0 12px; }
+		.amq-coupon-conditions p.form-field select, .amq-coupon-conditions p.form-field input.amq-cond-value { float:none; width:auto; display:inline-block; margin:0 4px 0 0; vertical-align:middle; }
+		.amq-coupon-conditions p.form-field input.amq-cond-value { min-width:200px; }
+		.amq-coupon-conditions p.form-field .amq-cond-hint { display:block; float:none; margin:4px 0 0; padding:0; }
+		.amq-coupon-conditions [hidden] { display:none !important; }
+		</style>
+		<h4>เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่</h4>
+		<p class="description amq-note">ไม่ใส่เลย = ไม่จำกัดเพิ่ม ข้อมูลที่ยังไม่ทราบ (เช่น ยังไม่กรอกอีเมล) ถือว่ายังไม่ตรงเงื่อนไข ลูกค้าจะเห็นข้อความบอกว่าต้องทำอะไร</p>
+		<p class="form-field">
+			<label for="cond_match">ต้องตรง</label>
+			<select name="cond_match" id="cond_match">
+				<option value="all" <?php selected( $set['match'], 'all' ); ?>>ครบทุกข้อ</option>
+				<option value="any" <?php selected( $set['match'], 'any' ); ?>>ข้อใดข้อหนึ่ง</option>
+			</select>
 		</p>
 		<?php for ( $n = 1; $n <= AMOURIQ_BOGO_CONDITION_ROWS; $n++ ) :
 			$row = isset( $rows[ $n - 1 ] ) ? $rows[ $n - 1 ] : array( 'type' => '', 'op' => '', 'value' => '' );
 		?>
-			<p class="amq-cond-row">
-				<span style="display:inline-block;width:5.5em">ข้อ <?php echo esc_html( $n ); ?></span>
+			<p class="form-field amq-cond-row">
+				<label>เงื่อนไขข้อ <?php echo esc_html( $n ); ?></label>
 				<select name="cond_type_<?php echo esc_attr( $n ); ?>" class="amq-cond-type">
 					<option value="">— ไม่ใช้ —</option>
 					<?php foreach ( $catalog as $key => $meta ) : ?>
@@ -51,7 +58,7 @@ function amouriq_coupon_conditions_panel( $coupon_id ) {
 					<?php endforeach; ?>
 				</select>
 				<select name="cond_op_<?php echo esc_attr( $n ); ?>" class="amq-cond-op" data-current="<?php echo esc_attr( $row['op'] ); ?>"></select>
-				<input type="text" name="cond_value_<?php echo esc_attr( $n ); ?>" class="amq-cond-value short" style="min-width:200px" value="<?php echo esc_attr( $row['type'] ? amouriq_cond_format_value( $row ) : '' ); ?>">
+				<input type="text" name="cond_value_<?php echo esc_attr( $n ); ?>" class="amq-cond-value" value="<?php echo esc_attr( $row['type'] ? amouriq_cond_format_value( $row ) : '' ); ?>">
 				<span class="description amq-cond-hint"></span>
 			</p>
 		<?php endfor; ?>
