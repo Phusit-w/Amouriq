@@ -69,3 +69,23 @@ _Avoid_: Deal, promotion
 **Points**:
 The store's loyalty currency, kept in our own ledger (ADR-0007), not by the Points & Rewards plugin. Earned when an order is Completed (default 1 point per ฿100 of paid item total, shipping excluded) and spent at the cart or checkout (default 1 point = ฿1, at most 20% of the item total after every other discount, at least 50 at a time). Expire 12 months after they are earned. Off until switched on under WooCommerce > แต้มสะสม. In Thai screens: **แต้มสะสม**.
 _Avoid_: Reward points, credit, cashback; "Member Privilege" (a different, percentage-based discount)
+
+**Condition**:
+A test on who the customer is, when it is, or what is in the cart or checkout, that a Deal, a Coupon or an Earning rule needs before it applies (logged in, role, orders so far, total spent, weekday and time, cart quantity or subtotal, product in cart, payment method, shipping province). A set of Conditions is "all must match" or "any must match". A Condition whose input is not known yet does not match (except New customer, which assumes new until the email is known). See ADR-0008.
+_Avoid_: Rule (a Deal is the thing that gives something; a Condition only decides whether it applies), Restriction
+
+**Product scope**:
+Which products a Deal or Coupon covers: include and exclude lists by category, tag, attribute (such as size), SKU, product or variation, and "only items on sale". Replaces the hand-ticked product lists, which stay valid.
+
+**Exclusive**:
+A Deal option: later Deals in the list do not also apply to the cart lines this Deal discounted. It never stops Member Privilege or Coupons, which follow Stacking.
+
+**Earning rule**:
+A line in the points settings that changes how many Points an order earns: a different rate for a scope, an exclusion, a date-range multiplier, a minimum order total or a per-order cap. The base rule (1 point per ฿100) applies where no rule matches.
+
+**Reward**:
+Something a customer buys with Points from My Account: a single-use personal Coupon, or a free gift product. Redeeming takes the points at once and is recorded in the ledger.
+_Avoid_: Prize, voucher
+
+**Adjustment**:
+A staff change to one customer's Points balance (add or deduct) with a required reason, recorded in the ledger with who made it.
