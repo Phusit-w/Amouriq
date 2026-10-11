@@ -8,7 +8,7 @@
  *
  * The lines may also be a callable returning them. A cart line:  product_id, variation_id, quantity, unit_price (tax-exclusive),
  *               on_sale (bool), categories (the line's product_cat slugs and term IDs)
- * The context:  today ('Y-m-d'), applied_coupons (list of codes),
+ * The context:  today ('Y-m-d') and optionally now ('Y-m-d H:i'), applied_coupons (list of codes),
  *               customer_uses (int, or null when the customer is not yet known; may be
  *               a callable given the deal and returning either, so the lookup only runs when needed),
  *               prices (product or variation id => tax-exclusive unit price)
@@ -165,6 +165,16 @@ function amouriq_bogo_core_split( $deal, $lines, $discount ) {
 		return amouriq_bogo_core_cheapest_split( $deal, $lines );
 	}
 
+	if ( 'spend_threshold' === $type ) {
+		$weights = array();
+		foreach ( $lines as $i => $line ) {
+			if ( amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
+				$weights[ $i ] = $line['quantity'] * $line['unit_price'];
+			}
+		}
+		return amouriq_bogo_core_spread( $discount, $weights );
+	}
+
 	// The other types discount units of the product they name: spread the total
 	// over those lines by line value.
 	if ( 'product_pair' === $type ) {
@@ -180,6 +190,11 @@ function amouriq_bogo_core_split( $deal, $lines, $discount ) {
 			$weights[ $i ] = $line['quantity'] * $line['unit_price'];
 		}
 	}
+	return amouriq_bogo_core_spread( $discount, $weights );
+}
+
+/** Spread an amount over lines in proportion to their weights (line index => weight). */
+function amouriq_bogo_core_spread( $discount, $weights ) {
 	$total = array_sum( $weights );
 	if ( $total <= 0 ) {
 		return array();
@@ -202,10 +217,7 @@ function amouriq_bogo_core_stop_reason( $deal, $ctx ) {
 		return 'disabled';
 	}
 
-	if ( ! empty( $deal['valid_from'] ) && $ctx['today'] < $deal['valid_from'] ) {
-		return 'outside_window';
-	}
-	if ( ! empty( $deal['valid_to'] ) && $ctx['today'] > $deal['valid_to'] ) {
+	if ( ! amouriq_bogo_core_in_window( $deal, $ctx ) ) {
 		return 'outside_window';
 	}
 
@@ -237,6 +249,28 @@ function amouriq_bogo_core_stop_reason( $deal, $ctx ) {
 	return null;
 }
 
+/**
+ * Whether the deal's start and end contain the moment in the context. Each is a
+ * date ('Y-m-d': start of that day / end of that day) or a date and time
+ * ('Y-m-d H:i'). The moment is ctx `now` ('Y-m-d H:i'); with only `today` the
+ * middle of that day is used, which a whole-day window contains.
+ */
+function amouriq_bogo_core_in_window( $deal, $ctx ) {
+	$now = isset( $ctx['now'] ) ? $ctx['now'] : $ctx['today'] . ' 12:00';
+	if ( ! empty( $deal['valid_from'] ) && $now < amouriq_bogo_core_full_time( $deal['valid_from'], false ) ) {
+		return false;
+	}
+	if ( ! empty( $deal['valid_to'] ) && $now > amouriq_bogo_core_full_time( $deal['valid_to'], true ) ) {
+		return false;
+	}
+	return true;
+}
+
+/** A stored start/end as 'Y-m-d H:i'; a bare date means the start (00:00) or the end (23:59) of that day. */
+function amouriq_bogo_core_full_time( $value, $is_end ) {
+	return 10 === strlen( $value ) ? $value . ( $is_end ? ' 23:59' : ' 00:00' ) : $value;
+}
+
 /** Coupon codes compare case-insensitively, as WooCommerce does. */
 function amouriq_bogo_core_code( $code ) {
 	return strtolower( trim( (string) $code ) );
@@ -253,8 +287,60 @@ function amouriq_bogo_core_discount( $deal, $lines, $ctx ) {
 			return amouriq_bogo_core_category_cheapest( $deal, $lines );
 		case 'quantity_tier':
 			return amouriq_bogo_core_quantity_tier( $deal, $lines, $ctx );
+		case 'spend_threshold':
+			return amouriq_bogo_core_spend_threshold( $deal, $lines );
 	}
 	return 0.0;
+}
+
+/** True when this line is one the spend-threshold Deal discounts (not skipped, ticked, not excluded). */
+function amouriq_bogo_core_threshold_eligible( $line, $deal ) {
+	if ( amouriq_bogo_core_excluded( $line, $deal ) ) {
+		return false;
+	}
+	$matches = static function ( $ids ) use ( $line ) {
+		foreach ( (array) $ids as $id ) {
+			if ( (int) $line['product_id'] === (int) $id || ( $line['variation_id'] && (int) $line['variation_id'] === (int) $id ) ) {
+				return true;
+			}
+		}
+		return false;
+	};
+	if ( ! empty( $deal['product_ids'] ) && ! $matches( $deal['product_ids'] ) ) {
+		return false;
+	}
+	return empty( $deal['excluded_ids'] ) || ! $matches( $deal['excluded_ids'] );
+}
+
+/**
+ * "Spend X, get Y% or Y baht off". The minimum counts every item as the shopper
+ * sees it (Sale Price items too, before any discount); the discount is taken
+ * only from the eligible lines. A baht value is what the shopper sees, so it is
+ * converted to the tax-exclusive amount a cart fee needs, and never exceeds the
+ * eligible items.
+ */
+function amouriq_bogo_core_spend_threshold( $deal, $lines ) {
+	$spend = 0.0;
+	$ex    = 0.0;
+	$incl  = 0.0;
+	foreach ( $lines as $line ) {
+		$shown  = isset( $line['price_incl_tax'] ) ? $line['price_incl_tax'] : $line['unit_price'];
+		$spend += $line['quantity'] * $shown;
+		if ( amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
+			$ex   += $line['quantity'] * $line['unit_price'];
+			$incl += $line['quantity'] * $shown;
+		}
+	}
+
+	if ( $ex <= 0 || round( $spend, 2 ) < (float) ( isset( $deal['min_spend'] ) ? $deal['min_spend'] : 0 ) ) {
+		return 0.0;
+	}
+
+	$value = isset( $deal['value'] ) ? (float) $deal['value'] : 0.0;
+	if ( isset( $deal['mode'] ) && 'baht' === $deal['mode'] ) {
+		return min( $ex, $value * $ex / $incl );
+	}
+	return $ex * min( 100.0, $value ) / 100;
 }
 
 /** True when this line is left out of the deal because the deal skips sale items. */

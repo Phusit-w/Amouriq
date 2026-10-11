@@ -220,6 +220,7 @@ function amouriq_bogo_price_context( $deals, $cart ) {
 
 	return array(
 		'today'           => current_time( 'Y-m-d' ),
+		'now'             => current_time( 'Y-m-d H:i' ),
 		'applied_coupons' => $cart->get_applied_coupons(),
 		'customer_uses'   => static function ( $deal ) {
 			return amouriq_bogo_customer_uses( $deal['id'] );
