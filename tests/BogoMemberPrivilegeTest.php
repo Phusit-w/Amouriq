@@ -121,6 +121,73 @@ final class BogoMemberPrivilegeTest extends TestCase {
 		$this->assertEqualsWithDelta(50.0, $result['member']['discount'], 0.001);
 	}
 
+	// --- against a Coupon: the larger discount wins, whole cart (ticket 03) ---
+
+	private function with_coupon(float $coupon_discount, array $lines, array $deals = []) {
+		$ctx = $this->ctx(['applied_coupons' => ['save'], 'coupon_discount' => $coupon_discount]);
+		return amouriq_bogo_cart_discounts($deals, $lines, $ctx)['member'];
+	}
+
+	public function test_a_larger_coupon_replaces_member_privilege(): void {
+		// Member 5% of 1000 = 50; the coupon gives 80.
+		$m = $this->with_coupon(80.0, [$this->line(self::SOAP, 2, 500)]);
+
+		$this->assertSame(0.0, $m['discount']);
+		$this->assertSame('coupon_larger', $m['reason']);
+		$this->assertSame('coupon', $m['winner']);
+	}
+
+	public function test_a_smaller_coupon_loses_and_member_privilege_adds_only_the_difference(): void {
+		// Member 50, coupon 30: the customer ends with 50 off in total, not 80.
+		$m = $this->with_coupon(30.0, [$this->line(self::SOAP, 2, 500)]);
+
+		$this->assertEqualsWithDelta(20.0, $m['discount'], 0.001);
+		$this->assertSame('member', $m['winner']);
+	}
+
+	public function test_a_tie_goes_to_the_coupon(): void {
+		$m = $this->with_coupon(50.0, [$this->line(self::SOAP, 2, 500)]);
+
+		$this->assertSame(0.0, $m['discount']);
+		$this->assertSame('coupon', $m['winner']);
+	}
+
+	public function test_a_coupon_worth_nothing_does_not_block_member_privilege(): void {
+		// e.g. a free-shipping-only coupon.
+		$m = $this->with_coupon(0.0, [$this->line(self::SOAP, 2, 500)]);
+
+		$this->assertEqualsWithDelta(50.0, $m['discount'], 0.001);
+		$this->assertNull($m['winner']);
+	}
+
+	public function test_without_a_coupon_member_privilege_is_unchanged(): void {
+		$m = $this->member([$this->line(self::SOAP, 2, 500)]);
+
+		$this->assertEqualsWithDelta(50.0, $m['discount'], 0.001);
+		$this->assertNull($m['winner']);
+	}
+
+	public function test_a_deal_and_a_coupon_still_stack_and_member_privilege_is_compared_after_the_deal(): void {
+		// Soap BOGO: deal 500 on the soap line; candle line member 20. Coupon 15 < 20.
+		$lines  = [$this->line(self::SOAP, 2, 500), $this->line(self::CANDLE, 1, 400)];
+		$result = amouriq_bogo_cart_discounts(
+			[$this->bogo_soap()],
+			$lines,
+			$this->ctx(['applied_coupons' => ['save'], 'coupon_discount' => 15.0])
+		);
+
+		$this->assertSame(500.0, $result['deals'][0]['discount']);
+		$this->assertEqualsWithDelta(5.0, $result['member']['discount'], 0.001); // 20 - 15
+	}
+
+	public function test_member_privilege_is_not_given_to_a_non_member_whatever_the_coupon(): void {
+		$ctx = $this->ctx(['is_member' => false, 'coupon_discount' => 10.0]);
+		$m   = amouriq_bogo_cart_discounts([], [$this->line(self::SOAP, 2, 500)], $ctx)['member'];
+
+		$this->assertSame(0.0, $m['discount']);
+		$this->assertSame('not_member', $m['reason']);
+	}
+
 	public function test_cheapest_free_is_charged_to_the_line_of_the_cheapest_item(): void {
 		$deal   = ['type' => 'cheapest_free', 'buy_qty' => 2];
 		$lines  = [$this->line(self::SOAP, 1, 500), $this->line(self::OIL, 1, 300)];

@@ -81,11 +81,13 @@ function amouriq_bogo_cart_discounts( $deals, $lines, $ctx ) {
  * Member Privilege on top of the Deals' per-line discounts. Per line the larger
  * of the two applies, never both, so the extra discount it adds is only what it
  * has over the Deal on that line. Returns array( 'discount', 'per_line',
- * 'deal_won' (line indexes where a Deal gave at least as much), 'reason' ).
- * `reason`: not_member, below_minimum, no_regular_lines, deal_larger (null when it applied).
+ * 'deal_won' (line indexes where a Deal gave at least as much), 'reason', 'winner' ).
+ * `reason`: not_member, below_minimum, no_regular_lines, deal_larger, coupon_larger (null when it applied).
+ * The context's `coupon_discount` is what the Coupons in the cart already take
+ * off (tax-exclusive, like every amount here); see amouriq_bogo_member_vs_coupon().
  */
 function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
-	$none = array( 'discount' => 0.0, 'per_line' => array(), 'deal_won' => array(), 'reason' => null );
+	$none = array( 'discount' => 0.0, 'per_line' => array(), 'deal_won' => array(), 'reason' => null, 'winner' => null );
 	if ( empty( $ctx['is_member'] ) ) {
 		$none['reason'] = 'not_member';
 		return $none;
@@ -126,8 +128,34 @@ function amouriq_bogo_member_privilege( $lines, $deal_per_line, $ctx ) {
 		$out['reason'] = 'no_regular_lines';
 	} elseif ( $out['discount'] <= 0 ) {
 		$out['reason'] = 'deal_larger';
+	} else {
+		$out = amouriq_bogo_member_vs_coupon( $out, isset( $ctx['coupon_discount'] ) ? (float) $ctx['coupon_discount'] : 0.0 );
 	}
 	return $out;
+}
+
+/**
+ * Whole-cart comparison with the Coupons in the cart (ADR-0006). WooCommerce has
+ * already taken the coupon discount off, so Member Privilege only adds what it
+ * has over it: the customer ends with the larger of the two, never both. A tie
+ * goes to the coupon. `winner` is 'coupon' or 'member' when a coupon was in play.
+ */
+function amouriq_bogo_member_vs_coupon( $member, $coupon_discount ) {
+	if ( $coupon_discount <= 0 ) {
+		return $member;
+	}
+	if ( $coupon_discount >= round( $member['discount'], 2 ) ) {
+		$member['discount'] = 0.0;
+		$member['per_line'] = array();
+		$member['reason']   = 'coupon_larger';
+		$member['winner']   = 'coupon';
+		return $member;
+	}
+	// The per-line split is no longer the amount charged; keep only the total.
+	$member['discount'] -= $coupon_discount;
+	$member['per_line']  = array();
+	$member['winner']    = 'member';
+	return $member;
 }
 
 /** Split a deal's discount over the lines it came from (line index => amount). */

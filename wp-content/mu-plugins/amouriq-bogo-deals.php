@@ -51,6 +51,8 @@ function amouriq_bogo_apply_deals( $cart ) {
 	$deals                = amouriq_bogo_deals();
 	$context              = amouriq_bogo_price_context( $deals, $cart );
 	$context['is_member'] = amouriq_bogo_is_member();
+	// WooCommerce has already worked out the coupons by the time fees are calculated.
+	$context['coupon_discount'] = array_sum( $cart->get_coupon_discount_totals() );
 	$result               = amouriq_bogo_cart_discounts(
 		$deals,
 		static function () use ( $cart ) {
@@ -79,15 +81,18 @@ function amouriq_bogo_apply_deals( $cart ) {
 	$member = $result['member'];
 	if ( $member['discount'] > 0 ) {
 		// When a Deal gave more on some item, this fee is only the rest, so don't claim a flat 5%.
-		$label = $member['deal_won']
-			? 'ส่วนลดสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า 5%)'
-			: 'ส่วนลดสมาชิก 5% (สินค้าราคาปกติ)';
+		if ( 'member' === $member['winner'] ) {
+			$label = 'ส่วนลดสมาชิก 5% (มากกว่าคูปอง จึงเพิ่มเฉพาะส่วนต่าง)';
+		} elseif ( $member['deal_won'] ) {
+			$label = 'ส่วนลดสมาชิก (สินค้าที่ไม่อยู่ในดีล หรือดีลให้น้อยกว่า 5%)';
+		} else {
+			$label = 'ส่วนลดสมาชิก 5% (สินค้าราคาปกติ)';
+		}
 		$cart->add_fee( $label, -$member['discount'], false );
 	} elseif ( 'below_minimum' === $member['reason'] ) {
-		$message = 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ';
-		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
-			wc_add_notice( $message, 'notice' );
-		}
+		amouriq_bogo_notice( 'ซื้อครบ ฿299 รับส่วนลดสมาชิก 5% สำหรับสินค้าราคาปกติ' );
+	} elseif ( 'coupon_larger' === $member['reason'] ) {
+		amouriq_bogo_notice( 'คูปองให้ส่วนลดมากกว่าส่วนลดสมาชิก 5% จึงใช้ส่วนลดของคูปอง (ไม่ซ้อนกัน)' );
 	}
 }
 
@@ -122,13 +127,17 @@ add_action(
 	5
 );
 
+/** Show the shopper a cart notice once (the cart is recalculated many times per page). */
+function amouriq_bogo_notice( $message ) {
+	if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
+		wc_add_notice( $message, 'notice' );
+	}
+}
+
 /** Tell the shopper why a Deal was held back by another coupon. */
 function amouriq_bogo_notify_blocked( $deal, $result ) {
 	if ( 'blocked_by_other_coupon' === $result['reason'] ) {
-		$message = sprintf( 'ดีล "%s" ไม่ใช้ร่วมกับคูปองอื่น จึงยังไม่ได้ส่วนลดดีลนี้', ! empty( $deal['label'] ) ? $deal['label'] : 'Deal discount' );
-		if ( function_exists( 'wc_has_notice' ) && ! wc_has_notice( $message, 'notice' ) ) {
-			wc_add_notice( $message, 'notice' );
-		}
+		amouriq_bogo_notice( sprintf( 'ดีล "%s" ไม่ใช้ร่วมกับคูปองอื่น จึงยังไม่ได้ส่วนลดดีลนี้', ! empty( $deal['label'] ) ? $deal['label'] : 'Deal discount' ) );
 	}
 }
 
