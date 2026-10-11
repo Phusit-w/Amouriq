@@ -9,7 +9,7 @@
 - [x] Worked amounts by hand in PHPUnit for each type, including a cart with 2N+1 items for the bundle
 - [x] A fixed price above the item's price gives no discount, never a surcharge
 - [x] Member Privilege takes the larger per line next to each new type
-- [x] The cart and checkout labels read correctly in Thai
+- [ ] The cart and checkout labels read correctly in Thai (list text done; the cart line shows the Deal label, not yet seen in a real cart)
 
 ## Notes (implementation)
 
