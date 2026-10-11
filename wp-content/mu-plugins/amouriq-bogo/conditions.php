@@ -369,3 +369,41 @@ function amouriq_cond_describe( $set ) {
 	}
 	return ( ( isset( $set['match'] ) && 'any' === $set['match'] ) ? 'ข้อใดข้อหนึ่ง: ' : 'ครบทุกข้อ: ' ) . implode( ' · ', $parts );
 }
+
+/**
+ * Judge a Condition set and say why in Thai, for a shopper who was refused (a Coupon).
+ * Returns array( 'result' => match|no_match|unknown, 'message' => '' when it matched ).
+ * A "no match" names the conditions not met (all of them for an "any" set); an "unknown"
+ * says what the shopper can do to let the shop check (sign in or type an email, add items).
+ */
+function amouriq_cond_explain( $set, $ctx ) {
+	$verdict = amouriq_cond_evaluate( $set, $ctx );
+	if ( 'match' === $verdict['result'] ) {
+		return array( 'result' => 'match', 'message' => '' );
+	}
+
+	if ( 'unknown' === $verdict['result'] ) {
+		$todo = array();
+		foreach ( $verdict['missing'] as $what ) {
+			if ( in_array( $what, array( 'email', 'customer', 'login' ), true ) ) {
+				$todo['login'] = 'เข้าสู่ระบบหรือกรอกอีเมลในหน้าชำระเงิน';
+			} elseif ( 'cart' === $what ) {
+				$todo['cart'] = 'เพิ่มสินค้าลงตะกร้า';
+			} else {
+				$todo['other'] = 'ลองใหม่อีกครั้ง';
+			}
+		}
+		return array( 'result' => 'unknown', 'message' => 'ยังตรวจสิทธิ์การใช้คูปองนี้ไม่ได้ กรุณา' . implode(' และ', array_values( $todo ) ) );
+	}
+
+	$rows = ( isset( $set['rows'] ) && is_array( $set['rows'] ) ) ? $set['rows'] : array();
+	$any  = isset( $set['match'] ) && 'any' === $set['match'];
+	$shown = array();
+	foreach ( $rows as $row ) {
+		if ( $any || 'no_match' === amouriq_cond_evaluate( array( 'match' => 'all', 'rows' => array( $row ) ), $ctx )['result'] ) {
+			$shown[] = $row;
+		}
+	}
+	$what = amouriq_cond_describe( array( 'match' => $any ? 'any' : 'all', 'rows' => $shown ) );
+	return array( 'result' => 'no_match', 'message' => 'คูปองนี้ใช้ไม่ได้ เพราะยังไม่เข้าเงื่อนไข — ' . $what );
+}
