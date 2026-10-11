@@ -44,7 +44,7 @@ function amouriq_points_ledger( $user_id ) {
  * Record a change of $points (earned +, used -). Earned points (and restored or
  * adjusted-up ones) carry an expiry date.
  */
-function amouriq_points_record( $user_id, $points, $type, $order_id = 0, $note = '' ) {
+function amouriq_points_record( $user_id, $points, $type, $order_id = 0, $note = '', $by = 0 ) {
 	$points = (int) $points;
 	if ( ! $user_id || 0 === $points ) {
 		return;
@@ -59,6 +59,9 @@ function amouriq_points_record( $user_id, $points, $type, $order_id = 0, $note =
 		'order_id' => (int) $order_id,
 		'note'     => $note,
 	);
+	if ( $by ) {
+		$ledger[ count( $ledger ) - 1 ]['by'] = (int) $by; // the staff member who made an Adjustment
+	}
 	update_user_meta( (int) $user_id, 'amouriq_points_ledger', $ledger );
 }
 
@@ -446,11 +449,14 @@ function amouriq_points_admin_handle() {
 		$note   = isset( $_POST['note'] ) ? sanitize_text_field( wp_unslash( $_POST['note'] ) ) : '';
 		if ( ! $user ) {
 			$notice = 'ไม่พบสมาชิกที่ใช้อีเมลนี้';
-		} elseif ( 0 === $points ) {
-			$notice = 'ใส่จำนวนแต้มที่ต้องการเพิ่ม (หรือหักด้วยเครื่องหมายลบ)';
 		} else {
-			amouriq_points_record( $user->ID, $points, 'adjust', 0, $note );
-			$notice = sprintf( 'ปรับแต้มของ %s แล้ว: %+d', $email, $points );
+			$problem = amouriq_points_core_check_adjustment( $points, $note, amouriq_points_balance( $user->ID )['points'] );
+			if ( $problem ) {
+				$notice = $problem;
+			} else {
+				amouriq_points_record( $user->ID, $points, 'adjust', 0, $note, get_current_user_id() );
+				$notice = sprintf( 'ปรับแต้มของ %s แล้ว: %+d', $email, $points );
+			}
 		}
 		$args['email'] = $email;
 	}
@@ -506,8 +512,10 @@ function amouriq_points_admin_page() {
 	echo '<h2>ปรับแต้มด้วยมือ</h2><p>เพิ่มแต้มให้สมาชิก (หรือใส่เลขลบเพื่อหัก) เช่น ชดเชยหรือแก้ไขข้อผิดพลาด</p>';
 	$inner = '<p><label>อีเมลสมาชิก <input type="email" name="email" value="' . esc_attr( $email ) . '" required></label> '
 		. '<label>แต้ม <input type="number" name="points" style="width:7em" required></label> '
-		. '<label>หมายเหตุ <input type="text" name="note" style="width:16em"></label></p>';
+		. '<label>เหตุผล (จำเป็น) <input type="text" name="note" style="width:18em" required></label></p>';
 	amouriq_points_admin_form( 'adjust', $inner, 'ปรับแต้ม' );
+
+	amouriq_points_admin_customer_list();
 
 	echo '<h2>ดูแต้มของสมาชิก</h2><form method="get"><input type="hidden" name="page" value="amouriq-points"><input type="email" name="email" value="' . esc_attr( $email ) . '" placeholder="อีเมลสมาชิก"> <button class="button">ค้นหา</button></form>';
 	if ( $email && ! $found ) {
@@ -515,19 +523,82 @@ function amouriq_points_admin_page() {
 	} elseif ( $found ) {
 		$balance = amouriq_points_balance( $found->ID );
 		printf( '<p><strong>%s</strong>: %s แต้ม%s</p>', esc_html( $email ), esc_html( number_format_i18n( $balance['points'] ) ), $balance['soonest_expiry'] ? esc_html( ' (ชุดที่หมดอายุเร็วสุด: ' . wp_date( 'j M Y', $balance['soonest_expiry'] ) . ')' ) : '' );
-		echo '<table class="widefat striped" style="max-width:800px"><thead><tr><th>วันที่</th><th>ประเภท</th><th>ออเดอร์</th><th>แต้ม</th><th>หมดอายุ</th><th>หมายเหตุ</th></tr></thead><tbody>';
+		echo '<table class="widefat striped" style="max-width:800px"><thead><tr><th>วันที่</th><th>ประเภท</th><th>ออเดอร์</th><th>แต้ม</th><th>หมดอายุ</th><th>หมายเหตุ</th><th>โดย</th></tr></thead><tbody>';
 		foreach ( array_reverse( amouriq_points_ledger( $found->ID ) ) as $row ) {
 			printf(
-				'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+				'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
 				esc_html( wp_date( 'j M Y H:i', $row['time'] ) ),
 				esc_html( isset( $row['type'] ) ? $row['type'] : '' ),
 				! empty( $row['order_id'] ) ? esc_html( '#' . $row['order_id'] ) : '—',
 				esc_html( ( $row['points'] > 0 ? '+' : '' ) . $row['points'] ),
 				! empty( $row['expires'] ) ? esc_html( wp_date( 'j M Y', $row['expires'] ) ) : '—',
-				esc_html( isset( $row['note'] ) ? $row['note'] : '' )
+				esc_html( isset( $row['note'] ) ? $row['note'] : '' ),
+				! empty( $row['by'] ) ? esc_html( ( get_userdata( $row['by'] ) ? get_userdata( $row['by'] )->display_name : '#' . $row['by'] ) ) : ''
 			);
 		}
 		echo '</tbody></table>';
 	}
 	echo '</div>';
+}
+
+/**
+ * Members who have anything in their ledger, with balance and the soonest expiry,
+ * 20 to a page, newest ledger holders first by user ID. `q` searches name and email.
+ * Each row links to that member's ledger below.
+ */
+function amouriq_points_admin_customer_list() {
+	// phpcs:disable WordPress.Security.NonceVerification -- read-only listing
+	$search = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+	$paged  = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
+	// phpcs:enable
+
+	$args = array(
+		'number'   => 20,
+		'paged'    => $paged,
+		'orderby'  => 'ID',
+		'order'    => 'DESC',
+		'fields'   => array( 'ID', 'user_email', 'display_name' ),
+		'meta_key' => 'amouriq_points_ledger', // phpcs:ignore WordPress.DB.SlowDBQuery
+		'meta_compare' => 'EXISTS',
+	);
+	if ( '' !== $search ) {
+		$args['search']         = '*' . $search . '*';
+		$args['search_columns'] = array( 'user_email', 'display_name', 'user_login' );
+	}
+	$query = new WP_User_Query( $args );
+	$total = (int) $query->get_total();
+
+	echo '<h2>สมาชิกที่มีแต้ม</h2>';
+	echo '<form method="get"><input type="hidden" name="page" value="amouriq-points"><input type="search" name="q" value="' . esc_attr( $search ) . '" placeholder="ค้นหาชื่อหรืออีเมล"> <button class="button">ค้นหา</button></form>';
+	echo '<table class="widefat striped" style="max-width:800px;margin-top:8px"><thead><tr><th>สมาชิก</th><th>อีเมล</th><th>แต้มคงเหลือ</th><th>ชุดที่หมดอายุเร็วสุด</th><th></th></tr></thead><tbody>';
+	$rows = $query->get_results();
+	if ( ! $rows ) {
+		echo '<tr><td colspan="5">ยังไม่มีสมาชิกที่มีรายการแต้ม</td></tr>';
+	}
+	foreach ( $rows as $user ) {
+		$balance = amouriq_points_balance( $user->ID );
+		printf(
+			'<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="%s">ดูรายการ / ปรับแต้ม</a></td></tr>',
+			esc_html( $user->display_name ),
+			esc_html( $user->user_email ),
+			esc_html( number_format_i18n( $balance['points'] ) ),
+			$balance['soonest_expiry'] ? esc_html( wp_date( 'j M Y', $balance['soonest_expiry'] ) ) : '—',
+			esc_url( amouriq_points_admin_url( array( 'email' => $user->user_email ) ) )
+		);
+	}
+	echo '</tbody></table>';
+
+	$pages = (int) ceil( $total / 20 );
+	if ( $pages > 1 ) {
+		echo '<p>' . wp_kses_post(
+			paginate_links(
+				array(
+					'base'    => add_query_arg( 'paged', '%#%', amouriq_points_admin_url( '' !== $search ? array( 'q' => $search ) : array() ) ),
+					'format'  => '',
+					'current' => $paged,
+					'total'   => $pages,
+				)
+			)
+		) . '</p>';
+	}
 }

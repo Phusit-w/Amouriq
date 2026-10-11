@@ -127,4 +127,12 @@ final class PointsTest extends TestCase {
 		// Already reversed once: only the difference is taken the second time.
 		$this->assertSame(0, amouriq_points_core_refund_reversal(1000, 300, 7, $s));
 	}
+
+	public function test_an_adjustment_needs_points_a_reason_and_enough_balance_to_deduct(): void {
+		$this->assertNull(amouriq_points_core_check_adjustment(50, 'ชดเชย', 0));
+		$this->assertNull(amouriq_points_core_check_adjustment(-30, 'แก้ไขผิดพลาด', 30));
+		$this->assertNotNull(amouriq_points_core_check_adjustment(0, 'x', 10));
+		$this->assertNotNull(amouriq_points_core_check_adjustment(10, '   ', 10));
+		$this->assertStringContainsString('20', amouriq_points_core_check_adjustment(-21, 'x', 20));
+	}
 }

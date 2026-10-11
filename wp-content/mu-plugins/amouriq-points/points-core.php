@@ -155,3 +155,22 @@ function amouriq_points_core_refund_reversal( $eligible, $refunded, $awarded, $s
 	$kept = amouriq_points_core_earn( $eligible - $refunded, $settings );
 	return max( 0, (int) $awarded - $kept );
 }
+
+/**
+ * Whether a staff Adjustment may be made: null when fine, otherwise the Thai message
+ * to show. A reason is required, zero is meaningless, and a deduction cannot take
+ * more than the customer can spend now.
+ */
+function amouriq_points_core_check_adjustment( $points, $reason, $balance ) {
+	$points = (int) $points;
+	if ( 0 === $points ) {
+		return 'ใส่จำนวนแต้มที่ต้องการเพิ่ม (หรือหักด้วยเครื่องหมายลบ)';
+	}
+	if ( '' === trim( (string) $reason ) ) {
+		return 'ต้องใส่เหตุผลในการปรับแต้ม';
+	}
+	if ( $points < 0 && -$points > (int) $balance ) {
+		return sprintf( 'หักได้ไม่เกินแต้มคงเหลือของสมาชิก (%d แต้ม)', (int) $balance );
+	}
+	return null;
+}
