@@ -467,6 +467,8 @@ function amouriq_points_admin_handle() {
 		$notice = 'บันทึกการตั้งค่าแล้ว';
 	} elseif ( in_array( $action, array( 'reward_add', 'reward_toggle', 'reward_delete' ), true ) ) {
 		$notice = amouriq_points_admin_reward_action( $action );
+	} elseif ( 'expiry_mail_save' === $action ) {
+		$notice = amouriq_points_admin_expiry_mail_save();
 	} elseif ( 'bonus_save' === $action ) {
 		$notice = amouriq_points_admin_bonus_save();
 	} elseif ( in_array( $action, array( 'earn_add', 'earn_delete', 'earn_toggle', 'earn_limits' ), true ) ) {
@@ -546,6 +548,7 @@ function amouriq_points_admin_page() {
 
 	amouriq_points_admin_earning_section();
 	amouriq_points_admin_bonus_section();
+	amouriq_points_admin_expiry_mail_section();
 	amouriq_points_admin_rewards_section();
 	amouriq_points_admin_report_section();
 
@@ -1436,4 +1439,78 @@ function amouriq_points_note_gift_reward( $order_id ) {
 			$order->add_order_note( sprintf( 'ลูกค้าใช้ของรางวัลที่แลกด้วยแต้มสะสม: %s (คูปอง %s) ของแถมอยู่ในรายการสินค้าเป็นสินค้าราคา ฿0', get_post_meta( $coupon_id, 'amouriq_points_gift_label', true ), $code ) );
 		}
 	}
+}
+
+/* ------------------------------------------------------------ expiry reminder */
+
+function amouriq_points_expiry_mail_settings() {
+	return amouriq_points_core_expiry_mail_settings( get_option( 'amouriq_points_expiry_mail', array() ) );
+}
+
+add_action( 'init', 'amouriq_points_expiry_schedule' );
+
+/** Keep the daily check scheduled only while the reminder and the programme are both on. */
+function amouriq_points_expiry_schedule() {
+	$on   = amouriq_points_expiry_mail_settings()['enabled'] && amouriq_points_enabled();
+	$next = wp_next_scheduled( 'amouriq_points_expiry_cron' );
+	if ( $on && ! $next ) {
+		wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'amouriq_points_expiry_cron' );
+	} elseif ( ! $on && $next ) {
+		wp_unschedule_event( $next, 'amouriq_points_expiry_cron' );
+	}
+}
+
+add_action( 'amouriq_points_expiry_cron', 'amouriq_points_expiry_run' );
+
+/**
+ * Email each member whose points expire within the chosen days, once per batch (the soonest
+ * expiry date of the batch is remembered in user meta). Returns how many emails were sent.
+ */
+function amouriq_points_expiry_run() {
+	$settings = amouriq_points_expiry_mail_settings();
+	if ( ! $settings['enabled'] || ! amouriq_points_enabled() || ! function_exists( 'WC' ) ) {
+		return 0;
+	}
+	$sent   = 0;
+	$offset = amouriq_points_site_offset();
+	foreach ( amouriq_points_all_ledgers() as $user_id => $ledger ) {
+		$expiring = amouriq_points_core_expiring( $ledger, time(), $settings['days'] );
+		$last     = (int) get_user_meta( $user_id, '_amouriq_points_expiry_notified', true );
+		$user     = get_userdata( $user_id );
+		if ( ! $user || ! amouriq_points_core_should_notify( $expiring, $last ) ) {
+			continue;
+		}
+		$text   = amouriq_points_core_expiry_message( $expiring['points'], $expiring['soonest'] + $offset, wc_get_account_endpoint_url( 'points' ) );
+		$mailer = WC()->mailer();
+		$html   = $mailer->wrap_message( $text['subject'], nl2br( esc_html( $text['body'] ) ) );
+		if ( $mailer->send( $user->user_email, $text['subject'], $html ) ) {
+			update_user_meta( $user_id, '_amouriq_points_expiry_notified', $expiring['soonest'] );
+			$sent++;
+		}
+	}
+	return $sent;
+}
+
+function amouriq_points_admin_expiry_mail_save() {
+	// phpcs:disable WordPress.Security.NonceVerification -- checked in amouriq_points_admin_handle()
+	$post = wp_unslash( $_POST );
+	// phpcs:enable
+	update_option(
+		'amouriq_points_expiry_mail',
+		amouriq_points_core_expiry_mail_settings(
+			array(
+				'enabled' => ! empty( $post['expiry_mail_on'] ),
+				'days'    => isset( $post['expiry_mail_days'] ) ? $post['expiry_mail_days'] : '',
+			)
+		),
+		false
+	);
+	return 'บันทึกการแจ้งเตือนแต้มใกล้หมดอายุแล้ว';
+}
+
+function amouriq_points_admin_expiry_mail_section() {
+	$s = amouriq_points_expiry_mail_settings();
+	echo '<h2>อีเมลเตือนแต้มใกล้หมดอายุ</h2><p>ส่งอีเมลภาษาไทยให้สมาชิกที่มีแต้มจะหมดอายุภายในจำนวนวันที่ตั้งไว้ ตรวจวันละครั้ง และเตือนครั้งเดียวต่อชุดแต้มที่ใกล้หมดอายุ (ไม่เตือนซ้ำทุกวัน) แต้มที่หมดอายุไปแล้วจะไม่ถูกเอ่ยถึง ปิดอยู่จนกว่าจะติ๊กเปิด และทำงานเมื่อระบบแต้มสะสมเปิดอยู่เท่านั้น อีเมลไม่มีราคาหรือรายละเอียดออเดอร์</p>';
+	$inner = '<p><label><input type="checkbox" name="expiry_mail_on" value="1" ' . checked( $s['enabled'], true, false ) . '> เปิดอีเมลเตือน</label> เตือนล่วงหน้า <input type="number" min="1" max="90" name="expiry_mail_days" value="' . esc_attr( $s['days'] ) . '" style="width:5em"> วัน</p>';
+	amouriq_points_admin_form( 'expiry_mail_save', $inner, 'บันทึก' );
 }

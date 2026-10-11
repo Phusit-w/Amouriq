@@ -603,3 +603,47 @@ function amouriq_points_core_redeem_confirm( $reward ) {
 		(int) $reward['days_valid']
 	);
 }
+
+/* ------------------------------------------------------------ expiry reminder */
+
+/** The reminder switch (off) and how many days ahead (default 14, 1 to 90). */
+function amouriq_points_core_expiry_mail_settings( $raw ) {
+	$raw  = is_array( $raw ) ? $raw : array();
+	$days = isset( $raw['days'] ) && is_numeric( $raw['days'] ) ? (int) $raw['days'] : 14;
+	return array(
+		'enabled' => isset( $raw['enabled'] ) && ! in_array( $raw['enabled'], array( false, 0, '0', 'no', '' ), true ),
+		'days'    => ( $days >= 1 && $days <= 90 ) ? $days : 14,
+	);
+}
+
+/**
+ * Points a customer still has that expire within `$days` days from `$now`: array( 'points' =>, 'soonest' => unix time ),
+ * or null when there are none. Only points that can still be spent count, so points that already expired are never mentioned.
+ */
+function amouriq_points_core_expiring( $ledger, $now, $days ) {
+	$points  = 0;
+	$soonest = 0;
+	foreach ( amouriq_points_core_lots( $ledger ) as $lot ) {
+		if ( $lot['left'] <= 0 || ! $lot['expires'] || $lot['expires'] <= $now || $lot['expires'] > $now + $days * 86400 ) {
+			continue;
+		}
+		$points += $lot['left'];
+		$soonest = $soonest ? min( $soonest, $lot['expires'] ) : $lot['expires'];
+	}
+	return $points > 0 ? array( 'points' => $points, 'soonest' => $soonest ) : null;
+}
+
+/** Whether to email: there is something expiring and this soonest-expiry batch was not announced already (`$last` = the batch last told, 0 = never). */
+function amouriq_points_core_should_notify( $expiring, $last ) {
+	return null !== $expiring && (int) $last !== (int) $expiring['soonest'];
+}
+
+/** Subject and plain-text body of the reminder (Thai, no prices). */
+function amouriq_points_core_expiry_message( $points, $soonest, $account_url ) {
+	$months = array( 1 => 'ม.ค.', 2 => 'ก.พ.', 3 => 'มี.ค.', 4 => 'เม.ย.', 5 => 'พ.ค.', 6 => 'มิ.ย.', 7 => 'ก.ค.', 8 => 'ส.ค.', 9 => 'ก.ย.', 10 => 'ต.ค.', 11 => 'พ.ย.', 12 => 'ธ.ค.' );
+	$date   = (int) gmdate( 'j', $soonest ) . ' ' . $months[ (int) gmdate( 'n', $soonest ) ] . ' ' . gmdate( 'Y', $soonest );
+	return array(
+		'subject' => sprintf( 'แต้มสะสม %d แต้มของคุณกำลังจะหมดอายุ', (int) $points ),
+		'body'    => sprintf( "แต้มสะสมของคุณ %d แต้ม จะหมดอายุภายในวันที่ %s\nเข้าสู่ระบบเพื่อดูแต้มและแลกของรางวัลหรือใช้เป็นส่วนลดได้ที่\n%s", (int) $points, $date, $account_url ),
+	);
+}
