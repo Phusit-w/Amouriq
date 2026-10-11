@@ -21,7 +21,7 @@
  * `per_line` splits the discount over the cart lines (line index => amount; the
  * amounts add up to `discount`). `reason` says why a Deal gave nothing when it was
  * stopped before the maths:
- * disabled, outside_window, coupon_missing, not_new_customer, customer_limit, blocked_by_other_coupon.
+ * disabled, outside_window, coupon_missing, conditions_not_met, not_new_customer, customer_limit, blocked_by_other_coupon.
  *
  * Member Privilege (ADR-0006) is amouriq_bogo_member_privilege() below; it
  * needs the per-line Deal discounts. amouriq_bogo_cart_discounts() runs every
@@ -31,6 +31,8 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+require_once __DIR__ . '/conditions.php';
 
 function amouriq_bogo_price( $deal, $lines, $ctx ) {
 	$reason = amouriq_bogo_core_stop_reason( $deal, $ctx );
@@ -93,7 +95,7 @@ function amouriq_bogo_core_hint( $deal, $lines ) {
 	if ( 'quantity_tier' === $type && ! empty( $deal['tiers'] ) ) {
 		$qty = 0;
 		foreach ( $lines as $line ) {
-			$counts = ! empty( $deal['product_ids'] )
+			$counts = amouriq_bogo_core_uses_ticked( $deal )
 				? amouriq_bogo_core_threshold_eligible( $line, $deal )
 				: ( ! empty( $deal['product_id'] ) && amouriq_bogo_core_line_is_any_of( $line, array( $deal['product_id'] ) ) && ! amouriq_bogo_core_excluded( $line, $deal ) );
 			if ( $counts ) {
@@ -306,7 +308,7 @@ function amouriq_bogo_core_split( $deal, $lines, $discount ) {
 		return amouriq_bogo_core_cheapest_split( $deal, $lines );
 	}
 
-	if ( 'spend_threshold' === $type || ( 'quantity_tier' === $type && ! empty( $deal['product_ids'] ) ) ) {
+	if ( 'spend_threshold' === $type || ( 'quantity_tier' === $type && amouriq_bogo_core_uses_ticked( $deal ) ) ) {
 		$weights = array();
 		foreach ( $lines as $i => $line ) {
 			if ( amouriq_bogo_core_threshold_eligible( $line, $deal ) ) {
@@ -360,6 +362,11 @@ function amouriq_bogo_core_stop_reason( $deal, $ctx ) {
 
 	if ( ! amouriq_bogo_core_in_window( $deal, $ctx ) ) {
 		return 'outside_window';
+	}
+
+	// Who, when and what is in the cart (see conditions.php). Not known yet counts as not met.
+	if ( ! empty( $deal['conditions'] ) && 'match' !== amouriq_cond_evaluate( $deal['conditions'], $ctx )['result'] ) {
+		return 'conditions_not_met';
 	}
 
 	$own = '';
@@ -447,6 +454,9 @@ function amouriq_bogo_core_discount( $deal, $lines, $ctx ) {
 /** True when this line is one the spend-threshold Deal discounts (not skipped, ticked, not excluded). */
 function amouriq_bogo_core_threshold_eligible( $line, $deal ) {
 	if ( amouriq_bogo_core_excluded( $line, $deal ) ) {
+		return false;
+	}
+	if ( ! empty( $deal['scope'] ) && ! amouriq_bogo_core_in_scope( $line, $deal['scope'] ) ) {
 		return false;
 	}
 	if ( ! empty( $deal['product_ids'] ) && ! amouriq_bogo_core_line_is_any_of( $line, $deal['product_ids'] ) ) {
@@ -646,6 +656,9 @@ function amouriq_bogo_core_cheapest_split( $deal, $lines ) {
 		if ( amouriq_bogo_core_excluded( $line, $deal ) ) {
 			continue;
 		}
+		if ( ! empty( $deal['scope'] ) && ! amouriq_bogo_core_in_scope( $line, $deal['scope'] ) ) {
+			continue;
+		}
 		for ( $n = 0; $n < $line['quantity']; $n++ ) {
 			$units[] = array( (float) $line['unit_price'], $i );
 		}
@@ -708,7 +721,7 @@ function amouriq_bogo_core_mix_and_match( $deal, $lines ) {
  * array( array( 'min' => 6, 'percent' => 10 ), array( 'min' => 12, 'percent' => 15 ) ).
  */
 function amouriq_bogo_core_quantity_tier( $deal, $lines, $ctx ) {
-	if ( ! empty( $deal['product_ids'] ) ) {
+	if ( amouriq_bogo_core_uses_ticked( $deal ) ) {
 		return amouriq_bogo_core_mix_and_match( $deal, $lines );
 	}
 	if ( empty( $deal['product_id'] ) || empty( $deal['tiers'] ) || ! is_array( $deal['tiers'] ) ) {
@@ -727,4 +740,71 @@ function amouriq_bogo_core_quantity_tier( $deal, $lines, $ctx ) {
 	}
 
 	return $qty * amouriq_bogo_core_price_of( $deal['product_id'], $ctx ) * ( $percent / 100 );
+}
+
+/** True when the Deal picks its lines by ticked products or by a Product scope, not by one fixed product. */
+function amouriq_bogo_core_uses_ticked( $deal ) {
+	return ! empty( $deal['product_ids'] ) || ! empty( $deal['scope'] );
+}
+
+/**
+ * Product scope: whether a cart line is covered. `include` dimensions (categories,
+ * tags, attributes, skus, products, on_sale_only) must ALL match, each dimension
+ * matching when any of its values does; any `exclude` hit leaves the line out.
+ * An empty or missing scope covers every line. Categories take slugs or term IDs;
+ * attributes are taxonomy => slugs; a product ID also covers its variations.
+ */
+function amouriq_bogo_core_in_scope( $line, $scope ) {
+	if ( empty( $scope ) || ! is_array( $scope ) ) {
+		return true;
+	}
+
+	$include = isset( $scope['include'] ) && is_array( $scope['include'] ) ? $scope['include'] : array();
+	$exclude = isset( $scope['exclude'] ) && is_array( $scope['exclude'] ) ? $scope['exclude'] : array();
+
+	if ( ! empty( $include['on_sale_only'] ) && empty( $line['on_sale'] ) ) {
+		return false;
+	}
+	foreach ( array( 'categories', 'tags', 'attributes', 'skus', 'products' ) as $dimension ) {
+		if ( ! empty( $include[ $dimension ] ) && ! amouriq_bogo_core_scope_hit( $line, $dimension, $include[ $dimension ] ) ) {
+			return false;
+		}
+	}
+
+	if ( ! empty( $exclude['on_sale_only'] ) && ! empty( $line['on_sale'] ) ) {
+		return false;
+	}
+	foreach ( array( 'categories', 'tags', 'attributes', 'skus', 'products' ) as $dimension ) {
+		if ( ! empty( $exclude[ $dimension ] ) && amouriq_bogo_core_scope_hit( $line, $dimension, $exclude[ $dimension ] ) ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/** Whether the line matches any of the wanted values of one scope dimension. */
+function amouriq_bogo_core_scope_hit( $line, $dimension, $wanted ) {
+	$text = static function ( $list ) {
+		return array_map( 'strtolower', array_map( 'strval', (array) $list ) );
+	};
+
+	switch ( $dimension ) {
+		case 'categories':
+		case 'tags':
+			$have = isset( $line[ 'categories' === $dimension ? 'categories' : 'tags' ] ) ? $line[ 'categories' === $dimension ? 'categories' : 'tags' ] : array();
+			return (bool) array_intersect( $text( $have ), $text( $wanted ) );
+		case 'skus':
+			return isset( $line['sku'] ) && '' !== $line['sku'] && in_array( strtolower( (string) $line['sku'] ), $text( $wanted ), true );
+		case 'products':
+			return amouriq_bogo_core_line_is_any_of( $line, $wanted );
+		case 'attributes':
+			$have = isset( $line['attributes'] ) && is_array( $line['attributes'] ) ? $line['attributes'] : array();
+			foreach ( (array) $wanted as $taxonomy => $slugs ) {
+				if ( isset( $have[ $taxonomy ] ) && array_intersect( $text( $have[ $taxonomy ] ), $text( $slugs ) ) ) {
+					return true;
+				}
+			}
+			return false;
+	}
+	return false;
 }

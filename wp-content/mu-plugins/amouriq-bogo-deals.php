@@ -243,6 +243,9 @@ function amouriq_bogo_cart_lines( $cart ) {
 			'price_incl_tax' => ( $product && ! $is_gift ) ? (float) wc_get_price_to_display( $product ) : 0.0,
 			'on_sale'        => $product && $product->is_on_sale(),
 			'categories'     => array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) ),
+			'tags'           => amouriq_bogo_line_tags( $cart_item['product_id'] ),
+			'attributes'     => amouriq_bogo_line_attributes( $cart_item, $product ),
+			'sku'            => $product ? (string) $product->get_sku() : '',
 		);
 	}
 	return $lines;
@@ -411,4 +414,35 @@ function amouriq_bogo_read_checkout_email( $post_data ) {
 	if ( $email && is_email( $email ) ) {
 		WC()->customer->set_billing_email( $email );
 	}
+}
+
+/** The product's tags (slugs and term IDs), for a Deal's Product scope. */
+function amouriq_bogo_line_tags( $product_id ) {
+	$terms = wp_get_post_terms( $product_id, 'product_tag' );
+	$terms = is_array( $terms ) ? $terms : array();
+	return array_merge( wp_list_pluck( $terms, 'slug' ), wp_list_pluck( $terms, 'term_id' ) );
+}
+
+/**
+ * The line's attributes as taxonomy => slugs (for example pa_quantity => 250-ml):
+ * the chosen variation attributes plus the product's own attribute terms.
+ */
+function amouriq_bogo_line_attributes( $cart_item, $product ) {
+	$out = array();
+	if ( ! empty( $cart_item['variation'] ) && is_array( $cart_item['variation'] ) ) {
+		foreach ( $cart_item['variation'] as $key => $value ) {
+			$taxonomy = preg_replace( '/^attribute_/', '', $key );
+			if ( '' !== (string) $value ) {
+				$out[ $taxonomy ][] = (string) $value;
+			}
+		}
+	}
+	if ( $product && method_exists( $product, 'get_attributes' ) ) {
+		foreach ( (array) $product->get_attributes() as $taxonomy => $value ) {
+			if ( is_string( $value ) && '' !== $value && ! isset( $out[ $taxonomy ] ) ) {
+				$out[ $taxonomy ][] = $value;
+			}
+		}
+	}
+	return $out;
 }
