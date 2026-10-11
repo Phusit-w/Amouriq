@@ -279,7 +279,7 @@ function amouriq_bogo_price_context( $deals, $cart ) {
 			return function_exists( 'amouriq_customer_has_previous_order' ) && ! amouriq_customer_has_previous_order();
 		},
 		'prices'          => $prices,
-	);
+	) + amouriq_bogo_condition_context( $cart );
 }
 
 /**
@@ -445,4 +445,139 @@ function amouriq_bogo_line_attributes( $cart_item, $product ) {
 		}
 	}
 	return $out;
+}
+
+/**
+ * What the Conditions (amouriq-bogo/conditions.php) can ask about the customer and
+ * the cart. Each value is a callable run only when a Deal's condition needs it, and
+ * remembers its answer for the rest of the request. `null` means "not known yet".
+ */
+function amouriq_bogo_condition_context( $cart ) {
+	$lines = null;
+	$paid  = static function () use ( &$lines, $cart ) {
+		if ( null === $lines ) {
+			$lines = array_filter(
+				amouriq_bogo_cart_lines( $cart ),
+				static function ( $line ) {
+					return ! amouriq_bogo_core_is_gift( $line );
+				}
+			);
+		}
+		return $lines;
+	};
+
+	$history = null;
+	$summary = static function () use ( &$history ) {
+		if ( null === $history ) {
+			$history = amouriq_bogo_customer_history();
+		}
+		return $history;
+	};
+
+	return array(
+		'logged_in'             => static function () {
+			return is_user_logged_in();
+		},
+		'user_roles'            => static function () {
+			$user = wp_get_current_user();
+			return $user && $user->exists() ? (array) $user->roles : array();
+		},
+		'email'                 => static function () {
+			$user = wp_get_current_user();
+			if ( $user && $user->exists() ) {
+				return $user->user_email;
+			}
+			return ( function_exists( 'WC' ) && WC()->customer ) ? WC()->customer->get_billing_email() : '';
+		},
+		'orders_count'          => static function () use ( $summary ) {
+			$h = $summary();
+			return $h ? $h['orders_count'] : null;
+		},
+		'total_spent'           => static function () use ( $summary ) {
+			$h = $summary();
+			return $h ? $h['total_spent'] : null;
+		},
+		'days_since_last_order' => static function () use ( $summary ) {
+			$h = $summary();
+			return $h ? $h['days_since_last_order'] : null;
+		},
+		'cart_items'            => static function () use ( $paid ) {
+			return count( $paid() );
+		},
+		'cart_quantity'         => static function () use ( $paid ) {
+			return array_sum( array_column( $paid(), 'quantity' ) );
+		},
+		// As the shopper sees the prices, before any discount, shipping left out: the same measure as every minimum spend.
+		'cart_subtotal'         => static function () use ( $paid ) {
+			$sum = 0.0;
+			foreach ( $paid() as $line ) {
+				$sum += $line['quantity'] * amouriq_bogo_core_shown_price( $line );
+			}
+			return round( $sum, 2 );
+		},
+		'cart_product_ids'      => static function () use ( $paid ) {
+			$ids = array();
+			foreach ( $paid() as $line ) {
+				$ids[] = (int) $line['product_id'];
+				if ( $line['variation_id'] ) {
+					$ids[] = (int) $line['variation_id'];
+				}
+			}
+			return array_values( array_unique( $ids ) );
+		},
+		'cart_category_ids'     => static function () use ( $paid ) {
+			$ids = array();
+			foreach ( $paid() as $line ) {
+				foreach ( $line['categories'] as $category ) {
+					if ( is_int( $category ) || ctype_digit( (string) $category ) ) {
+						$ids[] = (int) $category;
+					}
+				}
+			}
+			return array_values( array_unique( $ids ) );
+		},
+	);
+}
+
+/**
+ * The customer's counted orders summed up (see amouriq_cond_history()), matched by
+ * account and by billing email like a New customer, or null when the customer
+ * cannot be identified yet (not logged in and no email typed).
+ */
+function amouriq_bogo_customer_history() {
+	$user_id = get_current_user_id();
+	$email   = '';
+	if ( $user_id ) {
+		$user  = get_userdata( $user_id );
+		$email = $user ? $user->user_email : '';
+	}
+	if ( function_exists( 'WC' ) && WC()->customer && WC()->customer->get_billing_email() ) {
+		$email = $email ? $email : WC()->customer->get_billing_email();
+	}
+	if ( ! $user_id && '' === $email ) {
+		return null;
+	}
+
+	$statuses = amouriq_bogo_counted_statuses();
+	$found    = array();
+	if ( $user_id ) {
+		foreach ( wc_get_orders( array( 'limit' => -1, 'customer' => $user_id, 'status' => $statuses ) ) as $order ) {
+			$found[ $order->get_id() ] = $order;
+		}
+	}
+	if ( '' !== $email ) {
+		foreach ( wc_get_orders( array( 'limit' => -1, 'customer' => $email, 'status' => $statuses ) ) as $order ) {
+			$found[ $order->get_id() ] = $order;
+		}
+	}
+
+	$orders = array();
+	foreach ( $found as $order ) {
+		$date     = $order->get_date_created();
+		$orders[] = array(
+			'total' => (float) $order->get_total() - (float) $order->get_total_refunded(),
+			'time'  => $date ? $date->getTimestamp() : 0,
+		);
+	}
+	return amouriq_cond_history( $orders, time() );
 }

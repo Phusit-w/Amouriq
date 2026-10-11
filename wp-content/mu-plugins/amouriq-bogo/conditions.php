@@ -179,3 +179,26 @@ function amouriq_cond_number( $have, $op, $value ) {
 	}
 	return false;
 }
+
+/**
+ * A customer's counted orders summed up for the history Conditions. `$orders` are
+ * array( 'total' => baht still paid (refunds taken off), 'time' => unix time ), one per
+ * order. Returns orders_count, total_spent and days_since_last_order (false when there
+ * is no order yet, so "at least N days since the last order" does not match a
+ * customer who never ordered).
+ */
+function amouriq_cond_history( $orders, $now ) {
+	$count = 0;
+	$total = 0.0;
+	$last  = 0;
+	foreach ( $orders as $order ) {
+		$count++;
+		$total += max( 0.0, (float) $order['total'] );
+		$last   = max( $last, (int) $order['time'] );
+	}
+	return array(
+		'orders_count'          => $count,
+		'total_spent'           => round( $total, 2 ),
+		'days_since_last_order' => $count ? (int) floor( max( 0, $now - $last ) / 86400 ) : false,
+	);
+}
