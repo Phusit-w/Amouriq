@@ -20,6 +20,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/amouriq-bogo/pricing-core.php'; // Product scope and Conditions, shared with the Deals
 require_once __DIR__ . '/amouriq-points/points-core.php';
 
 /* ------------------------------------------------------------------ settings */
@@ -86,8 +87,12 @@ function amouriq_points_award( $order_id ) {
 	}
 
 	$eligible = amouriq_points_order_eligible( $order );
-	$points   = amouriq_points_core_earn( $eligible, amouriq_points_settings() );
+	// The rules in force when the order was placed decide the points (a double-points weekend
+	// still counts if the order is completed on Monday); orders without a plan are worked out now.
+	$planned = $order->get_meta( '_amouriq_points_planned', true );
+	$points  = '' !== (string) $planned ? (int) $planned : amouriq_points_earn_for_order( $order );
 	$order->update_meta_data( '_amouriq_points_awarded', $points );
+	$order->update_meta_data( '_amouriq_points_original', $points );
 	$order->update_meta_data( '_amouriq_points_eligible', round( $eligible, 2 ) );
 	$order->save();
 
@@ -107,7 +112,12 @@ function amouriq_points_reverse_for_refund( $order_id ) {
 	}
 
 	$awarded  = (int) $order->get_meta( '_amouriq_points_awarded', true );
-	$reverse  = amouriq_points_core_refund_reversal( (float) $order->get_meta( '_amouriq_points_eligible', true ), (float) $order->get_total_refunded(), $awarded, amouriq_points_settings() );
+	$eligible = (float) $order->get_meta( '_amouriq_points_eligible', true );
+	if ( 'yes' === $order->get_meta( '_amouriq_points_by_rules', true ) ) {
+		$reverse = amouriq_points_core_refund_reversal_share( $eligible, (float) $order->get_total_refunded(), (int) $order->get_meta( '_amouriq_points_original', true ), $awarded );
+	} else {
+		$reverse = amouriq_points_core_refund_reversal( $eligible, (float) $order->get_total_refunded(), $awarded, amouriq_points_settings() );
+	}
 	if ( $reverse <= 0 ) {
 		return;
 	}
@@ -442,6 +452,8 @@ function amouriq_points_admin_handle() {
 		}
 		update_option( 'amouriq_points_settings', amouriq_points_core_settings( $in ), false );
 		$notice = 'บันทึกการตั้งค่าแล้ว';
+	} elseif ( in_array( $action, array( 'earn_add', 'earn_delete', 'earn_toggle', 'earn_limits' ), true ) ) {
+		$notice = amouriq_points_admin_earning_action( $action );
 	} elseif ( 'adjust' === $action ) {
 		$email  = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$user   = $email ? get_user_by( 'email', $email ) : false;
@@ -514,6 +526,8 @@ function amouriq_points_admin_page() {
 		. '<label>แต้ม <input type="number" name="points" style="width:7em" required></label> '
 		. '<label>เหตุผล (จำเป็น) <input type="text" name="note" style="width:18em" required></label></p>';
 	amouriq_points_admin_form( 'adjust', $inner, 'ปรับแต้ม' );
+
+	amouriq_points_admin_earning_section();
 
 	amouriq_points_admin_customer_list();
 
@@ -601,4 +615,207 @@ function amouriq_points_admin_customer_list() {
 			)
 		) . '</p>';
 	}
+}
+
+/* ------------------------------------------------------------ earning rules */
+
+/** The owner's Earning rules (rates, exclusions, multipliers, minimum order, cap), cleaned. */
+function amouriq_points_earning() {
+	return amouriq_points_core_earning_clean( get_option( 'amouriq_points_earning', array() ) );
+}
+
+/** Whether any rule or limit is in force, i.e. whether the flat rule alone no longer describes the points. */
+function amouriq_points_earning_active( $earning ) {
+	foreach ( $earning['rules'] as $rule ) {
+		if ( $rule['enabled'] ) {
+			return true;
+		}
+	}
+	return $earning['min_order'] > 0 || $earning['max_per_order'] > 0;
+}
+
+/** The order's item lines as the points core wants them: what each cost and what a Product scope reads. */
+function amouriq_points_order_lines( WC_Order $order ) {
+	$lines = array();
+	foreach ( $order->get_items( 'line_item' ) as $item ) {
+		$product      = $item->get_product();
+		$product_id   = (int) $item->get_product_id();
+		$cats         = wp_get_post_terms( $product_id, 'product_cat' );
+		$tags         = wp_get_post_terms( $product_id, 'product_tag' );
+		$cats         = is_array( $cats ) ? $cats : array();
+		$tags         = is_array( $tags ) ? $tags : array();
+		$attributes   = array();
+		if ( $product && $product->is_type( 'variation' ) ) {
+			foreach ( (array) $product->get_attributes() as $taxonomy => $slug ) {
+				if ( '' !== (string) $slug ) {
+					$attributes[ $taxonomy ][] = (string) $slug;
+				}
+			}
+		}
+		$lines[] = array(
+			'paid'         => (float) $item->get_total() + (float) $item->get_total_tax(),
+			'product_id'   => $product_id,
+			'variation_id' => (int) $item->get_variation_id(),
+			'categories'   => array_merge( wp_list_pluck( $cats, 'slug' ), wp_list_pluck( $cats, 'term_id' ) ),
+			'tags'         => array_merge( wp_list_pluck( $tags, 'slug' ), wp_list_pluck( $tags, 'term_id' ) ),
+			'attributes'   => $attributes,
+			'sku'          => $product ? (string) $product->get_sku() : '',
+			'on_sale'      => $product ? $product->is_on_sale() : false,
+		);
+	}
+	return $lines;
+}
+
+/**
+ * Points this order earns under the settings and Earning rules right now. Remembers on the
+ * order whether rules were in play (a refund then keeps the same share of points).
+ */
+function amouriq_points_earn_for_order( WC_Order $order ) {
+	$earning  = amouriq_points_earning();
+	$eligible = amouriq_points_order_eligible( $order );
+	$ctx      = array(
+		'now'           => current_time( 'Y-m-d H:i' ),
+		'logged_in'     => (bool) $order->get_customer_id(),
+		'email'         => $order->get_billing_email(),
+		'cart_quantity' => array_sum( array_map( static function ( $item ) {
+			return (int) $item->get_quantity();
+		}, $order->get_items( 'line_item' ) ) ),
+		'cart_subtotal' => $eligible,
+	);
+	$order->update_meta_data( '_amouriq_points_by_rules', amouriq_points_earning_active( $earning ) ? 'yes' : 'no' );
+	return amouriq_points_core_earn_order( amouriq_points_order_lines( $order ), $eligible, $earning, amouriq_points_settings(), $ctx );
+}
+
+add_action( 'woocommerce_checkout_order_processed', 'amouriq_points_plan_earning', 20, 1 );
+
+/** Fix the points an order will earn at the moment it is placed, so a later rule change or a rule that ends before it is completed does not change them. */
+function amouriq_points_plan_earning( $order_id ) {
+	$order = wc_get_order( $order_id );
+	if ( ! $order || ! amouriq_points_enabled() || ! $order->get_customer_id() || '' !== (string) $order->get_meta( '_amouriq_points_planned', true ) ) {
+		return;
+	}
+	$order->update_meta_data( '_amouriq_points_planned', amouriq_points_earn_for_order( $order ) );
+	$order->save();
+}
+
+/* ------------------------------------------------ earning rules: admin screen */
+
+/** Handle add / delete / toggle of an Earning rule and the order-level limits. Returns the notice. */
+function amouriq_points_admin_earning_action( $action ) {
+	$earning = amouriq_points_earning();
+	// phpcs:disable WordPress.Security.NonceVerification -- checked in amouriq_points_admin_handle()
+	$post   = wp_unslash( $_POST );
+	$index  = isset( $post['index'] ) ? (int) $post['index'] : -1;
+	$notice = '';
+
+	if ( 'earn_limits' === $action ) {
+		$earning['min_order']     = isset( $post['min_order'] ) ? $post['min_order'] : 0;
+		$earning['max_per_order'] = isset( $post['max_per_order'] ) ? $post['max_per_order'] : 0;
+		$notice                   = 'บันทึกเงื่อนไขการได้แต้มแล้ว';
+	} elseif ( 'earn_delete' === $action && isset( $earning['rules'][ $index ] ) ) {
+		array_splice( $earning['rules'], $index, 1 );
+		$notice = 'ลบกติกาแล้ว';
+	} elseif ( 'earn_toggle' === $action && isset( $earning['rules'][ $index ] ) ) {
+		$earning['rules'][ $index ]['enabled'] = ! $earning['rules'][ $index ]['enabled'];
+		$notice                                = $earning['rules'][ $index ]['enabled'] ? 'เปิดกติกาแล้ว' : 'ปิดกติกาแล้ว';
+	} elseif ( 'earn_add' === $action ) {
+		$kind  = isset( $post['kind'] ) ? sanitize_key( $post['kind'] ) : '';
+		$scope = array( 'include' => array() );
+		$cats  = isset( $post['categories'] ) ? array_map( 'sanitize_text_field', (array) $post['categories'] ) : array();
+		$ids   = isset( $post['product_ids'] ) ? array_filter( array_map( 'absint', preg_split( '/[\s,]+/', (string) $post['product_ids'] ) ) ) : array();
+		if ( $cats ) {
+			$scope['include']['categories'] = array_values( $cats );
+		}
+		if ( $ids ) {
+			$scope['include']['products'] = array_values( $ids );
+		}
+		$rule  = array(
+			'kind'    => $kind,
+			'enabled' => true,
+			'label'   => isset( $post['label'] ) ? sanitize_text_field( $post['label'] ) : '',
+			'scope'   => $scope,
+			'baht'    => isset( $post['baht'] ) ? $post['baht'] : 0,
+			'factor'  => isset( $post['factor'] ) ? $post['factor'] : 0,
+			'from'    => isset( $post['from'] ) ? sanitize_text_field( $post['from'] ) : '',
+			'to'      => isset( $post['to'] ) ? sanitize_text_field( $post['to'] ) : '',
+		);
+		$check = amouriq_points_core_earning_clean( array( 'rules' => array( $rule ) ) );
+		if ( ! $check['rules'] ) {
+			$notice = 'ไม่ได้เพิ่มกติกา: ตรวจค่าที่กรอก (อัตราต้องมากกว่า 0 บาทต่อแต้ม, ตัวคูณต้องมากกว่า 1 ถึง 10)';
+		} elseif ( in_array( $kind, array( 'rate', 'exclude' ), true ) && ! $scope['include'] ) {
+			$notice = 'ไม่ได้เพิ่มกติกา: เลือกหมวดหรือใส่รหัสสินค้าอย่างน้อยหนึ่งอย่าง';
+		} else {
+			$earning['rules'][] = $check['rules'][0];
+			$notice             = 'เพิ่มกติกาแล้ว';
+		}
+	}
+	// phpcs:enable
+
+	update_option( 'amouriq_points_earning', amouriq_points_core_earning_clean( $earning ), false );
+	return $notice;
+}
+
+function amouriq_points_rule_summary( $rule ) {
+	$scope = '';
+	if ( ! empty( $rule['scope']['include']['categories'] ) ) {
+		$names = array_map(
+			static function ( $c ) {
+				$term = is_numeric( $c ) ? get_term( (int) $c, 'product_cat' ) : get_term_by( 'slug', $c, 'product_cat' );
+				return $term && ! is_wp_error( $term ) ? $term->name : $c;
+			},
+			$rule['scope']['include']['categories']
+		);
+		$scope .= ' หมวด ' . implode( ', ', $names );
+	}
+	if ( ! empty( $rule['scope']['include']['products'] ) ) {
+		$scope .= ' สินค้ารหัส ' . implode( ', ', $rule['scope']['include']['products'] );
+	}
+	$scope = '' === $scope ? ' ทุกสินค้า' : $scope;
+	if ( 'rate' === $rule['kind'] ) {
+		return sprintf( 'อัตราพิเศษ: ซื้อ %s บาท ได้ 1 แต้ม —%s', amouriq_bogo_member_number( $rule['baht'] ), $scope );
+	}
+	if ( 'exclude' === $rule['kind'] ) {
+		return 'ไม่ให้แต้ม —' . $scope;
+	}
+	$dates = ( $rule['from'] || $rule['to'] ) ? sprintf( ' (%s ถึง %s)', $rule['from'] ? $rule['from'] : '…', $rule['to'] ? $rule['to'] : '…' ) : ' (ตลอดเวลา)';
+	return sprintf( 'คูณแต้ม x%s%s%s', amouriq_bogo_member_number( $rule['factor'] ), $dates, ! empty( $rule['conditions'] ) ? ' + มีเงื่อนไข' : '' );
+}
+
+function amouriq_points_admin_earning_section() {
+	$earning = amouriq_points_earning();
+	echo '<h2>กติกาการได้แต้ม</h2><p>กติกาพื้นฐานคือซื้อครบตามที่ตั้งไว้ด้านบนได้ 1 แต้ม กติกาด้านล่างเป็นการปรับเพิ่ม: อัตราพิเศษเฉพาะหมวดหรือสินค้า, สินค้าที่ไม่ให้แต้ม และตัวคูณช่วงโปรโมชัน ใช้ตัวคูณที่มากที่สุดเพียงตัวเดียว (ไม่คูณซ้อน) แต้มจะถูกคำนวณและล็อกไว้ตอนลูกค้าสั่งซื้อ</p>';
+
+	echo '<table class="widefat striped" style="max-width:800px"><thead><tr><th>กติกา</th><th>สถานะ</th><th></th></tr></thead><tbody>';
+	if ( ! $earning['rules'] ) {
+		echo '<tr><td colspan="3">ยังไม่มีกติกาเพิ่มเติม (ใช้กติกาพื้นฐานอย่างเดียว)</td></tr>';
+	}
+	foreach ( $earning['rules'] as $i => $rule ) {
+		echo '<tr><td>' . ( '' !== $rule['label'] ? '<strong>' . esc_html( $rule['label'] ) . '</strong><br>' : '' ) . esc_html( amouriq_points_rule_summary( $rule ) ) . '</td>';
+		echo '<td>' . ( $rule['enabled'] ? 'เปิดอยู่' : 'ปิดอยู่' ) . '</td><td>';
+		$hidden = '<input type="hidden" name="index" value="' . (int) $i . '">';
+		amouriq_points_admin_form( 'earn_toggle', $hidden, $rule['enabled'] ? 'ปิด' : 'เปิด', 'button' );
+		amouriq_points_admin_form( 'earn_delete', $hidden, 'ลบ', 'button button-link-delete', 'ลบกติกานี้?' );
+		echo '</td></tr>';
+	}
+	echo '</tbody></table>';
+
+	$cats = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) );
+	$opts = '';
+	foreach ( is_array( $cats ) ? $cats : array() as $cat ) {
+		$opts .= '<option value="' . esc_attr( $cat->slug ) . '">' . esc_html( $cat->name ) . '</option>';
+	}
+	$inner = '<table class="form-table"><tr><th>ชนิด</th><td><select name="kind"><option value="rate">อัตราพิเศษ (ซื้อกี่บาทได้ 1 แต้ม)</option><option value="exclude">ไม่ให้แต้ม</option><option value="multiplier">ตัวคูณแต้ม</option></select></td></tr>'
+		. '<tr><th>ชื่อกติกา</th><td><input type="text" name="label" class="regular-text" placeholder="เช่น สบู่ได้แต้มเพิ่ม"></td></tr>'
+		. '<tr><th>ซื้อกี่บาทได้ 1 แต้ม</th><td><input type="number" step="any" min="0" name="baht" style="width:8em"> บาท (ใช้กับอัตราพิเศษ)</td></tr>'
+		. '<tr><th>หมวดสินค้า</th><td><select name="categories[]" multiple size="5" style="min-width:16em">' . $opts . '</select><br><small>ใช้กับอัตราพิเศษและไม่ให้แต้ม (กด Ctrl เพื่อเลือกหลายหมวด)</small></td></tr>'
+		. '<tr><th>รหัสสินค้า</th><td><input type="text" name="product_ids" class="regular-text" placeholder="เช่น 2278, 2285"><br><small>คั่นด้วยจุลภาค ถ้าเลือกทั้งหมวดและรหัส สินค้าต้องอยู่ในทั้งสองอย่าง</small></td></tr>'
+		. '<tr><th>ตัวคูณ</th><td>x <input type="number" step="any" min="1" max="10" name="factor" style="width:6em"> (ใช้กับตัวคูณแต้ม ระหว่าง 1 ถึง 10)</td></tr>'
+		. '<tr><th>ช่วงวันที่</th><td><input type="date" name="from"> ถึง <input type="date" name="to"> <small>เว้นว่าง = ไม่จำกัด (ใช้กับตัวคูณแต้ม)</small></td></tr></table>';
+	echo '<h3>เพิ่มกติกา</h3>';
+	amouriq_points_admin_form( 'earn_add', $inner, 'เพิ่มกติกา' );
+
+	$inner = '<p><label>ยอดสั่งซื้อขั้นต่ำที่จะได้แต้ม <input type="number" step="any" min="0" name="min_order" value="' . esc_attr( $earning['min_order'] ) . '" style="width:8em"> บาท</label> '
+		. '<label>แต้มสูงสุดต่อออเดอร์ <input type="number" min="0" name="max_per_order" value="' . esc_attr( $earning['max_per_order'] ) . '" style="width:7em"> แต้ม</label> <small>(0 = ไม่จำกัด)</small></p>';
+	echo '<h3>ข้อจำกัดต่อออเดอร์</h3>';
+	amouriq_points_admin_form( 'earn_limits', $inner, 'บันทึก' );
 }

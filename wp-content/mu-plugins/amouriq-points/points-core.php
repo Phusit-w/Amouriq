@@ -174,3 +174,175 @@ function amouriq_points_core_check_adjustment( $points, $reason, $balance ) {
 	}
 	return null;
 }
+
+/* ------------------------------------------------------------ earning rules */
+
+/**
+ * The owner's Earning rules as safe data. Shape:
+ *   array( 'rules' => array( rule, ... ), 'min_order' => baht, 'max_per_order' => points (0 = no cap) )
+ * A rule is one of
+ *   kind 'rate'        baht (of paid line total per 1 point, above 0), scope (a Product scope)
+ *   kind 'exclude'     scope: lines in it earn nothing
+ *   kind 'multiplier'  factor (above 1, at most 10), from / to ('Y-m-d', optional), conditions (optional set)
+ * each with `enabled` and an optional `label`. Anything else is dropped.
+ */
+function amouriq_points_core_earning_clean( $raw ) {
+	$raw = is_array( $raw ) ? $raw : array();
+	$out = array( 'rules' => array(), 'min_order' => 0.0, 'max_per_order' => 0 );
+
+	if ( isset( $raw['min_order'] ) && is_numeric( $raw['min_order'] ) ) {
+		$out['min_order'] = max( 0.0, (float) $raw['min_order'] );
+	}
+	if ( isset( $raw['max_per_order'] ) && is_numeric( $raw['max_per_order'] ) ) {
+		$out['max_per_order'] = max( 0, (int) $raw['max_per_order'] );
+	}
+
+	foreach ( isset( $raw['rules'] ) && is_array( $raw['rules'] ) ? $raw['rules'] : array() as $rule ) {
+		if ( ! is_array( $rule ) || ! isset( $rule['kind'] ) ) {
+			continue;
+		}
+		$clean = array(
+			'kind'    => (string) $rule['kind'],
+			'enabled' => ! isset( $rule['enabled'] ) || (bool) $rule['enabled'],
+			'label'   => isset( $rule['label'] ) ? trim( strip_tags( (string) $rule['label'] ) ) : '',
+		);
+		if ( 'rate' === $clean['kind'] || 'exclude' === $clean['kind'] ) {
+			$clean['scope'] = isset( $rule['scope'] ) && is_array( $rule['scope'] ) ? $rule['scope'] : array();
+			if ( 'rate' === $clean['kind'] ) {
+				if ( ! isset( $rule['baht'] ) || ! is_numeric( $rule['baht'] ) || $rule['baht'] <= 0 ) {
+					continue;
+				}
+				$clean['baht'] = (float) $rule['baht'];
+			}
+		} elseif ( 'multiplier' === $clean['kind'] ) {
+			if ( ! isset( $rule['factor'] ) || ! is_numeric( $rule['factor'] ) || $rule['factor'] <= 1 ) {
+				continue;
+			}
+			$clean['factor']     = min( 10.0, (float) $rule['factor'] );
+			$clean['from']       = ! empty( $rule['from'] ) ? (string) $rule['from'] : '';
+			$clean['to']         = ! empty( $rule['to'] ) ? (string) $rule['to'] : '';
+			$clean['conditions'] = isset( $rule['conditions'] ) && is_array( $rule['conditions'] ) ? $rule['conditions'] : array();
+		} else {
+			continue;
+		}
+		$out['rules'][] = $clean;
+	}
+	return $out;
+}
+
+/**
+ * Points an order earns under the Earning rules. `$lines` are the order's item
+ * lines: `paid` (what the line cost, tax included) plus the fields a Product scope
+ * reads (product_id, variation_id, categories, tags, attributes, sku, on_sale).
+ * `$eligible` is the paid item total the flat rule uses (after every discount and
+ * points used); the lines' `paid` are scaled to add up to it, so order-level
+ * discounts are shared by the lines. Each line earns at the first enabled `rate`
+ * rule covering it (else the base rate) unless an `exclude` rule covers it; the
+ * fractions add up, the largest valid multiplier applies, then the total rounds
+ * down once. A minimum order total and a per-order cap come last.
+ * `$ctx`: `now` ('Y-m-d H:i') plus anything the multiplier Conditions read.
+ * With no rules and no limits this is exactly amouriq_points_core_earn().
+ */
+function amouriq_points_core_earn_order( $lines, $eligible, $earning, $settings, $ctx ) {
+	if ( $eligible <= 0 ) {
+		return 0;
+	}
+	if ( $eligible < (float) $earning['min_order'] ) {
+		return 0;
+	}
+
+	$rules = array_filter(
+		$earning['rules'],
+		static function ( $rule ) {
+			return $rule['enabled'];
+		}
+	);
+
+	$total_paid = 0.0;
+	foreach ( $lines as $line ) {
+		$total_paid += max( 0.0, (float) $line['paid'] );
+	}
+
+	if ( ! $rules || $total_paid <= 0 ) {
+		$points = amouriq_points_core_earn( $eligible, $settings );
+	} else {
+		$fraction = 0.0;
+		foreach ( $lines as $line ) {
+			$paid = max( 0.0, (float) $line['paid'] ) * $eligible / $total_paid;
+			$baht = (float) $settings['earn_baht'];
+			foreach ( $rules as $rule ) {
+				if ( ! amouriq_points_core_rule_covers( $rule, $line ) ) {
+					continue;
+				}
+				if ( 'exclude' === $rule['kind'] ) {
+					$baht = 0.0;
+					break;
+				}
+				if ( 'rate' === $rule['kind'] ) {
+					$baht = (float) $rule['baht'];
+					break;
+				}
+			}
+			if ( $baht > 0 ) {
+				$fraction += round( $paid / $baht, 8 );
+			}
+		}
+
+		$factor = 1.0;
+		foreach ( $rules as $rule ) {
+			if ( 'multiplier' === $rule['kind'] && amouriq_points_core_multiplier_live( $rule, $ctx ) ) {
+				$factor = max( $factor, (float) $rule['factor'] );
+			}
+		}
+		$points = (int) floor( round( $fraction * $factor, 6 ) );
+	}
+
+	if ( $earning['max_per_order'] > 0 ) {
+		$points = min( $points, (int) $earning['max_per_order'] );
+	}
+	return max( 0, $points );
+}
+
+/** Whether a rate or exclude rule's Product scope covers the line. A rule that cannot be judged covers nothing. */
+function amouriq_points_core_rule_covers( $rule, $line ) {
+	if ( 'rate' !== $rule['kind'] && 'exclude' !== $rule['kind'] ) {
+		return false;
+	}
+	if ( ! function_exists( 'amouriq_bogo_core_in_scope' ) ) {
+		return false;
+	}
+	// An empty scope would cover every line; an exclude with no scope is almost certainly a mistake, so it covers nothing.
+	if ( empty( $rule['scope'] ) ) {
+		return 'rate' === $rule['kind'];
+	}
+	return amouriq_bogo_core_in_scope( $line, $rule['scope'] );
+}
+
+/** Whether a multiplier is in its dates and its Conditions (if any) match. */
+function amouriq_points_core_multiplier_live( $rule, $ctx ) {
+	$today = substr( isset( $ctx['now'] ) ? $ctx['now'] : '', 0, 10 );
+	if ( '' !== $rule['from'] && $today < $rule['from'] ) {
+		return false;
+	}
+	if ( '' !== $rule['to'] && $today > $rule['to'] ) {
+		return false;
+	}
+	if ( ! empty( $rule['conditions'] ) ) {
+		return function_exists( 'amouriq_cond_evaluate' ) && 'match' === amouriq_cond_evaluate( $rule['conditions'], $ctx )['result'];
+	}
+	return true;
+}
+
+/**
+ * Refund reversal for an order whose points came from Earning rules (so the flat
+ * rule cannot be re-run on the smaller amount): the order keeps the same share of
+ * its original points as the share of the money not refunded.
+ */
+function amouriq_points_core_refund_reversal_share( $eligible, $refunded, $original, $awarded_now ) {
+	if ( $eligible <= 0 ) {
+		return max( 0, (int) $awarded_now );
+	}
+	$left = max( 0.0, min( 1.0, ( $eligible - $refunded ) / $eligible ) );
+	$kept = (int) floor( round( $original * $left, 6 ) );
+	return max( 0, (int) $awarded_now - $kept );
+}
