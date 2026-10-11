@@ -30,8 +30,15 @@ _Avoid_: Sales page, landing page
 The interactive scent × size selector + Add to Cart control embedded in a Sales page. Bound to live WooCommerce product/variation data (price, SKU, stock), so unlike the rest of the Sales page it cannot be decomposed into independently Elementor-editable static fields — selecting a Scent swaps the underlying WooCommerce product entirely; selecting a Size swaps the variation within it.
 
 **Deal**:
-A discount the site computes from the items in the cart, managed in the AMOURIQ BOGO admin screen. Covers BOGO (same product, product pair, cheapest item free) and quantity tiers (more units, bigger percentage). A Deal is never a free-shipping rule or a coupon, and a spend-threshold discount ("spend X, get 20% off") is a plain Coupon, not a Deal.
-_Avoid_: Promotion, offer (use Deal), "ดีล" for shipping or coupons
+A discount or gift the site computes from the items in the cart, managed in the AMOURIQ BOGO admin screen. Covers BOGO (same product, product pair, cheapest item free), quantity tiers (more units, bigger percentage), spend-threshold discounts ("spend X, get Y% or Y baht off") and spend-threshold gifts ("spend X, choose a free item"). A Deal is never a free-shipping rule or a coupon; a Coupon is a code the customer types.
+_Avoid_: Promotion, offer, Campaign (use Deal), "ดีล" for shipping or coupons
+
+**Member Privilege**:
+A 5% discount on Regular Price items for any customer with an account, from their first order, with a minimum item total of ฿299 and no maximum discount. Because every buyer has an account (guest checkout is off), in practice it applies to every order. Items already on Sale Price get nothing from it. It never adds to another discount: see Stacking.
+_Avoid_: Member discount, loyalty discount (the Points & Rewards plugin's membership levels are a different, unused-by-us mechanism)
+
+**Minimum spend**:
+The cart item total, before any discount and excluding shipping, that a Deal, Coupon or Member Privilege requires. It counts every item, Sale Price items included, even when the discount itself only applies to some of them.
 
 **Trigger**:
 What makes a Deal apply: **auto** (applies as soon as the cart qualifies) or **coupon** (applies only while a named WooCommerce coupon code is in the cart). A coupon-trigger Deal references an existing coupon code; it never creates the coupon.
@@ -40,7 +47,7 @@ What makes a Deal apply: **auto** (applies as soon as the cart qualifies) or **c
 A WooCommerce coupon created under Marketing → Coupons. The source of truth for coupon codes, expiry, usage limits and its own free-shipping flag. Deals reference coupon codes but never own them.
 
 **Stacking**:
-Deals and Coupons combine on the same cart by default, and each is computed from regular price, not from a price already reduced by another discount. A coupon's minimum spend is also measured before Deals. A Deal can be marked as not combinable with other Coupons; when another Coupon is in the cart (not the Deal's own trigger coupon), that Deal gives no discount and the cart says why.
+Deals and Coupons combine on the same cart by default, and each is computed from regular price, not from a price already reduced by another discount. A coupon's minimum spend is also measured before Deals. A Deal can be marked as not combinable with other Coupons; when another Coupon is in the cart (not the Deal's own trigger coupon), that Deal gives no discount and the cart says why. **Member Privilege is the exception: it never stacks with anything, and the larger discount wins.** Against a Deal the comparison is per cart line (the Deal's item gets the Deal, other items still get Member Privilege); against a Coupon it is whole-cart.
 _Avoid_: Mixing
 
 **Enabled**:
