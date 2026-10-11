@@ -39,6 +39,7 @@ function amouriq_bogo_type_labels() {
 		'fixed_price_item'       => 'ราคาต่อชิ้นคงที่ (สินค้าที่เลือกเหลือชิ้นละ ฿Y)',
 		'amount_off_item'        => 'ลดบาทต่อชิ้น (ทุกชิ้นที่เลือกลดชิ้นละ ฿Y)',
 		'bundle_price'           => 'ราคาชุด (ซื้อ N ชิ้นในราคา ฿Y)',
+		'free_shipping'          => 'ส่งฟรีตามเงื่อนไข (ไม่ลดราคาสินค้า)',
 	);
 }
 
@@ -375,6 +376,17 @@ function amouriq_bogo_build_deal( array $in ) {
 		unset( $deal['get_discount_percent'] );
 	}
 
+	if ( 'free_shipping' === $type ) {
+		$min = ( isset( $in['min_spend'] ) && '' !== $in['min_spend'] ) ? (float) $in['min_spend'] : 0.0;
+		if ( $min < 0 ) {
+			return 'ยอดซื้อขั้นต่ำต้องไม่ติดลบ';
+		}
+		if ( $min > 0 ) {
+			$deal['min_spend'] = $min;
+		}
+		unset( $deal['get_discount_percent'] );
+	}
+
 	if ( 'spend_gift' === $type ) {
 		$min = isset( $in['min_spend'] ) ? (float) $in['min_spend'] : 0;
 		if ( $min <= 0 ) {
@@ -681,6 +693,9 @@ function amouriq_bogo_detail( $deal ) {
 			$what = amouriq_bogo_pname( isset( $deal['product_id'] ) ? $deal['product_id'] : 0 );
 		}
 		return $what . ': ' . implode( ' / ', $steps );
+	}
+	if ( 'free_shipping' === $type ) {
+		return 'ส่งฟรี' . ( ! empty( $deal['min_spend'] ) ? ' เมื่อซื้อครบ ฿' . $deal['min_spend'] : '' ) . ' (ไม่ลดราคาสินค้า)';
 	}
 	if ( 'fixed_price_item' === $type ) {
 		return 'ราคาต่อชิ้นเหลือ ฿' . ( $deal['price'] ?? 0 ) . ' (สินค้าที่แพงกว่านี้เท่านั้น)' . amouriq_bogo_scope_note( $deal );
@@ -1115,6 +1130,7 @@ function amouriq_bogo_admin_page() {
 		'fixed_price_item'       => 'สินค้าที่เลือกเหลือชิ้นละราคาที่ตั้ง (เช่น Castile Soap 250 ml ทุกกลิ่น ชิ้นละ ฿299) ชิ้นที่ถูกกว่านี้ไม่ถูกแตะ',
 		'amount_off_item'        => 'ทุกชิ้นที่เลือกลดชิ้นละกี่บาท (เช่น ลดชิ้นละ ฿20)',
 		'bundle_price'           => 'ซื้อครบ N ชิ้นในกลุ่มที่เลือก ได้ราคาชุดตามที่ตั้ง (เช่น 3 ชิ้น ฿999)',
+		'free_shipping'          => 'ค่าส่งเป็น 0 เมื่อเข้าเงื่อนไข เช่น ซื้อครบ ฿X, ใส่คูปอง, เฉพาะวันที่กำหนด หรือเฉพาะลูกค้าใหม่ (ใช้แทนกฎส่งฟรีของ Discount Rules)',
 	);
 
 	$groups = $show ? amouriq_bogo_product_groups() : array();
@@ -1216,8 +1232,8 @@ function amouriq_bogo_admin_page() {
 					<div class="v amq-row" data-types="same_product category_cheapest_free cheapest_free"><input type="number" name="get_discount_percent" id="bogo_pct" min="0" max="100" value="<?php echo esc_attr( $v( 'get_discount_percent', 100 ) ); ?>">
 						<p class="description">100 = ฟรี</p></div>
 
-					<label class="k amq-row" data-types="spend_threshold spend_gift" for="bogo_min">ยอดซื้อขั้นต่ำ (฿)</label>
-					<div class="v amq-row" data-types="spend_threshold spend_gift"><input type="number" name="min_spend" id="bogo_min" min="1" step="any" value="<?php echo esc_attr( $v( 'min_spend' ) ); ?>">
+					<label class="k amq-row" data-types="spend_threshold spend_gift free_shipping" for="bogo_min">ยอดซื้อขั้นต่ำ (฿)</label>
+					<div class="v amq-row" data-types="spend_threshold spend_gift free_shipping"><input type="number" name="min_spend" id="bogo_min" min="1" step="any" value="<?php echo esc_attr( $v( 'min_spend' ) ); ?>">
 						<p class="description">นับทุกสินค้าในตะกร้า (รวมสินค้าลดราคา) ก่อนหักส่วนลด ไม่รวมค่าส่ง ตามราคาที่ลูกค้าเห็น</p></div>
 
 					<span class="k amq-row" data-types="spend_gift" style="font-weight:600;padding-top:6px">ของแถมที่ให้เลือก</span>
@@ -1381,8 +1397,8 @@ function amouriq_bogo_admin_page() {
 						<div class="v"><input type="datetime-local" name="valid_from" id="bogo_from" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_from' ), false ) ); ?>"> <span class="description">เว้นว่าง = ใช้ได้ทันที</span></div>
 						<label class="k" for="bogo_to">ใช้ได้ถึง</label>
 						<div class="v"><input type="datetime-local" name="valid_to" id="bogo_to" value="<?php echo esc_attr( amouriq_bogo_datetime_value( $v( 'valid_to' ), true ) ); ?>"> <span class="description">เว้นว่าง = ไม่มีวันหมด</span></div>
-						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price" for="bogo_maxc">จำกัดต่อลูกค้า (ครั้ง)</label>
-						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price"><input type="number" name="max_uses_per_customer" id="bogo_maxc" min="0" value="<?php echo esc_attr( $v( 'max_uses_per_customer', 0 ) ); ?>">
+						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price free_shipping" for="bogo_maxc">จำกัดต่อลูกค้า (ครั้ง)</label>
+						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold fixed_price_item amount_off_item bundle_price free_shipping"><input type="number" name="max_uses_per_customer" id="bogo_maxc" min="0" value="<?php echo esc_attr( $v( 'max_uses_per_customer', 0 ) ); ?>">
 							<p class="description">0 = ไม่จำกัด ลูกค้าที่ล็อกอินนับตามบัญชี ที่ยังไม่ล็อกอินนับตามอีเมลตอนชำระเงิน</p></div>
 						<label class="k amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold bundle_price" for="bogo_maxo">จำกัดต่อออเดอร์ (ครั้ง)</label>
 						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold bundle_price"><input type="number" name="max_per_order" id="bogo_maxo" min="0" value="<?php echo esc_attr( $v( 'max_per_order', 0 ) ); ?>">

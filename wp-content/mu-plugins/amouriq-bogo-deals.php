@@ -114,7 +114,8 @@ function amouriq_bogo_notify_hint( $deal, $result ) {
 	$hint  = $result['hint'];
 
 	if ( 'spend' === $hint['kind'] ) {
-		$what    = ( isset( $deal['type'] ) && 'spend_gift' === $deal['type'] ) ? 'เลือกของแถมฟรี' : 'รับส่วนลด';
+		$type    = isset( $deal['type'] ) ? $deal['type'] : '';
+		$what    = 'spend_gift' === $type ? 'เลือกของแถมฟรี' : ( 'free_shipping' === $type ? 'ส่งฟรี' : 'รับส่วนลด' );
 		$message = sprintf( 'ซื้อเพิ่มอีก ฿%s เพื่อ%s ("%s")', number_format( $hint['remaining'], 2 ), $what, $label );
 	} else {
 		$message = sprintf( 'เพิ่มสินค้าในดีล "%s" อีก %d ชิ้น เพื่อรับส่วนลด %s%%', $label, $hint['remaining'], rtrim( rtrim( number_format( $hint['percent'], 2 ), '0' ), '.' ) );
@@ -352,6 +353,8 @@ function amouriq_bogo_record_usage( $order ) {
 		$discount = amouriq_bogo_deal_discount( $deal, $cart );
 		if ( $discount > 0 ) {
 			$used[ $deal['id'] ] = round( $discount, 2 );
+		} elseif ( amouriq_bogo_free_shipping_live( $deal, $cart ) ) {
+			$used[ $deal['id'] ] = 0.0; // a free-shipping Deal discounts nothing but still counts as used
 		}
 	}
 	if ( $used ) {
@@ -580,4 +583,39 @@ function amouriq_bogo_customer_history() {
 		);
 	}
 	return amouriq_cond_history( $orders, time() );
+}
+
+/* -------------------------------------------------------------- free shipping */
+
+add_filter( 'flexible-shipping/shipping-method/is-free-shipping', 'amouriq_bogo_free_shipping_filter' );
+
+/**
+ * Flexible Shipping asks whether shipping is free for the cart (it only checks its own
+ * threshold and never reads the Deals). A live free-shipping Deal says yes. This runs while
+ * the shipping rates are worked out, before the cart fees, so it judges the Deals itself.
+ */
+function amouriq_bogo_free_shipping_filter( $is_free_shipping ) {
+	if ( $is_free_shipping || ! function_exists( 'WC' ) || ! WC()->cart ) {
+		return $is_free_shipping;
+	}
+	foreach ( amouriq_bogo_deals() as $deal ) {
+		if ( amouriq_bogo_free_shipping_live( $deal, WC()->cart ) ) {
+			return true;
+		}
+	}
+	return $is_free_shipping;
+}
+
+/** Whether this one Deal is a free-shipping Deal that is live for the cart. */
+function amouriq_bogo_free_shipping_live( $deal, $cart ) {
+	if ( empty( $deal['type'] ) || 'free_shipping' !== $deal['type'] ) {
+		return false;
+	}
+	return amouriq_bogo_core_free_shipping(
+		$deal,
+		static function () use ( $cart ) {
+			return amouriq_bogo_cart_lines( $cart );
+		},
+		amouriq_bogo_price_context( array( $deal ), $cart )
+	);
 }

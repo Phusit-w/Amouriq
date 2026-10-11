@@ -83,7 +83,7 @@ function amouriq_bogo_price( $deal, $lines, $ctx ) {
 function amouriq_bogo_core_hint( $deal, $lines ) {
 	$type = isset( $deal['type'] ) ? $deal['type'] : '';
 
-	if ( 'spend_threshold' === $type || 'spend_gift' === $type ) {
+	if ( 'spend_threshold' === $type || 'spend_gift' === $type || ( 'free_shipping' === $type && ! empty( $deal['min_spend'] ) ) ) {
 		$spend = 0.0;
 		foreach ( $lines as $line ) {
 			$spend += $line['quantity'] * amouriq_bogo_core_shown_price( $line );
@@ -906,4 +906,29 @@ function amouriq_bogo_core_price_type_split( $deal, $lines ) {
 		$add( $unit[2], $off_shown * $unit[1] / $unit[0] );
 	}
 	return $split;
+}
+
+/**
+ * Whether a free-shipping Deal makes shipping free for this cart right now: it is a
+ * `free_shipping` Deal, nothing stops it (see amouriq_bogo_core_stop_reason()) and the
+ * optional `min_spend` (items as the shopper sees them, before discount, shipping and
+ * gifts left out) is reached. The Deal itself discounts nothing; the shipping method
+ * asks this when it works out the rate.
+ */
+function amouriq_bogo_core_free_shipping( $deal, $lines, $ctx ) {
+	if ( ! isset( $deal['type'] ) || 'free_shipping' !== $deal['type'] || null !== amouriq_bogo_core_stop_reason( $deal, $ctx ) ) {
+		return false;
+	}
+	$min = isset( $deal['min_spend'] ) ? (float) $deal['min_spend'] : 0.0;
+	if ( $min <= 0 ) {
+		return true;
+	}
+	$lines = is_callable( $lines ) ? call_user_func( $lines ) : $lines;
+	$spend = 0.0;
+	foreach ( $lines as $line ) {
+		if ( ! amouriq_bogo_core_is_gift( $line ) ) {
+			$spend += $line['quantity'] * amouriq_bogo_core_shown_price( $line );
+		}
+	}
+	return round( $spend, 2 ) >= $min;
 }
