@@ -25,6 +25,10 @@ function amouriq_payment_fee_apply( $cart ) {
 		return;
 	}
 	$method = WC()->session ? WC()->session->get( 'chosen_payment_method' ) : '';
+	if ( ! $method && function_exists( 'is_checkout' ) && is_checkout() && WC()->payment_gateways() ) {
+		// Nothing chosen yet: the checkout form preselects the first available gateway.
+		$method = (string) array_key_first( WC()->payment_gateways()->get_available_payment_gateways() );
+	}
 	$fee    = amouriq_payment_fee_core(
 		$method,
 		amouriq_payment_fee_settings(),

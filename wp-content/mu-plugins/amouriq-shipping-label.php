@@ -49,15 +49,14 @@ add_filter(
 
 /** The address the print view opens: nonce-protected, for logged-in shop managers. */
 function amouriq_shipping_label_print_url( array $order_ids ) {
-	return wp_nonce_url(
-		add_query_arg(
-			array(
-				'action'    => 'amouriq_label_print',
-				'order_ids' => implode( ',', array_map( 'absint', $order_ids ) ),
-			),
-			admin_url( 'admin-post.php' )
+	// Not wp_nonce_url(): it HTML-escapes the address, which a redirect (the bulk action) must not get.
+	return add_query_arg(
+		array(
+			'action'    => 'amouriq_label_print',
+			'order_ids' => implode( ',', array_map( 'absint', $order_ids ) ),
+			'_wpnonce'  => wp_create_nonce( 'amouriq_label_print' ),
 		),
-		'amouriq_label_print'
+		admin_url( 'admin-post.php' )
 	);
 }
 

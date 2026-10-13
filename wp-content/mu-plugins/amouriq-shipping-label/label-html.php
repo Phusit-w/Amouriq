@@ -99,7 +99,7 @@ function amouriq_label_recipient( $shipping_html, $billing_html, $shipping_phone
 	$html         = $use_shipping ? $shipping_html : $billing_html;
 	$phone        = '' !== trim( (string) $shipping_phone ) ? $shipping_phone : $billing_phone;
 
-	$lines = preg_split( '#<brs*/?>#i', (string) $html );
+	$lines = preg_split( '#<br\s*/?>#i', (string) $html );
 	$lines = array_map(
 		static function ( $line ) {
 			return trim( html_entity_decode( strip_tags( $line ), ENT_QUOTES, 'UTF-8' ) );

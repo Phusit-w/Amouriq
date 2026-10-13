@@ -191,4 +191,10 @@ final class ShippingLabelTest extends TestCase {
 
 		$this->assertSame(['A & B', '9'], $to['lines']);
 	}
+
+	public function test_a_line_break_with_a_space_still_splits_the_address(): void {
+		$to = amouriq_label_recipient('สมชาย ใจดี<br />99/9 หมู่ 1<BR>กรุงเทพฯ', '', '', '');
+
+		$this->assertSame(['สมชาย ใจดี', '99/9 หมู่ 1', 'กรุงเทพฯ'], $to['lines']);
+	}
 }
