@@ -113,7 +113,14 @@ function amouriq_label_recipient( $shipping_html, $billing_html, $shipping_phone
 		},
 		$lines
 	);
-	return array( 'lines' => array_values( array_filter( $lines, 'strlen' ) ), 'phone' => (string) $phone );
+	$lines = array_values( array_filter( $lines, 'strlen' ) );
+	// WooCommerce puts every part of the address (sub-district, district, province, postcode) on its own line,
+	// which took 6+ lines of a small sticker. The name keeps its own line; the rest runs on as one paragraph
+	// that wraps to the paper width, so a normal address is two lines. Nothing is dropped or shortened.
+	if ( count( $lines ) > 2 ) {
+		$lines = array( $lines[0], implode( ' ', array_slice( $lines, 1 ) ) );
+	}
+	return array( 'lines' => $lines, 'phone' => (string) $phone );
 }
 
 /**

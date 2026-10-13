@@ -215,7 +215,14 @@ final class ShippingLabelTest extends TestCase {
 	public function test_a_line_break_with_a_space_still_splits_the_address(): void {
 		$to = amouriq_label_recipient('สมชาย ใจดี<br />99/9 หมู่ 1<BR>กรุงเทพฯ', '', '', '');
 
-		$this->assertSame(['สมชาย ใจดี', '99/9 หมู่ 1', 'กรุงเทพฯ'], $to['lines']);
+		// The name keeps its own line; the address parts run on as one paragraph (a sticker has little room).
+		$this->assertSame(['สมชาย ใจดี', '99/9 หมู่ 1 กรุงเทพฯ'], $to['lines']);
+	}
+
+	public function test_a_long_formatted_address_becomes_a_name_and_one_address_paragraph(): void {
+		$to = amouriq_label_recipient('สมชาย ใจดี<br/>99/9 หมู่ 1<br/>ต.บางกะปิ<br/>เขตห้วยขวาง<br/>กรุงเทพมหานคร<br/>10310', '', '', '0812345678');
+
+		$this->assertSame(['สมชาย ใจดี', '99/9 หมู่ 1 ต.บางกะปิ เขตห้วยขวาง กรุงเทพมหานคร 10310'], $to['lines']);
 	}
 
 	public function test_the_pdf_document_is_compact_and_pads_the_page_itself(): void {
