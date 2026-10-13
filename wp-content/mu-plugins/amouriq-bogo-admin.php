@@ -1627,8 +1627,8 @@ function amouriq_bogo_admin_page() {
 					</div>
 				<?php endif; ?>
 
-				<details id="amq-type-picker" <?php echo $editing ? '' : 'open'; ?> style="margin:12px 0">
-				<summary><strong>ประเภทดีล:</strong> <span id="amq-type-name"><?php echo esc_html( isset( $types[ $cur_type ] ) ? $types[ $cur_type ] : '' ); ?></span> <span class="description">(กดเพื่อเปลี่ยน)</span></summary>
+				<details id="amq-type-picker" style="margin:12px 0">
+				<summary><strong>ประเภทดีล:</strong> <span id="amq-type-name"><?php echo esc_html( isset( $types[ $cur_type ] ) ? $types[ $cur_type ] : '' ); ?></span> <span class="description">(กดเพื่อเปลี่ยนประเภท)</span></summary>
 				<?php
 				$type_groups = array(
 					'ลดตามยอดซื้อ ส่งฟรี และของแถม' => array( 'spend_threshold', 'free_shipping', 'spend_gift' ),
