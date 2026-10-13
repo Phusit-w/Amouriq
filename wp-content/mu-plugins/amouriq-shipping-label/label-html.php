@@ -111,20 +111,40 @@ function amouriq_label_recipient( $shipping_html, $billing_html, $shipping_phone
 
 /**
  * A print page of one or more labels: each label on its own page of the owner's paper size
- * (the first label's settings decide it; all labels of one print share them).
+ * (the first label's settings decide it; all labels of one print share them). `$for_pdf` makes the
+ * document for dompdf: it ignores @page margins, so the page is padded in the markup, and the type is
+ * capped so a label fits small paper.
  */
-function amouriq_label_document( array $labels ) {
+function amouriq_label_document( array $labels, $for_pdf = false ) {
 	$first = amouriq_label_clean_options( isset( $labels[0]['options'] ) ? $labels[0]['options'] : array() );
 	$pages = '';
+	$pdf_css = '';
+	if ( $for_pdf ) {
+		$size    = min( 12, (int) $first['font_size'] );
+		$pdf_css = 'div.amq-page{ padding:4mm; }
+'
+			. 'div.amq-page .amq-label{ font-size:' . $size . 'px; line-height:1.2; }
+'
+			. 'div.amq-page .amq-label .to{ font-size:' . ( $size + 3 ) . 'px; }
+'
+			. 'div.amq-page .amq-label .order{ font-size:' . ( $size + 4 ) . 'px; }
+'
+			. 'div.amq-page .amq-label .block{ padding:5px 0; }
+'
+			. 'div.amq-page .amq-label .logo{ max-height:40px; }
+'
+			. 'div.amq-page .amq-label table.items th, div.amq-page .amq-label table.items td{ padding:3px 5px; }
+';
+	}
 	foreach ( $labels as $label ) {
 		$pages .= '<div class="amq-page">' . amouriq_label_html( $label ) . '</div>';
 	}
 	return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบปะหน้าพัสดุ</title><style>
-@page{ size: ' . (int) $first['page_width'] . 'mm ' . (int) $first['page_height'] . 'mm; margin: 4mm; }
+@page{ size: ' . (int) $first['page_width'] . 'mm ' . (int) $first['page_height'] . 'mm; margin: ' . ( $for_pdf ? '0' : '4mm' ) . '; }
 html, body{ margin:0; padding:0; background:#fff; }
 .amq-page{ break-after:page; page-break-after:always; }
 .amq-page:last-child{ break-after:auto; page-break-after:auto; }
-</style></head><body>' . $pages . '</body></html>';
+' . $pdf_css . '</style></head><body>' . $pages . '</body></html>';
 }
 
 function amouriq_label_html( array $label ) {

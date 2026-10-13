@@ -16,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/amouriq-shipping-label/label-html.php';
 require_once __DIR__ . '/amouriq-shipping-label/settings.php';
+require_once __DIR__ . '/amouriq-shipping-label/pdf.php';
 
 // --- hide the print plugin's label buttons (its invoices and packing slips are untouched) ---
 
@@ -47,12 +48,12 @@ add_filter(
 
 // --- our own print: one order from its screen, or many from the order list ---
 
-/** The address the print view opens: nonce-protected, for logged-in shop managers. */
-function amouriq_shipping_label_print_url( array $order_ids ) {
+/** The address of the print view ('print') or the PDF download ('pdf'): nonce-protected, for shop managers. */
+function amouriq_shipping_label_print_url( array $order_ids, $kind = 'print' ) {
 	// Not wp_nonce_url(): it HTML-escapes the address, which a redirect (the bulk action) must not get.
 	return add_query_arg(
 		array(
-			'action'    => 'amouriq_label_print',
+			'action'    => 'pdf' === $kind ? 'amouriq_label_pdf' : 'amouriq_label_print',
 			'order_ids' => implode( ',', array_map( 'absint', $order_ids ) ),
 			'_wpnonce'  => wp_create_nonce( 'amouriq_label_print' ),
 		),
@@ -60,14 +61,60 @@ function amouriq_shipping_label_print_url( array $order_ids ) {
 	);
 }
 
-// The button on a single order's screen.
+// The "ใบปะหน้าพัสดุ" box on a single order's screen (the print plugin has a Print/Download box there too).
 add_action(
-	'woocommerce_admin_order_data_after_shipping_address',
-	static function ( $order ) {
-		printf(
-			'<p><a class="button" href="%s" target="_blank" rel="noopener">พิมพ์ใบปะหน้าพัสดุ</a></p>',
-			esc_url( amouriq_shipping_label_print_url( array( $order->get_id() ) ) )
+	'add_meta_boxes',
+	static function () {
+		$screens = array( 'shop_order' );
+		if ( function_exists( 'wc_get_page_screen_id' ) ) {
+			$screens[] = wc_get_page_screen_id( 'shop-order' );
+		}
+		add_meta_box(
+			'amouriq_label_box',
+			'ใบปะหน้าพัสดุ',
+			static function ( $post_or_order ) {
+				$order = $post_or_order instanceof WC_Order ? $post_or_order : wc_get_order( $post_or_order->ID );
+				if ( ! $order ) {
+					return;
+				}
+				$ids = array( $order->get_id() );
+				printf(
+					'<p><a class="button button-primary" href="%1$s" target="_blank" rel="noopener">พิมพ์ใบปะหน้า</a> <a class="button" href="%2$s">ดาวน์โหลด PDF</a></p><p class="description">ขนาดกระดาษและรูปแบบตั้งที่ WooCommerce &gt; ใบปะหน้าพัสดุ</p>',
+					esc_url( amouriq_shipping_label_print_url( $ids ) ),
+					esc_url( amouriq_shipping_label_print_url( $ids, 'pdf' ) )
+				);
+			},
+			$screens,
+			'side',
+			'default'
 		);
+	}
+);
+
+// Two icon buttons on every row of the order list, in the Actions column (print and download), like the print plugin's.
+add_action(
+	'woocommerce_admin_order_actions_end',
+	static function ( $order ) {
+		$ids = array( $order->get_id() );
+		printf(
+			'<a class="button wc-action-button amq-label-print" href="%1$s" target="_blank" rel="noopener" title="พิมพ์ใบปะหน้าพัสดุ" aria-label="พิมพ์ใบปะหน้าพัสดุ">พิมพ์ใบปะหน้า</a><a class="button wc-action-button amq-label-pdf" href="%2$s" title="ดาวน์โหลดใบปะหน้า (PDF)" aria-label="ดาวน์โหลดใบปะหน้า (PDF)">ดาวน์โหลดใบปะหน้า</a>',
+			esc_url( amouriq_shipping_label_print_url( $ids ) ),
+			esc_url( amouriq_shipping_label_print_url( $ids, 'pdf' ) )
+		);
+	},
+	20
+);
+
+add_action(
+	'admin_head',
+	static function () {
+		?>
+		<style>
+			.wc-action-button.amq-label-print::after, .wc-action-button.amq-label-pdf::after { font-family:Dashicons; speak:never; font-weight:400; text-transform:none; line-height:1; margin:0; text-indent:0; position:absolute; top:0; left:0; width:100%; height:100%; text-align:center; line-height:2; }
+			.wc-action-button.amq-label-print::after { content:"\f193"; }
+			.wc-action-button.amq-label-pdf::after { content:"\f316"; }
+		</style>
+		<?php
 	}
 );
 
@@ -77,13 +124,20 @@ foreach ( array( 'woocommerce_page_wc-orders', 'edit-shop_order' ) as $amouriq_l
 		'bulk_actions-' . $amouriq_label_screen,
 		static function ( $actions ) {
 			$actions['amouriq_print_labels'] = 'พิมพ์ใบปะหน้าพัสดุ';
+			$actions['amouriq_pdf_labels']   = 'ดาวน์โหลดใบปะหน้าพัสดุ (PDF)';
 			return $actions;
 		}
 	);
 	add_filter(
 		'handle_bulk_actions-' . $amouriq_label_screen,
 		static function ( $redirect, $action, $ids ) {
-			return 'amouriq_print_labels' === $action && $ids ? amouriq_shipping_label_print_url( $ids ) : $redirect;
+			if ( ! $ids ) {
+				return $redirect;
+			}
+			if ( 'amouriq_print_labels' === $action ) {
+				return amouriq_shipping_label_print_url( $ids );
+			}
+			return 'amouriq_pdf_labels' === $action ? amouriq_shipping_label_print_url( $ids, 'pdf' ) : $redirect;
 		},
 		10,
 		3
@@ -91,8 +145,10 @@ foreach ( array( 'woocommerce_page_wc-orders', 'edit-shop_order' ) as $amouriq_l
 }
 
 add_action( 'admin_post_amouriq_label_print', 'amouriq_shipping_label_print' );
+add_action( 'admin_post_amouriq_label_pdf', 'amouriq_shipping_label_pdf' );
 
-function amouriq_shipping_label_print() {
+/** The label data of the orders named in the request, after the permission and nonce checks (dies when none). */
+function amouriq_shipping_label_request_labels() {
 	if ( ! current_user_can( 'manage_woocommerce' ) ) {
 		wp_die( 'ไม่มีสิทธิ์พิมพ์ใบปะหน้า', '', array( 'response' => 403 ) );
 	}
@@ -109,6 +165,32 @@ function amouriq_shipping_label_print() {
 	if ( ! $labels ) {
 		wp_die( 'ไม่พบออเดอร์ที่จะพิมพ์ใบปะหน้า' );
 	}
+	return $labels;
+}
+
+function amouriq_shipping_label_pdf() {
+	$labels = amouriq_shipping_label_request_labels();
+	$o      = $labels[0]['options'];
+	$pdf    = amouriq_label_pdf_bytes( amouriq_label_document( $labels, true ), $o['page_width'], $o['page_height'] );
+	if ( is_wp_error( $pdf ) ) {
+		wp_die( esc_html( $pdf->get_error_message() ) );
+	}
+	$numbers = array_map(
+		static function ( $label ) {
+			return preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $label['order_number'] );
+		},
+		$labels
+	);
+	$name = 'label-' . ( count( $numbers ) > 3 ? $numbers[0] . '-and-' . ( count( $numbers ) - 1 ) . '-more' : implode( '-', $numbers ) ) . '.pdf';
+	header( 'Content-Type: application/pdf' );
+	header( 'Content-Disposition: attachment; filename="' . $name . '"' );
+	header( 'Content-Length: ' . strlen( $pdf ) );
+	echo $pdf; // phpcs:ignore WordPress.Security.EscapeOutput -- binary PDF.
+	exit;
+}
+
+function amouriq_shipping_label_print() {
+	$labels = amouriq_shipping_label_request_labels();
 	header( 'Content-Type: text/html; charset=utf-8' );
 	// phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside amouriq_label_document().
 	echo str_replace( '</body>', '<script>window.addEventListener("load",function(){window.print();});</script></body>', amouriq_label_document( $labels ) );

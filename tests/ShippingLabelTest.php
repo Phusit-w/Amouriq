@@ -197,4 +197,27 @@ final class ShippingLabelTest extends TestCase {
 
 		$this->assertSame(['สมชาย ใจดี', '99/9 หมู่ 1', 'กรุงเทพฯ'], $to['lines']);
 	}
+
+	public function test_the_pdf_document_is_compact_and_pads_the_page_itself(): void {
+		$pdf = amouriq_label_document([$this->label()], true);
+
+		// dompdf ignores @page margins, so the page is padded in the markup; type is capped to fit small paper.
+		$this->assertStringContainsString('margin: 0', $pdf);
+		$this->assertStringContainsString('div.amq-page{ padding:4mm; }', $pdf);
+		$this->assertStringContainsString('div.amq-page .amq-label{ font-size:12px; line-height:1.2; }', $pdf);
+		$this->assertStringContainsString('size: 100mm 150mm', $pdf);
+	}
+
+	public function test_the_pdf_never_makes_the_type_bigger_than_the_owner_chose(): void {
+		$pdf = amouriq_label_document([$this->label(['options' => ['font_size' => 10]])], true);
+
+		$this->assertStringContainsString('font-size:10px; line-height:1.2', $pdf);
+	}
+
+	public function test_the_print_document_is_not_changed_by_the_pdf_mode(): void {
+		$print = amouriq_label_document([$this->label()]);
+
+		$this->assertStringContainsString('margin: 4mm', $print);
+		$this->assertStringNotContainsString('div.amq-page{ padding', $print);
+	}
 }
