@@ -172,7 +172,7 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertLessThan(strpos($doc, '5391'), strpos($doc, '5390'));
 		$this->assertLessThan(strpos($doc, '5392'), strpos($doc, '5391'));
 		// A page break after every page but the last, so no blank page ends the print.
-		$this->assertStringContainsString('.amq-page:last-child{ break-after:auto; page-break-after:auto; }', $doc);
+		$this->assertStringContainsString('.amq-page:last-of-type{ break-after:auto; page-break-after:auto; }', $doc);
 		$this->assertStringContainsString('.amq-page{ break-after:page; page-break-after:always; }', $doc);
 	}
 
