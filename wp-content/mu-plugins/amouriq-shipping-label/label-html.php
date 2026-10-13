@@ -46,6 +46,7 @@ function amouriq_label_defaults() {
 		'sender_name'     => '',
 		'sender_address'  => '',
 		'sender_phone'    => '',
+		'sender_lines'    => '', // the owner's own sender text, one printed line per typed line; empty = name + address + phone put together in 2 lines
 		'font_size'       => 14,
 		'show_option'     => true,
 		'show_to_phone'   => true,
@@ -72,7 +73,7 @@ function amouriq_label_clean_options( $raw ) {
 			$out[ $key ] = trim( strip_tags( (string) $raw[ $key ] ) );
 		}
 	}
-	foreach ( array( 'sender_address', 'note' ) as $key ) {
+	foreach ( array( 'sender_address', 'sender_lines', 'note' ) as $key ) {
 		if ( isset( $raw[ $key ] ) ) {
 			$lines       = preg_split( '/\r\n|\r|\n/', strip_tags( (string) $raw[ $key ] ) );
 			$out[ $key ] = trim( implode( "\n", array_map( 'trim', $lines ) ) );
@@ -177,7 +178,7 @@ html, body{ margin:0; padding:0; background:#fff; }
  */
 function amouriq_label_options_from_input( array $in ) {
 	$raw = array();
-	foreach ( array( 'logo_url', 'logo_width', 'sender_name', 'sender_address', 'sender_phone', 'font_size', 'note', 'page_width', 'page_height' ) as $key ) {
+	foreach ( array( 'logo_url', 'logo_width', 'sender_name', 'sender_address', 'sender_phone', 'sender_lines', 'font_size', 'note', 'page_width', 'page_height' ) as $key ) {
 		$raw[ $key ] = isset( $in[ $key ] ) ? $in[ $key ] : '';
 	}
 	foreach ( array( 'show_logo', 'show_option', 'show_to_phone', 'show_sender', 'show_order_number', 'show_items', 'show_invoice_number', 'show_order_date', 'show_customer_note' ) as $key ) {
@@ -223,8 +224,15 @@ function amouriq_label_html( array $label ) {
 
 	$logo = ( $opt['show_logo'] && ! empty( $label['logo_url'] ) ) ? '<img class="logo" src="' . amouriq_label_escape( $label['logo_url'] ) . '" alt="">' : '';
 
-	$sender_lines = amouriq_label_lines( array_merge( array( isset( $sender['name'] ) ? $sender['name'] : '' ), isset( $sender['lines'] ) ? $sender['lines'] : array() ) );
-	$sender_phone = ! empty( $sender['phone'] ) ? '<br>โทร ' . amouriq_label_escape( $sender['phone'] ) : '';
+	// The sender takes two lines: "name  โทร phone", then the address run together. The owner can instead type
+	// the lines to print, exactly as many as they want (settings: "ข้อความผู้ส่ง"), and then nothing else is added.
+	if ( '' !== $opt['sender_lines'] ) {
+		$sender_lines = amouriq_label_lines( explode( "\n", $opt['sender_lines'] ) );
+	} else {
+		$name_line    = trim( ( isset( $sender['name'] ) ? $sender['name'] : '' ) . ( ! empty( $sender['phone'] ) ? '  โทร ' . $sender['phone'] : '' ) );
+		$address_line = implode( ' ', array_filter( array_map( 'trim', isset( $sender['lines'] ) ? (array) $sender['lines'] : array() ), 'strlen' ) );
+		$sender_lines = amouriq_label_lines( array( $name_line, $address_line ) );
+	}
 	$to_phone     = ( $opt['show_to_phone'] && ! empty( $recipient['phone'] ) ) ? '<br>โทร ' . amouriq_label_escape( $recipient['phone'] ) : '';
 	$option_th    = $opt['show_option'] ? '<th class="opt">ตัวเลือก</th>' : '';
 	$note         = '' !== $opt['note'] ? '<div class="block note">' . str_replace( "\n", '<br>', amouriq_label_escape( $opt['note'] ) ) . '</div>' : '';
@@ -235,7 +243,7 @@ function amouriq_label_html( array $label ) {
 	// The parts are plain blocks and the items table is not nested in a cell: a table inside a cell cannot be
 	// split, so it jumped whole to the next page. Now the label fills the first page and only the items that
 	// do not fit continue on the next one, with the order number and the column heads repeated.
-	$sender_row = $opt['show_sender'] ? '<div class="block">' . $logo . '<span class="tag">ผู้ส่ง (From)</span><br>' . $sender_lines . $sender_phone . '</div>' : '';
+	$sender_row = $opt['show_sender'] ? '<div class="block">' . $logo . '<span class="tag">ผู้ส่ง (From)</span><br>' . $sender_lines . '</div>' : '';
 
 	$order_bits = array();
 	if ( $opt['show_order_number'] ) {

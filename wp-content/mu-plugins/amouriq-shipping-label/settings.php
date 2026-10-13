@@ -138,6 +138,7 @@ function amouriq_label_settings_page() {
 					<div class="amq-lbl-card">
 						<h2>2. ข้อมูลผู้ส่งและโลโก้</h2>
 						<p class="description">เว้นว่าง = ใช้ค่าจากปลั๊กอินพิมพ์เอกสารเดิม (กรอกที่นี่เพื่อไม่ต้องพึ่งปลั๊กอินนั้น)</p>
+						<div class="amq-lbl-field"><label for="lb_slines">ข้อความผู้ส่ง (พิมพ์เอง)</label><div><textarea rows="2" id="lb_slines" name="sender_lines" placeholder="เช่น&#10;บริษัท เนเจอร์ เคอร์เนล จำกัด โทร 02-023-3284&#10;61/63 ถ.บางแวก แขวงบางแค เขตบางแค กทม. 10160"><?php echo esc_textarea( $o['sender_lines'] ); ?></textarea><p class="description">พิมพ์กี่บรรทัดก็ได้ ใบปะหน้าจะพิมพ์ตามนี้ทุกบรรทัด (ไม่ใช้ชื่อ ที่อยู่ เบอร์โทรด้านล่าง) เว้นว่าง = ระบบรวมให้เหลือ 2 บรรทัด คือ "ชื่อ โทร เบอร์" แล้วตามด้วยที่อยู่</p></div></div>
 						<div class="amq-lbl-field"><label for="lb_sname">ชื่อผู้ส่ง / ร้าน</label><div><input type="text" id="lb_sname" name="sender_name" value="<?php echo esc_attr( $o['sender_name'] ); ?>"></div></div>
 						<div class="amq-lbl-field"><label for="lb_saddr">ที่อยู่ผู้ส่ง</label><div><textarea rows="3" id="lb_saddr" name="sender_address"><?php echo esc_textarea( $o['sender_address'] ); ?></textarea><p class="description">หนึ่งบรรทัดต่อหนึ่งแถว</p></div></div>
 						<div class="amq-lbl-field"><label for="lb_sphone">เบอร์โทรผู้ส่ง</label><div><input type="text" id="lb_sphone" name="sender_phone" value="<?php echo esc_attr( $o['sender_phone'] ); ?>"></div></div>

@@ -84,6 +84,28 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertStringContainsString('<tbody></tbody>', $html);
 	}
 
+	public function test_the_sender_is_two_lines_name_with_phone_then_the_address_run_together(): void {
+		$html = amouriq_label_html($this->label());
+
+		$this->assertStringContainsString('Nature Kernel Co., Ltd.  โทร 020233284<br>61/63 Bang Waek Road Bang Khae 10160</div>', $html);
+	}
+
+	public function test_the_owner_can_type_the_sender_lines_and_nothing_else_is_added(): void {
+		$html = amouriq_label_html($this->label(['options' => ['sender_lines' => "ร้าน A & B\nโทร 02-000-0000\n<b>กทม.</b>"]]));
+
+		// Tags are stripped when the option is cleaned, and what remains is escaped when printed.
+		$this->assertStringContainsString('ร้าน A &amp; B<br>โทร 02-000-0000<br>กทม.</div>', $html);
+		$this->assertStringNotContainsString('Nature Kernel', $html);
+		$this->assertStringNotContainsString('020233284', $html);
+	}
+
+	public function test_typed_sender_lines_are_cleaned_like_the_other_multiline_options(): void {
+		$o = amouriq_label_clean_options(['sender_lines' => "  แถวหนึ่ง  \r\nแถวสอง\n"]);
+
+		$this->assertSame("แถวหนึ่ง\nแถวสอง", $o['sender_lines']);
+		$this->assertSame('', amouriq_label_clean_options([])['sender_lines']);
+	}
+
 	public function test_items_table_is_not_inside_a_cell_so_it_can_continue_on_the_next_page(): void {
 		$html = amouriq_label_html($this->label());
 
