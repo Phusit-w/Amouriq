@@ -86,4 +86,16 @@ final class PaymentFeeTest extends TestCase {
 		// Even with a 30 baht fee on the order the cart is 100 short of 1500.
 		$this->assertSame(0, amouriq_bogo_cart_discounts([$deal], $lines, $ctx)['deals'][0]['allowed']);
 	}
+
+	public function test_woocommerce_still_leaves_a_non_taxable_positive_fee_untaxed(): void {
+		// The customer pays exactly the configured amount only while WooCommerce adds no tax to a
+		// positive fee added with taxable=false. Lock that in its source, so an update that changes it fails here.
+		$file = dirname(__DIR__) . '/wp-content/plugins/woocommerce/includes/class-wc-cart-totals.php';
+		if (!is_file($file)) {
+			$this->markTestSkipped('WooCommerce is not installed here.');
+		}
+		$source = file_get_contents($file);
+
+		$this->assertMatchesRegularExpression('/elseif \( \$fee->object->taxable \) \{\s*\$fee->taxes = WC_Tax::calc_tax/', $source);
+	}
 }

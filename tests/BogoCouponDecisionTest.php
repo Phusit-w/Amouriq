@@ -82,4 +82,36 @@ final class BogoCouponDecisionTest extends TestCase {
 	public function test_copying_a_deal_with_no_code_creates_nothing(): void {
 		$this->assertSame('none', amouriq_bogo_core_coupon_decision('', $this->lookup([]), 'copy')['action']);
 	}
+
+	public function test_a_coupon_made_by_the_points_programme_is_refused(): void {
+		$r = amouriq_bogo_core_coupon_decision('summer', $this->lookup(['summer' => ['id' => 9, 'status' => 'publish', 'owner' => 'points']]), 'save', 'b1');
+
+		$this->assertSame('refuse', $r['action']);
+		$this->assertStringContainsString('แต้มสะสม', $r['message']);
+	}
+
+	public function test_a_coupon_another_deal_created_is_refused(): void {
+		$r = amouriq_bogo_core_coupon_decision('summer', $this->lookup(['summer' => ['id' => 9, 'status' => 'publish', 'owner' => 'bOTHER']]), 'save', 'b1');
+
+		$this->assertSame('refuse', $r['action']);
+		$this->assertStringContainsString('ดีลอื่น', $r['message']);
+	}
+
+	public function test_a_deal_keeps_linking_to_the_coupon_it_created_itself(): void {
+		$r = amouriq_bogo_core_coupon_decision('summer', $this->lookup(['summer' => ['id' => 9, 'status' => 'publish', 'owner' => 'b1']]), 'save', 'b1');
+
+		$this->assertSame('link', $r['action']);
+	}
+
+	public function test_a_new_deal_cannot_take_a_coupon_a_deal_created(): void {
+		$r = amouriq_bogo_core_coupon_decision('summer', $this->lookup(['summer' => ['id' => 9, 'status' => 'publish', 'owner' => 'b1']]), 'save');
+
+		$this->assertSame('refuse', $r['action']);
+	}
+
+	public function test_a_coupon_the_owner_made_by_hand_is_still_linked(): void {
+		$r = amouriq_bogo_core_coupon_decision('summer', $this->lookup(['summer' => ['id' => 9, 'status' => 'publish', 'owner' => '']]), 'save', 'b1');
+
+		$this->assertSame('link', $r['action']);
+	}
 }

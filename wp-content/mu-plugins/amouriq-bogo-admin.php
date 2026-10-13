@@ -246,9 +246,9 @@ function amouriq_bogo_build_deal( array $in ) {
 
 	if ( 'coupon' === $trigger ) {
 		$code = isset( $in['coupon_code'] ) ? wc_format_coupon_code( wp_unslash( $in['coupon_code'] ) ) : '';
-		$decision = amouriq_bogo_core_coupon_decision( $code, 'amouriq_bogo_coupon_lookup', 'save' );
-		if ( 'refuse' === $decision['action'] ) {
-			return $decision['message'];
+		// Whether the code is usable (taken by something unrelated, invalid) is decided once, by amouriq_bogo_coupon_prepare().
+		if ( '' === $code ) {
+			return 'เลือกให้ทำงานด้วยคูปองแต่ยังไม่ได้ใส่รหัสคูปอง';
 		}
 		$deal['coupon_code'] = $code;
 	}
@@ -506,7 +506,16 @@ function amouriq_bogo_coupon_lookup( $code ) {
 			'fields'      => 'ids',
 		)
 	);
-	return $ids ? array( 'id' => (int) $ids[0], 'status' => get_post_status( $ids[0] ) ) : null;
+	if ( ! $ids ) {
+		return null;
+	}
+	$owner = '';
+	if ( get_post_meta( $ids[0], 'amouriq_points_user', true ) || get_post_meta( $ids[0], 'amouriq_points_reward', true ) ) {
+		$owner = 'points';
+	} else {
+		$owner = (string) get_post_meta( $ids[0], AMOURIQ_BOGO_COUPON_META, true );
+	}
+	return array( 'id' => (int) $ids[0], 'status' => get_post_status( $ids[0] ), 'owner' => $owner );
 }
 
 /**
@@ -514,11 +523,11 @@ function amouriq_bogo_coupon_lookup( $code ) {
  * error string, null when the Deal has no coupon, or the plan array( 'decision', 'expires', 'limit' )
  * for amouriq_bogo_coupon_commit(). Nothing is written here.
  */
-function amouriq_bogo_coupon_prepare( array $deal, array $in ) {
+function amouriq_bogo_coupon_prepare( array $deal, array $in, $deal_id = '' ) {
 	if ( empty( $deal['trigger'] ) || 'coupon' !== $deal['trigger'] ) {
 		return null;
 	}
-	$decision = amouriq_bogo_core_coupon_decision( isset( $deal['coupon_code'] ) ? $deal['coupon_code'] : '', 'amouriq_bogo_coupon_lookup', 'save' );
+	$decision = amouriq_bogo_core_coupon_decision( isset( $deal['coupon_code'] ) ? $deal['coupon_code'] : '', 'amouriq_bogo_coupon_lookup', 'save', $deal_id );
 	if ( 'refuse' === $decision['action'] ) {
 		return $decision['message'];
 	}
@@ -760,7 +769,7 @@ function amouriq_bogo_admin_handle() {
 			wp_safe_redirect( $back . '&edit=' . $index );
 			exit;
 		}
-		$plan = amouriq_bogo_coupon_prepare( $result, $_POST );
+		$plan = amouriq_bogo_coupon_prepare( $result, $_POST, $deals[ $index ]['id'] );
 		if ( is_string( $plan ) ) {
 			set_transient( 'amouriq_bogo_error_' . $uid, $plan, 60 );
 			wp_safe_redirect( $back . '&edit=' . $index );
