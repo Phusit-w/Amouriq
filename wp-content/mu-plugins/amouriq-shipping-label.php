@@ -91,31 +91,53 @@ add_action(
 	}
 );
 
-// Two icon buttons on every row of the order list, in the Actions column (print and download), like the print plugin's.
-add_action(
-	'woocommerce_admin_order_actions_end',
-	static function ( $order ) {
-		$ids = array( $order->get_id() );
-		printf(
-			'<a class="button wc-action-button amq-label-print" href="%1$s" target="_blank" rel="noopener" title="พิมพ์ใบปะหน้าพัสดุ" aria-label="พิมพ์ใบปะหน้าพัสดุ">พิมพ์ใบปะหน้า</a><a class="button wc-action-button amq-label-pdf" href="%2$s" title="ดาวน์โหลดใบปะหน้า (PDF)" aria-label="ดาวน์โหลดใบปะหน้า (PDF)">ดาวน์โหลดใบปะหน้า</a>',
-			esc_url( amouriq_shipping_label_print_url( $ids ) ),
-			esc_url( amouriq_shipping_label_print_url( $ids, 'pdf' ) )
-		);
-	},
-	20
-);
-
-add_action(
-	'admin_head',
-	static function () {
-		?>
-		<style>
-			.wc-action-button.amq-label-print::after, .wc-action-button.amq-label-pdf::after { font-family:Dashicons; speak:never; font-weight:400; text-transform:none; line-height:1; margin:0; text-indent:0; position:absolute; top:0; left:0; width:100%; height:100%; text-align:center; line-height:2; }
-			.wc-action-button.amq-label-print::after { content:"\f193"; }
-			.wc-action-button.amq-label-pdf::after { content:"\f316"; }
-		</style>
-		<?php
+// A "ใบปะหน้า" column on the order list with a print and a download button on every row. It is our own
+// column, so it shows without ticking anything in Screen Options (WooCommerce's Actions column can be hidden there).
+function amouriq_shipping_label_add_column( $columns ) {
+	$out = array();
+	foreach ( $columns as $key => $label ) {
+		$out[ $key ] = $label;
+		if ( 'order_status' === $key ) {
+			$out['amouriq_label'] = 'ใบปะหน้า';
+		}
 	}
+	return isset( $out['amouriq_label'] ) ? $out : $columns + array( 'amouriq_label' => 'ใบปะหน้า' );
+}
+
+function amouriq_shipping_label_column_buttons( $order ) {
+	if ( ! $order instanceof WC_Order ) {
+		return;
+	}
+	$ids = array( $order->get_id() );
+	printf(
+		'<a class="button button-small" href="%1$s" target="_blank" rel="noopener" title="พิมพ์ใบปะหน้าพัสดุ">พิมพ์</a> <a class="button button-small" href="%2$s" title="ดาวน์โหลดใบปะหน้า (PDF)">PDF</a>',
+		esc_url( amouriq_shipping_label_print_url( $ids ) ),
+		esc_url( amouriq_shipping_label_print_url( $ids, 'pdf' ) )
+	);
+}
+
+// The HPOS order list, then the older posts-based list.
+add_filter( 'manage_woocommerce_page_wc-orders_columns', 'amouriq_shipping_label_add_column' );
+add_action(
+	'manage_woocommerce_page_wc-orders_custom_column',
+	static function ( $column, $order ) {
+		if ( 'amouriq_label' === $column ) {
+			amouriq_shipping_label_column_buttons( $order );
+		}
+	},
+	10,
+	2
+);
+add_filter( 'manage_edit-shop_order_columns', 'amouriq_shipping_label_add_column' );
+add_action(
+	'manage_shop_order_posts_custom_column',
+	static function ( $column, $post_id ) {
+		if ( 'amouriq_label' === $column ) {
+			amouriq_shipping_label_column_buttons( wc_get_order( $post_id ) );
+		}
+	},
+	10,
+	2
 );
 
 // The bulk action in the order list (the HPOS screen and the legacy posts screen).
