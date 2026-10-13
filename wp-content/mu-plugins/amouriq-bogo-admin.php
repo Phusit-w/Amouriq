@@ -1251,7 +1251,7 @@ function amouriq_bogo_shipping_panel() {
 		$rows    = 0;
 		?>
 		<div class="amq-scroll"><table class="widefat amq-table">
-			<thead><tr><th>คูปอง</th><th style="width:140px">สถานะ</th><th style="width:110px">ใช้แล้ว</th><th style="width:230px">จัดการ</th></tr></thead>
+			<thead><tr><th>คูปอง</th><th style="width:130px">สถานะ</th><th style="width:150px">หมดอายุ</th><th style="width:150px">ใช้แล้ว</th><th style="width:170px">สร้างเมื่อ / แก้ไขล่าสุด</th><th style="width:200px">จัดการ</th></tr></thead>
 			<tbody>
 			<?php
 			foreach ( $coupons as $post ) :
@@ -1285,7 +1285,7 @@ function amouriq_bogo_shipping_panel() {
 				</tr>
 			<?php endforeach; ?>
 			<?php if ( ! $rows ) : ?>
-				<tr><td colspan="4" class="amq-empty">ยังไม่มีคูปองที่ติ๊ก "ส่งฟรี"</td></tr>
+				<tr><td colspan="6" class="amq-empty">ยังไม่มีคูปองที่ติ๊ก "ส่งฟรี"</td></tr>
 			<?php endif; ?>
 			</tbody>
 		</table></div>
