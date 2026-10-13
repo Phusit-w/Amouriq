@@ -232,4 +232,14 @@ final class BogoGiftTest extends TestCase {
 	public function test_no_candidates_gives_no_groups(): void {
 		$this->assertSame([], amouriq_bogo_core_gift_choices([], []));
 	}
+
+	public function test_each_option_carries_its_picture(): void {
+		$groups = amouriq_bogo_core_gift_choices([
+			$this->candidate(41, 40, 'ครีม', 200.0, ['option' => 'S', 'image' => 'https://example.test/s.jpg']),
+			$this->candidate(42, 40, 'ครีม', 350.0, ['option' => 'L']),
+		], []);
+
+		$this->assertSame('https://example.test/s.jpg', $groups[0]['options'][0]['image']);
+		$this->assertSame('', $groups[0]['options'][1]['image']);
+	}
 }

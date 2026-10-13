@@ -128,6 +128,7 @@ function amouriq_bogo_choice_candidates( $deal ) {
 	foreach ( amouriq_bogo_choice_items( $deal ) as $item_id => $item ) {
 		$is_variation = $item->is_type( 'variation' );
 		$parent       = $is_variation ? wc_get_product( $item->get_parent_id() ) : $item;
+		$image_id     = $item->get_image_id() ? $item->get_image_id() : ( $parent ? $parent->get_image_id() : 0 );
 		$candidates[] = array(
 			'id'            => $item_id,
 			'parent_id'     => $parent ? $parent->get_id() : $item_id,
@@ -135,6 +136,7 @@ function amouriq_bogo_choice_candidates( $deal ) {
 			'option'        => $is_variation ? wc_get_formatted_variation( $item, true, false ) : '',
 			'regular_price' => (float) wc_get_price_to_display( $item, array( 'price' => (float) $item->get_regular_price() ) ),
 			'in_stock'      => $item->is_in_stock() && $item->is_purchasable(),
+			'image'         => $image_id ? (string) wp_get_attachment_image_url( $image_id, 'thumbnail' ) : '',
 		);
 	}
 	return $candidates;
@@ -168,7 +170,9 @@ function amouriq_bogo_render_choices() {
 				$multi = count( $group['options'] ) > 1;
 			?>
 				<li class="amq-choice-row" data-gift="<?php echo $is_gift ? '1' : '0'; ?>" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #ecd9a8<?php echo $group['available'] ? '' : ';opacity:.6'; ?>">
-					<span>
+					<span class="amq-choice-info" style="display:flex;align-items:center;gap:10px">
+						<img class="amq-choice-img" src="<?php echo esc_url( $shown['image'] ); ?>" alt="" width="56" height="56" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #ecd9a8;background:#fff<?php echo '' === $shown['image'] ? ';visibility:hidden' : ''; ?>">
+						<span>
 						<?php echo esc_html( $group['name'] ); ?>
 						<?php if ( $multi ) : ?>
 							<select class="amq-choice-option" aria-label="ตัวเลือก">
@@ -177,6 +181,7 @@ function amouriq_bogo_render_choices() {
 										data-href="<?php echo esc_attr( $option['available'] ? amouriq_bogo_choice_pick_url( $deal, $option['id'] ) : '' ); ?>"
 										data-state="<?php echo esc_attr( $option['picked'] ? 'picked' : ( $option['available'] ? 'ok' : 'out' ) ); ?>"
 										data-price="<?php echo esc_attr( wc_price( $option['regular_price'] ) ); ?>"
+										data-image="<?php echo esc_attr( $option['image'] ); ?>"
 										<?php selected( $option['id'], $shown['id'] ); ?>>
 										<?php echo esc_html( $option['option'] . ( $option['available'] ? '' : ( $option['picked'] ? ' (เลือกแล้ว)' : ' (สินค้าหมด)' ) ) ); ?>
 									</option>
@@ -192,6 +197,7 @@ function amouriq_bogo_render_choices() {
 						<?php else : ?>
 							<?php echo wp_kses_post( wc_price( $shown['regular_price'] ) ); ?>
 						<?php endif; ?>
+						</span>
 						</span>
 					</span>
 					<span class="amq-choice-action">
@@ -225,6 +231,8 @@ function amouriq_bogo_choice_script() {
 		if (!e.target.classList || !e.target.classList.contains('amq-choice-option')) { return; }
 		var opt = e.target.options[e.target.selectedIndex], row = e.target.closest('.amq-choice-row');
 		var gift = row.dataset.gift === '1';
+		var img = row.querySelector('.amq-choice-img');
+		if (img) { img.src = opt.dataset.image || ''; img.style.visibility = opt.dataset.image ? 'visible' : 'hidden'; }
 		row.querySelector('.amq-choice-price').innerHTML = gift ? '<del>' + opt.dataset.price + '</del> <strong>ฟรี</strong>' : opt.dataset.price;
 		var box = row.querySelector('.amq-choice-action'), state = opt.dataset.state;
 		box.innerHTML = '';

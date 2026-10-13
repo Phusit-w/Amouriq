@@ -169,7 +169,7 @@ function amouriq_bogo_core_gifts_to_remove( $lines, $allowed ) {
 
 /**
  * The Gift choice box as plain data. $candidates are the items a customer can pick
- * (id, parent_id, name, option label or '', regular_price shown to the customer, in_stock);
+ * (id, parent_id, name, option label or '', regular_price shown to the customer, in_stock, image url or '');
  * $taken are the item ids already in the cart as this Deal's gift. Returns one group per
  * product, in order: product_id, name, available (some option can still be picked), options
  * (id, option, regular_price, picked, available). Each item stands on its own price, so
@@ -189,6 +189,7 @@ function amouriq_bogo_core_gift_choices( $candidates, $taken ) {
 			'id'            => (int) $item['id'],
 			'option'        => isset( $item['option'] ) ? $item['option'] : '',
 			'regular_price' => (float) $item['regular_price'],
+			'image'         => isset( $item['image'] ) ? (string) $item['image'] : '',
 			'picked'        => $picked,
 			'available'     => $available,
 		);

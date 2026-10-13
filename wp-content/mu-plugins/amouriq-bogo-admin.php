@@ -11,6 +11,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once __DIR__ . '/amouriq-bogo/coupon-core.php';
+require_once __DIR__ . '/amouriq-bogo/bulk-core.php';
 
 // How many Condition rows the form offers.
 const AMOURIQ_BOGO_CONDITION_ROWS = 5;
@@ -652,6 +653,18 @@ function amouriq_bogo_admin_handle() {
 			$deals[ $index ]['updated_at'] = current_time( 'mysql' );
 			set_transient( 'amouriq_bogo_notice_' . $uid, $on ? 'ปิดดีลแล้ว' : 'เปิดดีลแล้ว', 60 );
 		}
+	} elseif ( 'bulk' === $action ) {
+		$ids = isset( $_POST['bulk'] ) && is_array( $_POST['bulk'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['bulk'] ) ) : array();
+		$do  = isset( $_POST['bulk_action'] ) ? sanitize_key( wp_unslash( $_POST['bulk_action'] ) ) : '';
+		if ( ! $ids || ! in_array( $do, array( 'enable', 'disable', 'delete' ), true ) ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, 'ติ๊กเลือกดีลและเลือกสิ่งที่จะทำก่อน', 60 );
+			wp_safe_redirect( $back );
+			exit;
+		}
+		$result = amouriq_bogo_core_bulk( $deals, $ids, $do, current_time( 'mysql' ) );
+		$deals  = $result['deals'];
+		$verb   = array( 'enable' => 'เปิด', 'disable' => 'ปิด', 'delete' => 'ลบ' );
+		set_transient( 'amouriq_bogo_notice_' . $uid, $verb[ $do ] . 'ดีลแล้ว ' . $result['changed'] . ' รายการ' . ( count( $ids ) > $result['changed'] ? ' (อีก ' . ( count( $ids ) - $result['changed'] ) . ' รายการอยู่ในสถานะนั้นอยู่แล้ว)' : '' ), 60 );
 	} elseif ( 'duplicate' === $action && isset( $deals[ $index ] ) ) {
 		$copy            = $deals[ $index ];
 		$copy['id']      = 'b' . wp_generate_password( 10, false, false );
@@ -1184,8 +1197,21 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 		return;
 	}
 	?>
+	<form method="post" id="amq-bulk-form" action="<?php echo esc_url( amouriq_bogo_page_url() ); ?>" class="amq-bulk">
+		<?php wp_nonce_field( 'amouriq_bogo_save' ); ?>
+		<input type="hidden" name="amouriq_bogo_action" value="bulk">
+		<label for="amq-bulk-do" class="screen-reader-text">จัดการดีลที่เลือก</label>
+		<select name="bulk_action" id="amq-bulk-do">
+			<option value="">จัดการดีลที่ติ๊กเลือก…</option>
+			<option value="enable">เปิดดีลที่เลือก</option>
+			<option value="disable">ปิดดีลที่เลือก</option>
+			<option value="delete">ลบดีลที่เลือก</option>
+		</select>
+		<button type="submit" class="button">ทำตามที่เลือก</button>
+		<span class="description" id="amq-bulk-count">ยังไม่ได้เลือกดีล</span>
+	</form>
 	<div class="amq-scroll"><table class="widefat amq-table">
-		<thead><tr><th style="width:44px">#</th><th>ดีล</th><th style="width:120px">สถานะ</th><th style="width:120px">ใช้แล้ว</th><th style="width:170px">สร้างเมื่อ / แก้ไขล่าสุด</th><th style="width:220px">จัดการ</th></tr></thead>
+		<thead><tr><th style="width:30px"><input type="checkbox" id="amq-bulk-all" aria-label="เลือกทั้งหมด"></th><th style="width:44px">#</th><th>ดีล</th><th style="width:120px">สถานะ</th><th style="width:120px">ใช้แล้ว</th><th style="width:170px">สร้างเมื่อ / แก้ไขล่าสุด</th><th style="width:220px">จัดการ</th></tr></thead>
 		<tbody>
 		<?php foreach ( $deals as $i => $deal ) :
 			$rep   = $report[ $deal['id'] ?? '' ] ?? array( 'orders' => 0, 'total' => 0 );
@@ -1194,6 +1220,7 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 			$id    = isset( $deal['id'] ) ? $deal['id'] : '';
 		?>
 			<tr class="<?php echo $is_on ? '' : 'amq-dim'; ?>">
+				<td><input type="checkbox" class="amq-bulk-pick" name="bulk[]" value="<?php echo esc_attr( $id ); ?>" form="amq-bulk-form" aria-label="เลือกดีลนี้"></td>
 				<td class="amq-no"><?php echo esc_html( $i + 1 ); ?></td>
 				<td>
 					<div class="amq-deal-title"><?php echo esc_html( $deal['label'] ?? '' ); ?></div>
@@ -1230,6 +1257,29 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 		<?php endforeach; ?>
 		</tbody>
 	</table></div>
+	<script>
+	(function () {
+		var form = document.getElementById('amq-bulk-form');
+		var all = document.getElementById('amq-bulk-all');
+		var picks = [].slice.call(document.querySelectorAll('.amq-bulk-pick'));
+		var count = document.getElementById('amq-bulk-count');
+		function refresh() {
+			var n = picks.filter(function (p) { return p.checked; }).length;
+			count.textContent = n ? 'เลือกแล้ว ' + n + ' ดีล' : 'ยังไม่ได้เลือกดีล';
+			all.checked = n > 0 && n === picks.length;
+			all.indeterminate = n > 0 && n < picks.length;
+		}
+		all.addEventListener('change', function () { picks.forEach(function (p) { p.checked = all.checked; }); refresh(); });
+		picks.forEach(function (p) { p.addEventListener('change', refresh); });
+		form.addEventListener('submit', function (e) {
+			var n = picks.filter(function (p) { return p.checked; }).length;
+			var action = form.querySelector('select').value;
+			if (!n || !action) { e.preventDefault(); count.textContent = 'ติ๊กเลือกดีลและเลือกสิ่งที่จะทำก่อน'; return; }
+			if (action === 'delete' && !confirm('ลบดีลที่เลือก ' + n + ' รายการ? ลบแล้วกู้คืนไม่ได้')) { e.preventDefault(); }
+		});
+		refresh();
+	})();
+	</script>
 	<p class="description">ดีลที่อยู่ข้างบนทำงานก่อนดีลข้างล่าง (ใช้ลูกศร ↑ ↓ เรียงลำดับ) ส่วนลดรวมนับเฉพาะออเดอร์ที่ไม่ถูกยกเลิก ล้มเหลว หรือคืนเงิน</p>
 	<?php
 }
@@ -1420,6 +1470,7 @@ function amouriq_bogo_admin_css() {
 		.amq-table .button { margin:0 2px 2px 0; }
 		.amq-table thead th { background:#f6f7f7; font-weight:600; padding:10px; }
 		.amq-table tbody tr:hover td { background:#fafcff; } .amq-table tr.amq-dim:hover td { background:#f0f0f1; }
+		.amq-bulk { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 10px; }
 		.amq-no { text-align:center; color:#8c8f94; font-weight:600; font-size:15px; }
 		.amq-deal-title { font-size:15px; font-weight:600; color:#1d2327; margin-bottom:2px; }
 		.amq-deal-detail { margin:4px 0 2px; color:#3c434a; }
