@@ -45,6 +45,8 @@ function amouriq_label_settings_save() {
 				'show_option'    => ! empty( $in['show_option'] ),
 				'show_to_phone'  => ! empty( $in['show_to_phone'] ),
 				'note'           => isset( $in['note'] ) ? $in['note'] : '',
+				'page_width'     => isset( $in['page_width'] ) ? $in['page_width'] : '',
+				'page_height'    => isset( $in['page_height'] ) ? $in['page_height'] : '',
 			)
 		);
 		update_option( AMOURIQ_LABEL_OPTION, $clean, false );
@@ -99,6 +101,7 @@ function amouriq_label_settings_page() {
 				<tr><th><label for="lb_font">ขนาดตัวอักษร</label></th><td><input type="number" id="lb_font" name="font_size" min="10" max="24" value="<?php echo esc_attr( $o['font_size'] ); ?>" style="width:70px"> px (10 ถึง 24)</td></tr>
 				<tr><th>ตารางสินค้า</th><td><label><input type="checkbox" name="show_option" value="1" <?php checked( $o['show_option'] ); ?>> แสดงคอลัมน์ตัวเลือก (ขนาด / กลิ่น)</label></td></tr>
 				<tr><th>ผู้รับ</th><td><label><input type="checkbox" name="show_to_phone" value="1" <?php checked( $o['show_to_phone'] ); ?>> แสดงเบอร์โทรผู้รับ</label></td></tr>
+				<tr><th>ขนาดกระดาษ</th><td>กว้าง <input type="number" name="page_width" min="50" max="400" value="<?php echo esc_attr( $o['page_width'] ); ?>" style="width:70px"> × สูง <input type="number" name="page_height" min="50" max="600" value="<?php echo esc_attr( $o['page_height'] ); ?>" style="width:70px"> มม. <p class="description">ขนาดสติกเกอร์/กระดาษที่เครื่องพิมพ์ใช้ (ค่าเริ่มต้น 100 × 150) ออเดอร์ละหนึ่งหน้า</p></td></tr>
 				<tr><th><label for="lb_note">ข้อความท้ายใบ</label></th><td><textarea class="large-text" rows="3" id="lb_note" name="note"><?php echo esc_textarea( $o['note'] ); ?></textarea><p class="description">เช่น "สินค้าแตกหักง่าย" เว้นว่าง = ไม่แสดง</p></td></tr>
 			</table>
 			<p>

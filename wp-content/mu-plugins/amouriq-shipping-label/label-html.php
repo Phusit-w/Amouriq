@@ -49,6 +49,8 @@ function amouriq_label_defaults() {
 		'show_option'     => true,
 		'show_to_phone'   => true,
 		'note'            => '',
+		'page_width'      => 100, // mm, the paper the label prints on
+		'page_height'     => 150,
 	);
 }
 
@@ -73,7 +75,7 @@ function amouriq_label_clean_options( $raw ) {
 		$url             = trim( (string) $raw['logo_url'] );
 		$out['logo_url'] = ( '' !== $url && preg_match( '#^https?://#i', $url ) && false !== filter_var( $url, FILTER_VALIDATE_URL ) ) ? $url : '';
 	}
-	foreach ( array( 'logo_width' => array( 40, 400 ), 'font_size' => array( 10, 24 ) ) as $key => $range ) {
+	foreach ( array( 'logo_width' => array( 40, 400 ), 'font_size' => array( 10, 24 ), 'page_width' => array( 50, 400 ), 'page_height' => array( 50, 600 ) ) as $key => $range ) {
 		if ( isset( $raw[ $key ] ) && is_numeric( $raw[ $key ] ) && $raw[ $key ] >= $range[0] && $raw[ $key ] <= $range[1] ) {
 			$out[ $key ] = (int) round( $raw[ $key ] );
 		}
@@ -84,6 +86,45 @@ function amouriq_label_clean_options( $raw ) {
 		}
 	}
 	return $out;
+}
+
+/**
+ * Who the parcel goes to, as the label's recipient (name first, then address lines): the
+ * shipping address, or the billing one when the order has no shipping address (no shipping
+ * needed). The addresses are WooCommerce's formatted HTML (lines split by <br>); the phone
+ * follows the same choice.
+ */
+function amouriq_label_recipient( $shipping_html, $billing_html, $shipping_phone, $billing_phone ) {
+	$use_shipping = '' !== trim( strip_tags( (string) $shipping_html ) );
+	$html         = $use_shipping ? $shipping_html : $billing_html;
+	$phone        = '' !== trim( (string) $shipping_phone ) ? $shipping_phone : $billing_phone;
+
+	$lines = preg_split( '#<brs*/?>#i', (string) $html );
+	$lines = array_map(
+		static function ( $line ) {
+			return trim( html_entity_decode( strip_tags( $line ), ENT_QUOTES, 'UTF-8' ) );
+		},
+		$lines
+	);
+	return array( 'lines' => array_values( array_filter( $lines, 'strlen' ) ), 'phone' => (string) $phone );
+}
+
+/**
+ * A print page of one or more labels: each label on its own page of the owner's paper size
+ * (the first label's settings decide it; all labels of one print share them).
+ */
+function amouriq_label_document( array $labels ) {
+	$first = amouriq_label_clean_options( isset( $labels[0]['options'] ) ? $labels[0]['options'] : array() );
+	$pages = '';
+	foreach ( $labels as $label ) {
+		$pages .= '<div class="amq-page">' . amouriq_label_html( $label ) . '</div>';
+	}
+	return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบปะหน้าพัสดุ</title><style>
+@page{ size: ' . (int) $first['page_width'] . 'mm ' . (int) $first['page_height'] . 'mm; margin: 4mm; }
+html, body{ margin:0; padding:0; background:#fff; }
+.amq-page{ break-after:page; page-break-after:always; }
+.amq-page:last-child{ break-after:auto; page-break-after:auto; }
+</style></head><body>' . $pages . '</body></html>';
 }
 
 function amouriq_label_html( array $label ) {

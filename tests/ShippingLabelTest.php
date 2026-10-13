@@ -118,4 +118,77 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertStringContainsString('ตัวเลือก', $html);
 		$this->assertStringContainsString('โทร 0812345678', $html);
 	}
+
+	// --- own print: paper size, one page per order, address fallback (tickets 02, 03) ---
+
+	public function test_the_paper_size_defaults_to_100_by_150_mm(): void {
+		$doc = amouriq_label_document([$this->label()]);
+
+		$this->assertStringContainsString('size: 100mm 150mm', $doc);
+	}
+
+	public function test_the_paper_size_is_a_setting(): void {
+		$doc = amouriq_label_document([$this->label(['options' => ['page_width' => 105, 'page_height' => 148]])]);
+
+		$this->assertStringContainsString('size: 105mm 148mm', $doc);
+	}
+
+	public function test_a_bad_paper_size_falls_back_to_the_default(): void {
+		$o = amouriq_label_clean_options(['page_width' => '5', 'page_height' => 'abc']);
+
+		$this->assertSame(100, $o['page_width']);
+		$this->assertSame(150, $o['page_height']);
+		$this->assertSame(210, amouriq_label_clean_options(['page_width' => 210])['page_width']);
+	}
+
+	public function test_each_order_is_its_own_page(): void {
+		$doc = amouriq_label_document([
+			$this->label(['order_number' => '5390']),
+			$this->label(['order_number' => '5391']),
+			$this->label(['order_number' => '5392']),
+		]);
+
+		$this->assertSame(3, substr_count($doc, 'class="amq-page"'));
+		$this->assertLessThan(strpos($doc, '5391'), strpos($doc, '5390'));
+		$this->assertLessThan(strpos($doc, '5392'), strpos($doc, '5391'));
+		// A page break after every page but the last, so no blank page ends the print.
+		$this->assertStringContainsString('.amq-page:last-child{ break-after:auto; page-break-after:auto; }', $doc);
+		$this->assertStringContainsString('.amq-page{ break-after:page; page-break-after:always; }', $doc);
+	}
+
+	public function test_a_single_order_is_a_single_page(): void {
+		$this->assertSame(1, substr_count(amouriq_label_document([$this->label()]), 'class="amq-page"'));
+	}
+
+	public function test_the_document_never_shows_a_price(): void {
+		$doc = amouriq_label_document([$this->label()]);
+
+		$this->assertStringNotContainsString('฿', $doc);
+	}
+
+	public function test_an_order_with_no_shipping_address_falls_back_to_billing(): void {
+		$to = amouriq_label_recipient('', 'สมชาย ใจดี<br/>99/9 หมู่ 1', '', '0812345678');
+
+		$this->assertSame(['สมชาย ใจดี', '99/9 หมู่ 1'], $to['lines']);
+		$this->assertSame('0812345678', $to['phone']);
+	}
+
+	public function test_a_shipping_address_wins_over_billing(): void {
+		$to = amouriq_label_recipient('วิชัย รักดี<br/>1 ถนนสุขุมวิท', 'สมชาย ใจดี<br/>99/9', '0899999999', '0812345678');
+
+		$this->assertSame(['วิชัย รักดี', '1 ถนนสุขุมวิท'], $to['lines']);
+		$this->assertSame('0899999999', $to['phone']);
+	}
+
+	public function test_a_shipping_address_of_only_tags_counts_as_empty(): void {
+		$to = amouriq_label_recipient('<br/> ', 'สมชาย ใจดี', '', '0812345678');
+
+		$this->assertSame(['สมชาย ใจดี'], $to['lines']);
+	}
+
+	public function test_html_in_the_address_is_stripped_and_entities_decoded(): void {
+		$to = amouriq_label_recipient('A &amp; B<br/><b>9</b>', '', '', '');
+
+		$this->assertSame(['A & B', '9'], $to['lines']);
+	}
 }
