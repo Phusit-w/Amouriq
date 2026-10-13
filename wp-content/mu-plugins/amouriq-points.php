@@ -428,38 +428,126 @@ function amouriq_points_account_page() {
 	$balance  = amouriq_points_balance( $user_id );
 	$names    = amouriq_points_core_type_names();
 
-	printf( '<p><strong>แต้มสะสมคงเหลือ: %s แต้ม</strong></p>', esc_html( number_format_i18n( $balance['points'] ) ) );
+	$num = static function ( $n ) {
+		return rtrim( rtrim( number_format( (float) $n, 2 ), '0' ), '.' );
+	};
+
+	amouriq_points_account_css();
+	echo '<div class="amq-pts">';
+
+	// Balance card.
+	$worth = $balance['points'] * $settings['redeem_baht'];
+	echo '<section class="amq-pts-hero"><div class="amq-pts-hero-label">แต้มสะสมคงเหลือ</div>';
+	printf( '<div class="amq-pts-hero-num">%s<span> แต้ม</span></div>', esc_html( number_format_i18n( $balance['points'] ) ) );
+	printf( '<div class="amq-pts-hero-worth">เทียบเท่าส่วนลดประมาณ ฿%s</div>', esc_html( number_format_i18n( $worth, $worth == floor( $worth ) ? 0 : 2 ) ) );
 	if ( $balance['soonest_expiry'] ) {
-		printf( '<p>แต้มชุดที่หมดอายุเร็วที่สุดหมดอายุวันที่ %s</p>', esc_html( wp_date( 'j M Y', $balance['soonest_expiry'] ) ) );
+		printf( '<div class="amq-pts-hero-pill">แต้มชุดที่หมดอายุเร็วที่สุด หมดอายุวันที่ %s</div>', esc_html( wp_date( 'j M Y', $balance['soonest_expiry'] ) ) );
 	}
+	echo '</section>';
+
+	// How it works.
+	echo '<div class="amq-pts-steps">';
 	printf(
-		'<p>ทุก ฿%s ที่ชำระค่าสินค้า (ไม่รวมค่าส่ง) ได้ 1 แต้ม เมื่อออเดอร์เสร็จสมบูรณ์ ใช้แต้มเป็นส่วนลดได้ 1 แต้ม = ฿%s ครั้งละอย่างน้อย %d แต้ม และไม่เกิน %s%% ของยอดสินค้า%s</p>',
-		esc_html( number_format( $settings['earn_baht'], 0 ) ),
-		esc_html( rtrim( rtrim( number_format( $settings['redeem_baht'], 2 ), '0' ), '.' ) ),
-		(int) $settings['min_redeem'],
-		esc_html( rtrim( rtrim( number_format( $settings['max_percent'], 2 ), '0' ), '.' ) ),
-		$settings['expiry_months'] ? sprintf( ' แต้มมีอายุ %d เดือนนับจากวันที่ได้รับ', (int) $settings['expiry_months'] ) : ''
+		'<div class="amq-pts-step"><b>สะสม</b><strong>฿%s = 1 แต้ม</strong><span>ทุกการชำระค่าสินค้า (ไม่รวมค่าส่ง) เมื่อออเดอร์เสร็จสมบูรณ์</span></div>',
+		esc_html( number_format( $settings['earn_baht'], 0 ) )
 	);
+	printf(
+		'<div class="amq-pts-step"><b>ใช้</b><strong>1 แต้ม = ฿%s</strong><span>ใช้เป็นส่วนลดที่ตะกร้า ครั้งละอย่างน้อย %d แต้ม และไม่เกิน %s%% ของยอดสินค้า</span></div>',
+		esc_html( $num( $settings['redeem_baht'] ) ),
+		(int) $settings['min_redeem'],
+		esc_html( $num( $settings['max_percent'] ) )
+	);
+	printf(
+		'<div class="amq-pts-step"><b>อายุแต้ม</b><strong>%s</strong><span>%s</span></div>',
+		$settings['expiry_months'] ? esc_html( (int) $settings['expiry_months'] . ' เดือน' ) : 'ไม่มีวันหมดอายุ',
+		$settings['expiry_months'] ? 'นับจากวันที่ได้รับแต้มแต่ละครั้ง' : 'แต้มที่สะสมไว้อยู่กับคุณตลอดไป'
+	);
+	echo '</div>';
 
 	amouriq_points_account_rewards( $user_id, $balance['points'] );
 
+	// History.
+	echo '<h3 class="amq-pts-h">ประวัติแต้มสะสม</h3>';
 	$ledger = array_reverse( amouriq_points_ledger( $user_id ) );
 	if ( ! $ledger ) {
-		echo '<p>ยังไม่มีรายการแต้มสะสม</p>';
+		echo '<div class="amq-pts-empty"><strong>ยังไม่มีรายการแต้มสะสม</strong><span>แต้มจะเริ่มสะสมเมื่อคุณสั่งซื้อและออเดอร์เสร็จสมบูรณ์</span>';
+		printf( '<a class="amq-pts-btn" href="%s">เลือกซื้อสินค้า</a></div>', esc_url( wc_get_page_permalink( 'shop' ) ) );
+		echo '</div>';
 		return;
 	}
-	echo '<table class="shop_table shop_table_responsive"><thead><tr><th>วันที่</th><th>รายการ</th><th>ออเดอร์</th><th>แต้ม</th></tr></thead><tbody>';
+	echo '<ul class="amq-pts-ledger">';
 	foreach ( array_slice( $ledger, 0, 50 ) as $row ) {
-		$type = isset( $row['type'] ) ? $row['type'] : '';
+		$type   = isset( $row['type'] ) ? $row['type'] : '';
+		$plus   = $row['points'] > 0;
+		$detail = wp_date( 'j M Y', $row['time'] ) . ( ! empty( $row['order_id'] ) ? ' · ออเดอร์ #' . $row['order_id'] : '' );
 		printf(
-			'<tr><td data-title="วันที่">%s</td><td data-title="รายการ">%s</td><td data-title="ออเดอร์">%s</td><td data-title="แต้ม">%s</td></tr>',
-			esc_html( wp_date( 'j M Y', $row['time'] ) ),
+			'<li><span class="amq-pts-dot %s">%s</span><span class="amq-pts-ledger-main"><strong>%s</strong><small>%s</small></span><span class="amq-pts-amt %s">%s</span></li>',
+			$plus ? 'is-plus' : 'is-minus',
+			$plus ? '+' : '−',
 			esc_html( isset( $names[ $type ] ) ? $names[ $type ] : $type ),
-			! empty( $row['order_id'] ) ? esc_html( '#' . $row['order_id'] ) : '—',
-			esc_html( ( $row['points'] > 0 ? '+' : '' ) . $row['points'] )
+			esc_html( $detail ),
+			$plus ? 'is-plus' : 'is-minus',
+			esc_html( ( $plus ? '+' : '' ) . number_format_i18n( $row['points'] ) )
 		);
 	}
-	echo '</tbody></table>';
+	echo '</ul></div>';
+}
+
+/** The customer Points page's own styles (one block, printed with the page). Colours follow the theme palette. */
+function amouriq_points_account_css() {
+	echo '<style>
+.amq-pts{--navy:var(--theme-palette-color-1,#1F3A55);--sky:var(--theme-palette-color-2,#8EBED6);--ink:#1d2733;--muted:#6b7785;--line:#e6ebf0;--soft:#f5f8fb;--good:#1e8a5a;--bad:#b9382b;max-width:780px;color:var(--ink)}
+.amq-pts *{box-sizing:border-box}
+.amq-pts-hero{position:relative;overflow:hidden;border-radius:20px;padding:30px 30px 26px;color:#fff;background:linear-gradient(135deg,var(--navy) 0%,#335b82 100%);box-shadow:0 10px 28px rgba(31,58,85,.22)}
+.amq-pts-hero::before{content:"";position:absolute;right:-60px;top:-70px;width:220px;height:220px;border-radius:50%;background:rgba(142,190,214,.28)}
+.amq-pts-hero::after{content:"";position:absolute;right:50px;bottom:-90px;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,.08)}
+.amq-pts-hero>*{position:relative;z-index:1}
+.amq-pts-hero-label{font-size:15px;opacity:.85;letter-spacing:.02em}
+.amq-pts-hero-num{font-size:60px;line-height:1.1;font-weight:700;margin:6px 0 4px}
+.amq-pts-hero-num span{font-size:20px;font-weight:500;opacity:.9}
+.amq-pts-hero-worth{font-size:15px;opacity:.9}
+.amq-pts-hero-pill{display:inline-block;margin-top:16px;padding:7px 14px;border-radius:999px;font-size:13px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
+.amq-pts-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0 6px}
+.amq-pts-step{display:flex;flex-direction:column;gap:4px;padding:16px 18px;border-radius:14px;background:var(--soft);border:1px solid var(--line)}
+.amq-pts-step b{font-size:12px;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}
+.amq-pts-step strong{font-size:20px;color:var(--navy)}
+.amq-pts-step span{font-size:13px;line-height:1.5;color:var(--muted)}
+.amq-pts-h{margin:34px 0 14px;font-size:20px;color:var(--navy)}
+.amq-pts-rewards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.amq-pts-reward{display:flex;flex-direction:column;gap:10px;margin:0;padding:18px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 2px 10px rgba(31,58,85,.05)}
+.amq-pts-reward.is-ready{border-color:var(--sky);box-shadow:0 4px 16px rgba(142,190,214,.35)}
+.amq-pts-reward-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.amq-pts-reward-top strong{font-size:16px;line-height:1.35;color:var(--ink)}
+.amq-pts-cost{flex:none;padding:4px 11px;border-radius:999px;font-size:13px;font-weight:600;color:var(--navy);background:rgba(142,190,214,.32)}
+.amq-pts-reward small{font-size:13px;line-height:1.55;color:var(--muted)}
+.amq-pts-bar{height:7px;border-radius:99px;background:var(--line);overflow:hidden}
+.amq-pts-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--sky),var(--navy))}
+.amq-pts-btn,.amq-pts button.amq-pts-btn{display:block;width:100%;padding:11px 16px;border:0;border-radius:10px;font:inherit;font-weight:600;text-align:center;text-decoration:none;cursor:pointer;color:#fff!important;background:var(--navy)}
+.amq-pts-btn:hover{filter:brightness(1.12)}
+.amq-pts .amq-pts-btn[disabled],.amq-pts .amq-pts-btn[disabled]:hover{cursor:not-allowed;filter:none;color:var(--muted)!important;background:var(--soft)!important;border:1px dashed #cdd6df!important;font-weight:500}
+.amq-pts-reward .amq-pts-btn{margin-top:auto}
+.amq-pts-coupons{display:grid;gap:10px;margin:0;padding:0;list-style:none}
+.amq-pts-coupons li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.amq-pts-coupons .grow{flex:1 1 180px;display:flex;flex-direction:column;gap:2px}
+.amq-pts-coupons small{color:var(--muted);font-size:12px}
+.amq-pts-code{padding:6px 12px;border:1px dashed var(--navy);border-radius:8px;font-family:ui-monospace,Consolas,monospace;font-size:14px;letter-spacing:.04em;color:var(--navy);background:var(--soft)}
+.amq-pts-badge{padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(30,138,90,.12);color:var(--good)}
+.amq-pts-badge.is-off{background:#eef0f2;color:var(--muted)}
+.amq-pts-ledger{margin:0;padding:0;list-style:none;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}
+.amq-pts-ledger li{display:flex;align-items:center;gap:14px;padding:13px 16px;border-top:1px solid var(--line)}
+.amq-pts-ledger li:first-child{border-top:0}
+.amq-pts-dot{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;font-weight:700;font-size:17px}
+.amq-pts-dot.is-plus{background:rgba(30,138,90,.12);color:var(--good)}
+.amq-pts-dot.is-minus{background:rgba(185,56,43,.1);color:var(--bad)}
+.amq-pts-ledger-main{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
+.amq-pts-ledger-main small{color:var(--muted);font-size:12px}
+.amq-pts-amt{flex:none;font-size:17px;font-weight:700}
+.amq-pts-amt.is-plus{color:var(--good)}.amq-pts-amt.is-minus{color:var(--bad)}
+.amq-pts-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:30px 20px;border:1px dashed var(--sky);border-radius:16px;background:var(--soft);text-align:center}
+.amq-pts-empty span{color:var(--muted);font-size:14px;margin-bottom:10px}
+.amq-pts-empty .amq-pts-btn{width:auto;min-width:200px}
+@media (max-width:520px){.amq-pts-hero{padding:24px 20px 22px}.amq-pts-hero-num{font-size:48px}}
+</style>';
 }
 
 /* --------------------------------------------------------------------- admin */
@@ -1403,18 +1491,21 @@ function amouriq_points_account_rewards( $user_id, $balance ) {
 		}
 	);
 	if ( $rewards ) {
-		echo '<h3>แลกแต้มเป็นคูปอง</h3><div class="amq-rewards" style="display:grid;gap:12px;max-width:640px">';
+		echo '<h3 class="amq-pts-h">แลกของรางวัล</h3><div class="amq-pts-rewards">';
 		foreach ( $rewards as $reward ) {
 			$can = $balance >= $reward['cost'];
-			echo '<form method="post" style="border:1px solid #ddd;padding:12px;border-radius:6px" onsubmit="return confirm(' . esc_attr( wp_json_encode( amouriq_points_core_redeem_confirm( $reward ) ) ) . ');">';
+			$pct = min( 100, max( 0, (int) floor( 100 * $balance / $reward['cost'] ) ) );
+			echo '<form method="post" class="amq-pts-reward' . ( $can ? ' is-ready' : '' ) . '" onsubmit="return confirm(' . esc_attr( wp_json_encode( amouriq_points_core_redeem_confirm( $reward ) ) ) . ');">';
 			wp_nonce_field( 'amouriq_points_redeem', 'amouriq_points_redeem_nonce' );
 			echo '<input type="hidden" name="amouriq_points_redeem" value="' . esc_attr( $reward['id'] ) . '">';
 			echo '<input type="hidden" name="amouriq_points_token" value="' . esc_attr( wp_generate_password( 16, false, false ) ) . '">';
-			echo '<strong>' . esc_html( $reward['label'] ) . '</strong> · ' . esc_html( number_format_i18n( $reward['cost'] ) ) . ' แต้ม<br><small>' . esc_html( amouriq_points_reward_text( $reward ) ) . '</small><br>';
+			echo '<div class="amq-pts-reward-top"><strong>' . esc_html( $reward['label'] ) . '</strong><span class="amq-pts-cost">' . esc_html( number_format_i18n( $reward['cost'] ) ) . ' แต้ม</span></div>';
+			echo '<small>' . esc_html( amouriq_points_reward_text( $reward ) ) . '</small>';
+			echo '<div class="amq-pts-bar" aria-hidden="true"><i style="width:' . (int) $pct . '%"></i></div>';
 			if ( $can ) {
-				echo '<button type="submit" class="button" style="margin-top:6px">แลกเลย</button>';
+				echo '<button type="submit" class="amq-pts-btn">แลกเลย</button>';
 			} else {
-				echo '<button type="button" class="button" disabled style="margin-top:6px">แต้มไม่พอ (ขาดอีก ' . esc_html( number_format_i18n( $reward['cost'] - $balance ) ) . ' แต้ม)</button>';
+				echo '<button type="button" class="amq-pts-btn" disabled>ขาดอีก ' . esc_html( number_format_i18n( $reward['cost'] - $balance ) ) . ' แต้ม</button>';
 			}
 			echo '</form>';
 		}
@@ -1423,26 +1514,30 @@ function amouriq_points_account_rewards( $user_id, $balance ) {
 
 	$redeemed = array_reverse( amouriq_points_redemptions( $user_id ) );
 	if ( $redeemed ) {
-		echo '<h3>คูปองที่แลกแล้ว</h3><table class="shop_table shop_table_responsive"><thead><tr><th>วันที่</th><th>ของรางวัล</th><th>รหัสคูปอง</th><th>สถานะ</th></tr></thead><tbody>';
+		echo '<h3 class="amq-pts-h">คูปองที่แลกแล้ว</h3><ul class="amq-pts-coupons">';
 		foreach ( array_slice( $redeemed, 0, 20 ) as $row ) {
 			$coupon  = new WC_Coupon( (int) $row['coupon_id'] );
 			$expires = $coupon->get_date_expires();
+			$usable  = true;
 			if ( $coupon->get_usage_count() > 0 ) {
 				$status = 'ใช้แล้ว';
+				$usable = false;
 			} elseif ( $expires && $expires->getTimestamp() < time() ) {
 				$status = 'หมดอายุแล้ว';
+				$usable = false;
 			} else {
 				$status = 'ใช้ได้' . ( $expires ? ' ถึง ' . wp_date( 'j M Y', $expires->getTimestamp() ) : '' );
 			}
 			printf(
-				'<tr><td data-title="วันที่">%s</td><td data-title="ของรางวัล">%s</td><td data-title="รหัสคูปอง"><code>%s</code></td><td data-title="สถานะ">%s</td></tr>',
-				esc_html( wp_date( 'j M Y', $row['time'] ) ),
+				'<li><span class="grow"><strong>%s</strong><small>แลกเมื่อ %s</small></span><code class="amq-pts-code">%s</code><span class="amq-pts-badge%s">%s</span></li>',
 				esc_html( $row['label'] ),
+				esc_html( wp_date( 'j M Y', $row['time'] ) ),
 				esc_html( $row['code'] ),
+				$usable ? '' : ' is-off',
 				esc_html( $status )
 			);
 		}
-		echo '</tbody></table>';
+		echo '</ul>';
 	}
 }
 
