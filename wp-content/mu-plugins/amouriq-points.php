@@ -885,52 +885,49 @@ function amouriq_points_admin_legacy_import() {
 	return $count ? sprintf( 'ยกยอดแล้ว %d คน รวม %s แต้ม', $count, number_format_i18n( $total ) ) : 'ไม่ได้เลือกสมาชิกคนใดที่ยังยกยอดได้';
 }
 
-/** The "bring over old points" box on the Members tab: only shown while there is something from the old plugin. */
+/** The "bring over old points" box on the Members tab: folded away, and only there while someone from the old plugin is still waiting. */
 function amouriq_points_admin_legacy_section() {
-	$plan = amouriq_points_legacy_plan();
-	if ( ! $plan ) {
+	// Only members not yet imported are listed; once everyone is imported (or ignored) the box goes away.
+	$pending = array_values(
+		array_filter(
+			amouriq_points_legacy_plan(),
+			static function ( $row ) {
+				return 'ready' === $row['status'];
+			}
+		)
+	);
+	if ( ! $pending ) {
 		return;
 	}
-	$pending = array_filter(
-		$plan,
-		static function ( $row ) {
-			return 'ready' === $row['status'];
-		}
-	);
-	echo '<div class="amq-pts-card"><h2>ยกยอดแต้มจากระบบเดิม</h2>';
+	echo '<details class="amq-pts-card"><summary style="cursor:pointer;font-size:15px"><strong>ยกยอดแต้มจากระบบเดิม</strong> · ยังไม่ได้ยกยอด ' . (int) count( $pending ) . ' คน (กดเพื่อเปิด/ซ่อน)</summary>';
 	echo '<p class="description">ระบบแต้มเดิม (Points &amp; Rewards) ยังมียอดแต้มเก็บไว้ของสมาชิกด้านล่าง ยกยอดมาเป็นแต้มของระบบนี้ได้ครั้งเดียวต่อคน โดยนับอายุแต้มใหม่ตามกติกาตอนนี้ ข้อมูลเดิมไม่ถูกลบหรือแก้ ปลั๊กอินเดิมต้องปิดไว้ตลอด</p>';
 
 	// Every piece below is escaped as it is built; `$editable` adds the tick boxes (only while the programme is off).
-	$table = static function ( $editable ) use ( $plan ) {
+	$table = static function ( $editable ) use ( $pending ) {
 		$html = '';
-		foreach ( $plan as $row ) {
+		foreach ( $pending as $row ) {
 			$user  = get_userdata( $row['user_id'] );
 			$staff = $user && amouriq_points_legacy_is_staff( $row['user_id'] );
-			$ready = 'ready' === $row['status'];
 			$html .= sprintf(
 				'<tr><td>%s</td><td>%s</td><td>%s</td><td style="text-align:right"><strong>%s</strong></td><td>%s</td></tr>',
-				( $ready && $editable ) ? '<input type="checkbox" name="legacy_users[]" value="' . (int) $row['user_id'] . '"' . ( $staff ? '' : ' checked' ) . '>' : ( $ready ? '' : '✓' ),
+				$editable ? '<input type="checkbox" name="legacy_users[]" value="' . (int) $row['user_id'] . '"' . ( $staff ? '' : ' checked' ) . '>' : '',
 				esc_html( $user ? $user->display_name : '#' . $row['user_id'] ),
 				esc_html( $user ? $user->user_email : '' ),
 				esc_html( number_format_i18n( $row['points'] ) ),
-				$ready ? ( $staff ? 'บัญชีทีมงาน (ไม่ได้ติ๊กไว้ให้)' : 'ยังไม่ได้ยกยอด' ) : 'ยกยอดแล้ว'
+				$staff ? 'บัญชีทีมงาน (ไม่ได้ติ๊กไว้ให้)' : 'ยังไม่ได้ยกยอด'
 			);
 		}
 		return '<table class="widefat striped" style="max-width:760px;margin:8px 0"><thead><tr><th style="width:36px"></th><th>สมาชิก</th><th>อีเมล</th><th style="text-align:right">แต้มเดิม</th><th>สถานะ</th></tr></thead><tbody>' . $html . '</tbody></table>';
 	};
 
-	if ( ! $pending ) {
-		echo $table( false ) . '<p>ยกยอดครบทุกคนแล้ว</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above
-		return;
-	}
 	if ( amouriq_points_enabled() ) {
 		echo $table( false ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above
-		echo '<p><strong>ปิดระบบแต้มสะสมก่อนจึงจะยกยอดได้</strong> (กันไม่ให้ยอดเปลี่ยนระหว่างที่ลูกค้ากำลังใช้งาน) ปิดที่แท็บ "ภาพรวม" แล้วกลับมาที่นี่</p></div>';
+		echo '<p><strong>ปิดระบบแต้มสะสมก่อนจึงจะยกยอดได้</strong> (กันไม่ให้ยอดเปลี่ยนระหว่างที่ลูกค้ากำลังใช้งาน) ปิดที่แท็บ "ภาพรวม" แล้วกลับมาที่นี่</p></details>';
 		return;
 	}
 	echo '<p>ติ๊กสมาชิกที่ต้องการยกยอด (บัญชีทีมงานไม่ได้ติ๊กไว้ให้) แล้วกดปุ่มด้านล่าง</p>';
 	amouriq_points_admin_form( 'legacy_import', $table( true ), 'ยกยอดแต้มที่ติ๊กไว้', 'button button-primary', 'ยกยอดแต้มของสมาชิกที่ติ๊กไว้ ทำซ้ำกับคนเดิมไม่ได้ ยืนยันไหม?' );
-	echo '</div>';
+	echo '</details>';
 }
 
 /**
