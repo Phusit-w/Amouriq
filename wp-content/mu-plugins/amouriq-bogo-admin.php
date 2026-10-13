@@ -1132,7 +1132,7 @@ function amouriq_bogo_admin_tabs() {
 		'deals'    => 'ดีลทั้งหมด',
 		'member'   => 'สิทธิพิเศษสมาชิก',
 		'shipping' => 'ส่งฟรี',
-		'fee'      => 'ค่าธรรมเนียม',
+		'fee'      => '⚙ ตั้งค่าทั่วไป',
 	);
 }
 
@@ -1367,6 +1367,12 @@ function amouriq_bogo_admin_css() {
 		.amq-template strong { display:block; margin-bottom:4px; } .amq-template span { color:#50575e; font-size:12px; }
 		.amq-empty-state { text-align:center; padding:24px; } .amq-empty-state .amq-templates { text-align:left; max-width:900px; margin-left:auto; margin-right:auto; }
 		.amq-group-title { margin:16px 0 6px; font-size:14px; color:#1d2327; } .amq-group-help { margin:0 0 6px; color:#50575e; }
+		.amq-two { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
+		.amq-side { position:sticky; top:40px; background:#fff; border:1px solid #c3c4c7; border-radius:6px; padding:14px 16px; }
+		.amq-side h2 { margin-top:0; } .amq-side .amq-summary { position:static; margin:8px 0; }
+		.amq-adv-block h3 { margin:14px 0 6px; font-size:13px; }
+		button.amq-template { text-align:left; cursor:pointer; font:inherit; }
+		@media (max-width:900px) { .amq-two { grid-template-columns:1fr; } .amq-side { position:static; } }
 		.amq-summary { position:sticky; bottom:0; background:#f0f6fc; border:1px solid #2271b1; border-radius:6px; padding:10px 14px; margin:18px 0 8px; } .amq-summary b { color:#2271b1; }
 		.amq-table { max-width:1250px; }
 		.amq-table td { vertical-align:top; padding:12px 10px; line-height:1.55; }
@@ -1463,7 +1469,7 @@ function amouriq_bogo_admin_page() {
 		<?php if ( ! $show ) : ?>
 			<nav class="nav-tab-wrapper" style="margin-bottom:12px">
 				<?php foreach ( amouriq_bogo_admin_tabs() as $key => $label ) : ?>
-					<a class="nav-tab<?php echo $key === $tab ? ' nav-tab-active' : ''; ?>" href="<?php echo esc_url( $back . '&tab=' . $key ); ?>"><?php echo esc_html( $label ); ?></a>
+					<a class="nav-tab<?php echo $key === $tab ? ' nav-tab-active' : ''; ?>"<?php echo 'fee' === $key ? ' style="float:right"' : ''; ?> href="<?php echo esc_url( $back . '&tab=' . $key ); ?>"><?php echo esc_html( $label ); ?></a>
 				<?php endforeach; ?>
 			</nav>
 		<?php else : ?>
@@ -1502,7 +1508,17 @@ function amouriq_bogo_admin_page() {
 
 				<h2><?php echo $editing ? 'แก้ไขดีล #' . esc_html( $edit_at + 1 ) : 'เพิ่มดีลใหม่'; ?></h2>
 
-				<h2>1. เลือกประเภทดีล</h2>
+				<?php if ( ! $editing ) : ?>
+					<h3 class="amq-group-title">เริ่มจากแม่แบบ <span class="description">(กดแล้วช่องด้านล่างถูกเติมให้ ตรวจตัวเลขแล้วบันทึก)</span></h3>
+					<div class="amq-templates">
+						<?php foreach ( amouriq_bogo_templates() as $tpl ) : ?>
+							<button type="button" class="amq-template amq-template-pick" data-tpl="<?php echo esc_attr( $tpl['key'] ); ?>"><strong><?php echo esc_html( $tpl['title'] ); ?></strong><span><?php echo esc_html( $tpl['text'] ); ?></span></button>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+
+				<details id="amq-type-picker" <?php echo $editing ? '' : 'open'; ?> style="margin:12px 0">
+				<summary><strong>ประเภทดีล:</strong> <span id="amq-type-name"><?php echo esc_html( isset( $types[ $cur_type ] ) ? $types[ $cur_type ] : '' ); ?></span> <span class="description">(กดเพื่อเปลี่ยน)</span></summary>
 				<?php
 				$type_groups = array(
 					'ลดตามยอดซื้อ ส่งฟรี และของแถม' => array( 'spend_threshold', 'free_shipping', 'spend_gift' ),
@@ -1522,8 +1538,10 @@ function amouriq_bogo_admin_page() {
 						<?php endforeach; ?>
 					</div>
 				<?php endforeach; ?>
+				</details>
 
-				<h2>2. รายละเอียดดีล</h2>
+				<div class="amq-two"><div class="amq-main">
+				<h2>1. รายละเอียดดีล</h2>
 				<div class="amq-grid">
 					<label class="k" for="bogo_label">ป้ายในตะกร้า</label>
 					<div class="v"><input type="text" name="label" id="bogo_label" class="amq-wide" maxlength="100" placeholder="เช่น ซื้อ 2 แถม 1" value="<?php echo esc_attr( $v( 'label' ) ); ?>">
@@ -1645,7 +1663,7 @@ function amouriq_bogo_admin_page() {
 					</div>
 				</div>
 
-				<h2>3. ดีลนี้เริ่มทำงานเมื่อไหร่</h2>
+				<h2>2. ดีลนี้เริ่มทำงานเมื่อไหร่</h2>
 				<div class="amq-grid">
 					<span class="k" style="font-weight:600;padding-top:6px">วิธีเปิดใช้</span>
 					<div class="v">
@@ -1670,13 +1688,16 @@ function amouriq_bogo_admin_page() {
 					</div>
 				</div>
 
-				<details <?php echo ( $editing && ! empty( $editing['conditions'] ) ) ? 'open' : ''; ?>>
-					<summary>เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่ (ไม่บังคับ เช่น เฉพาะลูกค้าที่เคยสั่งซื้อ วันในสัปดาห์ จำนวนชิ้นในตะกร้า)</summary>
+				<?php
+				$adv_open = $editing && ( ! empty( $editing['conditions'] ) || ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['exclusive'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) );
+				?>
+				<details id="amq-advanced" <?php echo $adv_open ? 'open' : ''; ?>>
+					<summary><strong>ตัวเลือกขั้นสูง</strong> <span class="description">(ส่วนใหญ่ไม่ต้องแตะ: เงื่อนไขเพิ่มเติม, Exclusive, ช่วงเวลา, จำกัดสิทธิ์)</span></summary>
+				<div class="amq-adv-block">$1$2</h3>
 					<?php amouriq_bogo_condition_fields( amouriq_bogo_conditions_for_form( $v( 'conditions', array() ) ) ); ?>
-				</details>
+				</div>
 
-				<details <?php echo ( $editing && ( ! empty( $editing['exclude_sale'] ) || ! empty( $editing['no_combine'] ) || ! empty( $editing['new_customer_only'] ) || ! empty( $editing['exclusive'] ) || ! empty( $editing['valid_from'] ) || ! empty( $editing['valid_to'] ) || ! empty( $editing['max_uses_per_customer'] ) || ! empty( $editing['max_per_order'] ) ) ) ? 'open' : ''; ?>>
-					<summary>4. ตัวเลือกเพิ่มเติม (วันที่ จำกัดสิทธิ์ ไม่ใช้ร่วมกับคูปอง)</summary>
+				<div class="amq-adv-block"><h3>ตัวเลือกเพิ่มเติม (วันที่ จำกัดสิทธิ์ ไม่ใช้ร่วมกับคูปอง)</h3>
 					<div class="amq-grid">
 						<span class="k" style="font-weight:600">เงื่อนไขพิเศษ</span>
 						<div class="v">
@@ -1696,14 +1717,19 @@ function amouriq_bogo_admin_page() {
 						<div class="v amq-row" data-types="same_product product_pair category_cheapest_free cheapest_free quantity_tier spend_threshold bundle_price"><input type="number" name="max_per_order" id="bogo_maxo" min="0" value="<?php echo esc_attr( $v( 'max_per_order', 0 ) ); ?>">
 							<p class="description">0 = ไม่จำกัด</p></div>
 					</div>
+				</div>
 				</details>
+				</div>
 
-				<div class="amq-summary" id="amq-live-summary"></div>
-
-				<p style="margin-top:20px">
-					<?php submit_button( $editing ? 'บันทึกการแก้ไข' : 'เพิ่มดีล', 'primary', 'submit', false ); ?>
-					<a class="button" href="<?php echo esc_url( $back ); ?>" style="margin-left:6px">ยกเลิก</a>
-				</p>
+				<aside class="amq-side">
+					<h2>สรุปให้ตรวจ</h2>
+					<div class="amq-summary" id="amq-live-summary"></div>
+					<p class="description">ดีลใหม่เริ่มที่ "ปิดอยู่" เสมอ ตรวจแล้วค่อยเปิดที่รายการดีล</p>
+					<p style="margin-top:14px">
+						<?php submit_button( $editing ? 'บันทึกการแก้ไข' : 'เพิ่มดีล', 'primary', 'submit', false ); ?>
+						<a class="button" href="<?php echo esc_url( $back ); ?>" style="margin-left:6px">ยกเลิก</a>
+					</p>
+				</aside></div>
 			</form>
 		</div>
 		<script>
@@ -1790,18 +1816,26 @@ function amouriq_bogo_admin_page() {
 			};
 			var tplKey = new URLSearchParams(window.location.search).get('tpl');
 			var isNew = form.querySelector('input[name=amouriq_bogo_action][value=add]');
-			if (isNew && tplKey && templates[tplKey]) {
-				var tpl = templates[tplKey];
+			function applyTemplate(key) {
+				var tpl = templates[key];
+				var oldNote = form.querySelector('.amq-tpl-note');
+				if (oldNote) { oldNote.remove(); }
 				var radio = form.querySelector('input[name=type][value=' + tpl.type + ']');
 				if (radio) { radio.checked = true; }
 				Object.keys(tpl).forEach(function (k) { if (k !== 'type') { setField(k, tpl[k]); } });
 				var note = document.createElement('div');
-				note.className = 'notice notice-info inline';
+				note.className = 'notice notice-info inline amq-tpl-note';
 				note.innerHTML = '<p>กรอกจากแม่แบบแล้ว ตรวจตัวเลขและเลือกสินค้า (ถ้าต้องเลือก) แล้วกด "เพิ่มดีล"</p>';
 				form.insertBefore(note, form.firstChild);
-				var more = [].filter.call(form.querySelectorAll('details'), function (d) { return /^4./.test(d.querySelector('summary').textContent.trim()); })[0];
+				var more = document.getElementById('amq-advanced');
 				if (more && tpl.new_customer_only) { more.open = true; }
+				sync();
+				setTimeout(summarise, 0);
 			}
+			if (isNew && tplKey && templates[tplKey]) { applyTemplate(tplKey); }
+			form.querySelectorAll('.amq-template-pick').forEach(function (btn) {
+				btn.addEventListener('click', function () { applyTemplate(btn.getAttribute('data-tpl')); });
+			});
 			var summaryBox = document.getElementById('amq-live-summary');
 			function money(v) { return v === '' ? '…' : '฿' + Number(v).toLocaleString('en-US'); }
 			function summarise() {
@@ -1840,7 +1874,10 @@ function amouriq_bogo_admin_page() {
 			// After the field sync has run, so fields of other types (disabled) are not read.
 			form.addEventListener('input', function () { setTimeout(summarise, 0); });
 			form.addEventListener('change', function () { setTimeout(summarise, 0); });
-			form.addEventListener('change', sync);
+$1			form.addEventListener('change', function () {
+				var r = form.querySelector('input[name=type]:checked'), nameEl = document.getElementById('amq-type-name');
+				if (r && nameEl && r.parentNode.querySelector('strong')) { nameEl.textContent = r.parentNode.querySelector('strong').textContent; }
+			});
 			sync();
 			summarise();
 		})();
