@@ -99,6 +99,9 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertStringContainsString('.amq-page', $print);
 		$this->assertStringContainsString('style.zoom', $print);
 		$this->assertStringNotContainsString('<script', $pdf);
+		// The script sits after the last label in <body>, so "last label" must not mean :last-child (a blank extra sheet).
+		$this->assertStringContainsString('.amq-page:last-of-type', $print);
+		$this->assertStringNotContainsString(':last-child', $print);
 	}
 
 	public function test_options_can_hide_the_option_column_logo_and_recipient_phone(): void {
