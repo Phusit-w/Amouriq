@@ -648,13 +648,15 @@ function amouriq_bogo_admin_handle() {
 	} elseif ( 'toggle_deal' === $action ) {
 		if ( isset( $deals[ $index ] ) ) {
 			$on = ! isset( $deals[ $index ]['enabled'] ) || $deals[ $index ]['enabled'];
-			$deals[ $index ]['enabled'] = ! $on;
+			$deals[ $index ]['enabled']    = ! $on;
+			$deals[ $index ]['updated_at'] = current_time( 'mysql' );
 			set_transient( 'amouriq_bogo_notice_' . $uid, $on ? 'ปิดดีลแล้ว' : 'เปิดดีลแล้ว', 60 );
 		}
 	} elseif ( 'duplicate' === $action && isset( $deals[ $index ] ) ) {
 		$copy            = $deals[ $index ];
 		$copy['id']      = 'b' . wp_generate_password( 10, false, false );
 		$copy['label']   = ( isset( $copy['label'] ) ? $copy['label'] : '' ) . ' (สำเนา)';
+		$copy['created_at'] = $copy['updated_at'] = current_time( 'mysql' );
 		$copy['enabled'] = false; // a copy starts off, so it cannot change prices before it is checked
 		$new_code        = amouriq_bogo_coupon_copy( $copy, $deals[ $index ] );
 		if ( '' !== $new_code ) {
@@ -752,6 +754,7 @@ function amouriq_bogo_admin_handle() {
 			exit;
 		}
 		$result['id'] = 'b' . wp_generate_password( 10, false, false );
+		$result['created_at'] = $result['updated_at'] = current_time( 'mysql' );
 		if ( $plan ) {
 			amouriq_bogo_coupon_commit( $result, $plan );
 		}
@@ -775,7 +778,9 @@ function amouriq_bogo_admin_handle() {
 			wp_safe_redirect( $back . '&edit=' . $index );
 			exit;
 		}
-		$result['id'] = $deals[ $index ]['id'];
+		$result['id']         = $deals[ $index ]['id'];
+		$result['updated_at'] = current_time( 'mysql' );
+		$result['created_at'] = ! empty( $deals[ $index ]['created_at'] ) ? $deals[ $index ]['created_at'] : $result['updated_at'];
 		if ( $plan ) {
 			amouriq_bogo_coupon_commit( $result, $plan );
 		}
@@ -1155,6 +1160,12 @@ function amouriq_bogo_templates() {
 }
 
 /** The deals the owner made, as one table. Everything else (Member Privilege, free shipping) has its own tab. */
+/** A stored site-time stamp ('Y-m-d H:i:s') as dd/mm/yyyy hh:mm. */
+function amouriq_bogo_stamp( $stamp ) {
+	$time = strtotime( (string) $stamp );
+	return $time ? gmdate( 'd/m/Y H:i', $time ) : '';
+}
+
 function amouriq_bogo_deals_table( $deals, $report, $types ) {
 	$new_url = amouriq_bogo_page_url() . '&add=1#amq-form';
 	if ( empty( $deals ) ) {
@@ -1174,7 +1185,7 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 	}
 	?>
 	<div class="amq-scroll"><table class="widefat amq-table">
-		<thead><tr><th>ดีล</th><th style="width:130px">สถานะ</th><th style="width:110px">ใช้แล้ว</th><th style="width:260px">จัดการ</th></tr></thead>
+		<thead><tr><th style="width:44px">#</th><th>ดีล</th><th style="width:120px">สถานะ</th><th style="width:120px">ใช้แล้ว</th><th style="width:170px">สร้างเมื่อ / แก้ไขล่าสุด</th><th style="width:220px">จัดการ</th></tr></thead>
 		<tbody>
 		<?php foreach ( $deals as $i => $deal ) :
 			$rep   = $report[ $deal['id'] ?? '' ] ?? array( 'orders' => 0, 'total' => 0 );
@@ -1183,28 +1194,42 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 			$id    = isset( $deal['id'] ) ? $deal['id'] : '';
 		?>
 			<tr class="<?php echo $is_on ? '' : 'amq-dim'; ?>">
+				<td class="amq-no"><?php echo esc_html( $i + 1 ); ?></td>
 				<td>
-					<strong><?php echo esc_html( $deal['label'] ?? '' ); ?></strong> <small class="amq-kind amq-kind-deal"><?php echo esc_html( $types[ $deal['type'] ] ?? $deal['type'] ); ?></small><br>
-					<?php echo esc_html( amouriq_bogo_detail( $deal ) ); ?><br>
+					<div class="amq-deal-title"><?php echo esc_html( $deal['label'] ?? '' ); ?></div>
+					<span class="amq-kind amq-kind-deal"><?php echo esc_html( $types[ $deal['type'] ] ?? $deal['type'] ); ?></span>
+					<div class="amq-deal-detail"><?php echo esc_html( amouriq_bogo_detail( $deal ) ); ?></div>
 					<?php echo amouriq_bogo_chips_html( amouriq_bogo_chips( $deal ) ); // phpcs:ignore ?>
 				</td>
 				<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
-				<td><?php echo esc_html( $rep['orders'] ); ?> ออเดอร์<br><small>ลดรวม ฿<?php echo esc_html( number_format( $rep['total'], 2 ) ); ?></small></td>
+				<td><strong><?php echo esc_html( $rep['orders'] ); ?></strong> ออเดอร์<br><small>ลดรวม ฿<?php echo esc_html( number_format( $rep['total'], 2 ) ); ?></small></td>
+				<td class="amq-dates">
+					<?php if ( ! empty( $deal['created_at'] ) ) : ?>
+						<span class="description">สร้าง</span> <?php echo esc_html( amouriq_bogo_stamp( $deal['created_at'] ) ); ?><br>
+						<span class="description">แก้ล่าสุด</span> <?php echo esc_html( amouriq_bogo_stamp( isset( $deal['updated_at'] ) ? $deal['updated_at'] : $deal['created_at'] ) ); ?>
+					<?php else : ?>
+						<span class="description">ไม่มีบันทึกวันที่<br>(สร้างก่อนเพิ่มระบบนี้ จะเริ่มบันทึกเมื่อแก้ไขครั้งถัดไป)</span>
+					<?php endif; ?>
+				</td>
 				<td style="white-space:normal">
-					<a class="button button-primary" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
-					<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', $id ); ?>
-					<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'button', '', $id ); ?>
-					<span class="amq-order" title="ลำดับ: ดีลบนทำก่อนดีลล่าง (สำคัญเมื่อใช้ Exclusive)">
-					<?php
-					if ( $i > 0 ) {
-						amouriq_bogo_action_form( 'move_up', 'index', $i, '↑', 'button', '', $id );
-					}
-					if ( $i < count( $deals ) - 1 ) {
-						amouriq_bogo_action_form( 'move_down', 'index', $i, '↓', 'button', '', $id );
-					}
-					?>
-					</span>
-					<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-link-delete', 'ลบดีลนี้?', $id ); ?>
+					<div class="amq-actions-main">
+						<a class="button button-primary" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
+						<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', $id ); ?>
+					</div>
+					<div class="amq-actions-more">
+						<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'button button-small', '', $id ); ?>
+						<span class="amq-order" title="ลำดับ: ดีลบนทำก่อนดีลล่าง (สำคัญเมื่อใช้ Exclusive)">
+						<?php
+						if ( $i > 0 ) {
+							amouriq_bogo_action_form( 'move_up', 'index', $i, '↑', 'button button-small', '', $id );
+						}
+						if ( $i < count( $deals ) - 1 ) {
+							amouriq_bogo_action_form( 'move_down', 'index', $i, '↓', 'button button-small', '', $id );
+						}
+						?>
+						</span>
+						<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-small button-link-delete', 'ลบดีลนี้?', $id ); ?>
+					</div>
 				</td>
 			</tr>
 		<?php endforeach; ?>
@@ -1398,6 +1423,14 @@ function amouriq_bogo_admin_css() {
 		.amq-table td { vertical-align:top; padding:12px 10px; line-height:1.55; }
 		.amq-table tr.amq-dim td { background:#f6f7f7; color:#787c82; }
 		.amq-table .button { margin:0 2px 2px 0; }
+		.amq-table thead th { background:#f6f7f7; font-weight:600; padding:10px; }
+		.amq-table tbody tr:hover td { background:#fafcff; } .amq-table tr.amq-dim:hover td { background:#f0f0f1; }
+		.amq-no { text-align:center; color:#8c8f94; font-weight:600; font-size:15px; }
+		.amq-deal-title { font-size:15px; font-weight:600; color:#1d2327; margin-bottom:2px; }
+		.amq-deal-detail { margin:4px 0 2px; color:#3c434a; }
+		.amq-dates { font-size:12px; line-height:1.7; }
+		.amq-actions-main { margin-bottom:6px; } .amq-actions-more { display:flex; flex-wrap:wrap; gap:2px; align-items:center; opacity:.85; }
+		.amq-actions-more form, .amq-actions-main form { display:inline; margin:0; }
 		.amq-empty { text-align:center; color:#646970; padding:24px !important; }
 		.amq-badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; }
 		.amq-on { background:#d7f0dd; color:#14532d; }
