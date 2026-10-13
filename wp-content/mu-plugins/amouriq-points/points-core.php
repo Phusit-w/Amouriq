@@ -366,6 +366,7 @@ function amouriq_points_core_type_names() {
 		'give_back'    => 'คืนแต้ม',
 		'refund'       => 'หักแต้ม (คืนเงิน)',
 		'adjust'       => 'ปรับแต้มโดยร้าน',
+		'import'       => 'ยกยอดจากระบบเดิม',
 		'bonus_signup' => 'โบนัสสมัครสมาชิก',
 		'bonus_first'  => 'โบนัสออเดอร์แรก',
 		'bonus_review' => 'โบนัสรีวิวสินค้า',
@@ -466,7 +467,7 @@ function amouriq_points_core_report( $ledgers, $now, $offset = 0 ) {
 				$earners[ $user_id ]       = ( isset( $earners[ $user_id ] ) ? $earners[ $user_id ] : 0 ) + $points;
 			} elseif ( 'use' === $type || 'redeem' === $type ) {
 				$months[ $key ]['used'] += -$points;
-			} elseif ( 'adjust' === $type ) {
+			} elseif ( 'adjust' === $type || 'import' === $type ) {
 				$months[ $key ]['adjusted'] += $points;
 			} else {
 				$months[ $key ]['taken'] += $points; // refund (negative) and give_back (positive)
@@ -646,4 +647,30 @@ function amouriq_points_core_expiry_message( $points, $soonest, $account_url ) {
 		'subject' => sprintf( 'แต้มสะสม %d แต้มของคุณกำลังจะหมดอายุ', (int) $points ),
 		'body'    => sprintf( "แต้มสะสมของคุณ %d แต้ม จะหมดอายุภายในวันที่ %s\nเข้าสู่ระบบเพื่อดูแต้มและแลกของรางวัลหรือใช้เป็นส่วนลดได้ที่\n%s", (int) $points, $date, $account_url ),
 	);
+}
+
+/* ------------------------------------------------------------ legacy import */
+
+/**
+ * What to bring over from the old Points & Rewards plugin. `$legacy` is user ID => the old plugin's
+ * balance as stored (any text); `$done` lists user IDs already imported. One row per member who has
+ * a positive balance: user_id, points (whole number) and status 'ready' or 'done', in user ID order.
+ * Zero, negative and non-numeric balances are left out: there is nothing to carry over.
+ */
+function amouriq_points_core_legacy_plan( array $legacy, array $done ) {
+	$done = array_map( 'intval', $done );
+	$rows = array();
+	foreach ( $legacy as $user_id => $balance ) {
+		$points = is_numeric( $balance ) ? (int) floor( (float) $balance ) : 0;
+		if ( $points <= 0 ) {
+			continue;
+		}
+		$rows[ (int) $user_id ] = array(
+			'user_id' => (int) $user_id,
+			'points'  => $points,
+			'status'  => in_array( (int) $user_id, $done, true ) ? 'done' : 'ready',
+		);
+	}
+	ksort( $rows );
+	return array_values( $rows );
 }

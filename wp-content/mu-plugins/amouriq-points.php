@@ -596,6 +596,8 @@ function amouriq_points_admin_handle() {
 		$notice = amouriq_points_admin_bonus_save();
 	} elseif ( in_array( $action, array( 'earn_add', 'earn_delete', 'earn_toggle', 'earn_limits' ), true ) ) {
 		$notice = amouriq_points_admin_earning_action( $action );
+	} elseif ( 'legacy_import' === $action ) {
+		$notice = amouriq_points_admin_legacy_import();
 	} elseif ( 'adjust' === $action ) {
 		$email  = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$user   = $email ? get_user_by( 'email', $email ) : false;
@@ -820,8 +822,115 @@ function amouriq_points_admin_tab_members() {
 		return;
 	}
 
+	amouriq_points_admin_legacy_section();
 	echo '<p class="amq-pts-help">เลือกสมาชิกจากรายชื่อเพื่อดูประวัติแต้ม และเพิ่มหรือหักแต้มให้เป็นรายคน (ค้นหาด้วยชื่อหรืออีเมลได้)</p>';
 	amouriq_points_admin_customer_list();
+}
+
+/* ----------------------------------------------------------- legacy import */
+
+/**
+ * The old Points & Rewards plugin keeps each member's balance in the user meta `wps_wpr_points`; it stays
+ * in the database while that plugin is inactive. Returns user ID => balance for every member with one.
+ */
+function amouriq_points_legacy_balances() {
+	global $wpdb;
+	$rows = $wpdb->get_results( "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'wps_wpr_points' AND CAST( meta_value AS DECIMAL(12,2) ) > 0" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$out  = array();
+	foreach ( (array) $rows as $row ) {
+		$out[ (int) $row->user_id ] = $row->meta_value;
+	}
+	return $out;
+}
+
+/** The legacy plan (see amouriq_points_core_legacy_plan()): members already imported carry the meta `amouriq_points_legacy_imported`. */
+function amouriq_points_legacy_plan() {
+	$legacy = amouriq_points_legacy_balances();
+	$done   = array();
+	foreach ( array_keys( $legacy ) as $user_id ) {
+		if ( get_user_meta( $user_id, 'amouriq_points_legacy_imported', true ) ) {
+			$done[] = $user_id;
+		}
+	}
+	return amouriq_points_core_legacy_plan( $legacy, $done );
+}
+
+/** Staff accounts are unticked by default in the import list (they are rarely real customers' balances). */
+function amouriq_points_legacy_is_staff( $user_id ) {
+	return user_can( $user_id, 'manage_woocommerce' ) || user_can( $user_id, 'manage_options' );
+}
+
+/**
+ * Admin: bring the ticked members' old balance over as one "ยกยอดจากระบบเดิม" entry each (expiring by today's
+ * rules). Only while the programme is off, once per member, and the balance is read again here, never taken
+ * from the form. The old plugin's data is left as it is. Returns the notice.
+ */
+function amouriq_points_admin_legacy_import() {
+	if ( amouriq_points_enabled() ) {
+		return 'ยกยอดไม่ได้ขณะที่ระบบแต้มเปิดอยู่ ปิดระบบก่อน แล้วค่อยยกยอด';
+	}
+	// phpcs:ignore WordPress.Security.NonceVerification -- checked in amouriq_points_admin_handle()
+	$ticked = isset( $_POST['legacy_users'] ) && is_array( $_POST['legacy_users'] ) ? array_map( 'intval', wp_unslash( $_POST['legacy_users'] ) ) : array();
+	$count  = 0;
+	$total  = 0;
+	foreach ( amouriq_points_legacy_plan() as $row ) {
+		if ( 'ready' !== $row['status'] || ! in_array( $row['user_id'], $ticked, true ) || ! get_userdata( $row['user_id'] ) ) {
+			continue;
+		}
+		amouriq_points_record( $row['user_id'], $row['points'], 'import', 0, 'ยกยอดจากระบบแต้มเดิม (Points & Rewards)', get_current_user_id() );
+		update_user_meta( $row['user_id'], 'amouriq_points_legacy_imported', time() );
+		++$count;
+		$total += $row['points'];
+	}
+	return $count ? sprintf( 'ยกยอดแล้ว %d คน รวม %s แต้ม', $count, number_format_i18n( $total ) ) : 'ไม่ได้เลือกสมาชิกคนใดที่ยังยกยอดได้';
+}
+
+/** The "bring over old points" box on the Members tab: only shown while there is something from the old plugin. */
+function amouriq_points_admin_legacy_section() {
+	$plan = amouriq_points_legacy_plan();
+	if ( ! $plan ) {
+		return;
+	}
+	$pending = array_filter(
+		$plan,
+		static function ( $row ) {
+			return 'ready' === $row['status'];
+		}
+	);
+	echo '<div class="amq-pts-card"><h2>ยกยอดแต้มจากระบบเดิม</h2>';
+	echo '<p class="description">ระบบแต้มเดิม (Points &amp; Rewards) ยังมียอดแต้มเก็บไว้ของสมาชิกด้านล่าง ยกยอดมาเป็นแต้มของระบบนี้ได้ครั้งเดียวต่อคน โดยนับอายุแต้มใหม่ตามกติกาตอนนี้ ข้อมูลเดิมไม่ถูกลบหรือแก้ ปลั๊กอินเดิมต้องปิดไว้ตลอด</p>';
+
+	// Every piece below is escaped as it is built; `$editable` adds the tick boxes (only while the programme is off).
+	$table = static function ( $editable ) use ( $plan ) {
+		$html = '';
+		foreach ( $plan as $row ) {
+			$user  = get_userdata( $row['user_id'] );
+			$staff = $user && amouriq_points_legacy_is_staff( $row['user_id'] );
+			$ready = 'ready' === $row['status'];
+			$html .= sprintf(
+				'<tr><td>%s</td><td>%s</td><td>%s</td><td style="text-align:right"><strong>%s</strong></td><td>%s</td></tr>',
+				( $ready && $editable ) ? '<input type="checkbox" name="legacy_users[]" value="' . (int) $row['user_id'] . '"' . ( $staff ? '' : ' checked' ) . '>' : ( $ready ? '' : '✓' ),
+				esc_html( $user ? $user->display_name : '#' . $row['user_id'] ),
+				esc_html( $user ? $user->user_email : '' ),
+				esc_html( number_format_i18n( $row['points'] ) ),
+				$ready ? ( $staff ? 'บัญชีทีมงาน (ไม่ได้ติ๊กไว้ให้)' : 'ยังไม่ได้ยกยอด' ) : 'ยกยอดแล้ว'
+			);
+		}
+		return '<table class="widefat striped" style="max-width:760px;margin:8px 0"><thead><tr><th style="width:36px"></th><th>สมาชิก</th><th>อีเมล</th><th style="text-align:right">แต้มเดิม</th><th>สถานะ</th></tr></thead><tbody>' . $html . '</tbody></table>';
+	};
+
+	if ( ! $pending ) {
+		echo $table( false ) . '<p>ยกยอดครบทุกคนแล้ว</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above
+		return;
+	}
+	if ( amouriq_points_enabled() ) {
+		echo $table( false ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above
+		echo '<p><strong>ปิดระบบแต้มสะสมก่อนจึงจะยกยอดได้</strong> (กันไม่ให้ยอดเปลี่ยนระหว่างที่ลูกค้ากำลังใช้งาน) ปิดที่แท็บ "ภาพรวม" แล้วกลับมาที่นี่</p></div>';
+		return;
+	}
+	echo '<p>ติ๊กสมาชิกที่ต้องการยกยอด (บัญชีทีมงานไม่ได้ติ๊กไว้ให้) แล้วกดปุ่มด้านล่าง</p>';
+	amouriq_points_admin_form( 'legacy_import', $table( true ), 'ยกยอดแต้มที่ติ๊กไว้', 'button button-primary', 'ยกยอดแต้มของสมาชิกที่ติ๊กไว้ ทำซ้ำกับคนเดิมไม่ได้ ยืนยันไหม?' );
+	echo '</div>';
 }
 
 /**
