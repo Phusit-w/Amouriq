@@ -1368,6 +1368,8 @@ function amouriq_bogo_admin_css() {
 		.amq-empty-state { text-align:center; padding:24px; } .amq-empty-state .amq-templates { text-align:left; max-width:900px; margin-left:auto; margin-right:auto; }
 		.amq-group-title { margin:16px 0 6px; font-size:14px; color:#1d2327; } .amq-group-help { margin:0 0 6px; color:#50575e; }
 		.amq-two { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start; }
+		.amq-opts-closed .amq-opt { display:none !important; }
+		.amq-grid .description { font-size:12px; margin:2px 0 0; }
 		.amq-side { position:sticky; top:40px; background:#fff; border:1px solid #c3c4c7; border-radius:6px; padding:14px 16px; }
 		.amq-side h2 { margin-top:0; } .amq-side .amq-summary { position:static; margin:8px 0; }
 		.amq-adv-block h3 { margin:14px 0 6px; font-size:13px; }
@@ -1613,8 +1615,12 @@ function amouriq_bogo_admin_page() {
 						<select name="mode"><option value="percent" <?php selected( $v( 'mode', 'percent' ), 'percent' ); ?>>% ของสินค้าที่ร่วมรายการ</option><option value="baht" <?php selected( $v( 'mode' ), 'baht' ); ?>>บาท (ไม่เกินมูลค่าสินค้าที่ร่วมรายการ)</option></select>
 					</div>
 
-					<span class="k amq-row" data-types="spend_threshold fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
-					<div class="v amq-row" data-types="spend_threshold fixed_price_item amount_off_item bundle_price"><?php amouriq_bogo_product_checklist( 'product_ids', $v( 'product_ids', array() ), $groups, $stock, 'ไม่ติ๊กเลย = ทุกสินค้าร่วมรายการ' ); ?></div>
+					<?php $opts_open = $editing && ( ! empty( $editing['product_ids'] ) || ! empty( $editing['excluded_ids'] ) || ! empty( $editing['scope'] ) ); ?>
+					<span class="k amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price"></span>
+					<div class="v amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price"><button type="button" class="button" id="amq-opt-toggle" data-open="<?php echo $opts_open ? '1' : '0'; ?>">เลือกเฉพาะบางสินค้า หรือยกเว้นสินค้า</button> <span class="description" id="amq-opt-hint">ไม่ตั้ง = ใช้กับทุกสินค้า</span></div>
+
+					<span class="k amq-row amq-opt" data-types="spend_threshold fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
+					<div class="v amq-row amq-opt" data-types="spend_threshold fixed_price_item amount_off_item bundle_price"><?php amouriq_bogo_product_checklist( 'product_ids', $v( 'product_ids', array() ), $groups, $stock, 'ไม่ติ๊กเลย = ทุกสินค้าร่วมรายการ' ); ?></div>
 
 					<span class="k amq-row" data-types="quantity_tier" style="font-weight:600;padding-top:6px">สินค้าที่ร่วมรายการ</span>
 					<?php
@@ -1626,8 +1632,8 @@ function amouriq_bogo_admin_page() {
 					?>
 					<div class="v amq-row" data-types="quantity_tier"><?php amouriq_bogo_product_checklist( 'product_ids', $tier_ids, $groups, $stock, 'ติ๊กหลายรายการได้ เช่น ทุกกลิ่นของ Castile Soap ขนาด 250 ml จำนวนนับรวมกันข้ามกลิ่น' ); ?></div>
 
-					<span class="k amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">สินค้าที่ยกเว้น</span>
-					<div class="v amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price"><?php amouriq_bogo_product_checklist( 'excluded_ids', $v( 'excluded_ids', array() ), $groups, $stock, 'สินค้าที่ติ๊กจะไม่ได้ส่วนลด แต่ยังนับรวมในยอดขั้นต่ำ' ); ?></div>
+					<span class="k amq-row amq-opt" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">สินค้าที่ยกเว้น</span>
+					<div class="v amq-row amq-opt" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price"><?php amouriq_bogo_product_checklist( 'excluded_ids', $v( 'excluded_ids', array() ), $groups, $stock, 'สินค้าที่ติ๊กจะไม่ได้ส่วนลด แต่ยังนับรวมในยอดขั้นต่ำ' ); ?></div>
 
 					<span class="k amq-row" data-types="quantity_tier" style="font-weight:600;padding-top:6px">ขั้นส่วนลด</span>
 					<div class="v amq-row" data-types="quantity_tier">
@@ -1654,8 +1660,8 @@ function amouriq_bogo_admin_page() {
 					<div class="v amq-row" data-types="amount_off_item"><input type="number" name="off_value" id="bogo_off" min="0" step="any" value="<?php echo esc_attr( $v( 'value' ) ); ?>">
 						<p class="description">ทุกชิ้นที่ร่วมรายการลดชิ้นละเท่านี้ (ไม่เกินราคาสินค้าชิ้นนั้น)</p></div>
 
-					<span class="k amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">ขอบเขตสินค้า</span>
-					<div class="v amq-row" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price">
+					<span class="k amq-row amq-opt" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price" style="font-weight:600;padding-top:6px">ขอบเขตสินค้า</span>
+					<div class="v amq-row amq-opt" data-types="spend_threshold quantity_tier fixed_price_item amount_off_item bundle_price">
 						<details <?php echo ( $editing && ! empty( $editing['scope'] ) ) ? 'open' : ''; ?> style="margin:0;border:0;padding:0">
 							<summary>เลือกตามหมวด แท็ก ขนาด หรือ SKU (ไม่บังคับ)</summary>
 							<?php amouriq_bogo_scope_fields( isset( $editing['scope'] ) ? $editing['scope'] : array(), $cats ); ?>
@@ -1693,7 +1699,7 @@ function amouriq_bogo_admin_page() {
 				?>
 				<details id="amq-advanced" <?php echo $adv_open ? 'open' : ''; ?>>
 					<summary><strong>ตัวเลือกขั้นสูง</strong> <span class="description">(ส่วนใหญ่ไม่ต้องแตะ: เงื่อนไขเพิ่มเติม, Exclusive, ช่วงเวลา, จำกัดสิทธิ์)</span></summary>
-				<div class="amq-adv-block">$1$2</h3>
+				<div class="amq-adv-block"><h3>เงื่อนไขเพิ่มเติม: ใครและเมื่อไหร่ (ไม่บังคับ เช่น เฉพาะลูกค้าที่เคยสั่งซื้อ วันในสัปดาห์ จำนวนชิ้นในตะกร้า)</h3>
 					<?php amouriq_bogo_condition_fields( amouriq_bogo_conditions_for_form( $v( 'conditions', array() ) ) ); ?>
 				</div>
 
@@ -1873,10 +1879,23 @@ function amouriq_bogo_admin_page() {
 			// After the field sync has run, so fields of other types (disabled) are not read.
 			form.addEventListener('input', function () { setTimeout(summarise, 0); });
 			form.addEventListener('change', function () { setTimeout(summarise, 0); });
-$1			form.addEventListener('change', function () {
+			form.addEventListener('change', sync);
+			form.addEventListener('change', function () {
 				var r = form.querySelector('input[name=type]:checked'), nameEl = document.getElementById('amq-type-name');
 				if (r && nameEl && r.parentNode.querySelector('strong')) { nameEl.textContent = r.parentNode.querySelector('strong').textContent; }
 			});
+			// Choosing only some products (or excluding some) is optional and rare: folded until asked for.
+			var optBtn = document.getElementById('amq-opt-toggle');
+			function setOpts(open) {
+				form.classList.toggle('amq-opts-closed', !open);
+				optBtn.setAttribute('data-open', open ? '1' : '0');
+				optBtn.textContent = open ? 'ซ่อนส่วนเลือกสินค้า' : 'เลือกเฉพาะบางสินค้า หรือยกเว้นสินค้า';
+				document.getElementById('amq-opt-hint').hidden = open;
+			}
+			if (optBtn) {
+				optBtn.addEventListener('click', function () { setOpts(optBtn.getAttribute('data-open') !== '1'); });
+				setOpts(optBtn.getAttribute('data-open') === '1');
+			}
 			sync();
 			summarise();
 		})();
