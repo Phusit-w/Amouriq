@@ -133,6 +133,8 @@ function amouriq_label_document( array $labels, $for_pdf = false ) {
 '
 			. 'div.amq-page .amq-label .logo{ max-height:40px; }
 '
+			. 'div.amq-page .amq-label table.items{ width:97%; }
+'
 			. 'div.amq-page .amq-label table.items th, div.amq-page .amq-label table.items td{ padding:3px 5px; }
 ';
 	}
