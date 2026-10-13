@@ -1275,9 +1275,27 @@ function amouriq_bogo_shipping_panel() {
 				$is_on = 'draft' !== $post->post_status;
 			?>
 				<tr class="<?php echo $is_on ? '' : 'amq-dim'; ?>">
-					<td><strong><?php echo esc_html( $coupon->get_code() ); ?></strong><br>หมดอายุ: <?php echo $expires ? esc_html( $expires->date_i18n( 'Y-m-d' ) ) : 'ไม่มีกำหนด'; ?></td>
+					<td><code style="font-size:14px;font-weight:600;padding:3px 8px;background:#f0f6fc;border:1px solid #c5d9ed;border-radius:4px"><?php echo esc_html( $coupon->get_code() ); ?></code>
+						<?php if ( $coupon->get_description() ) : ?><br><span class="description"><?php echo esc_html( $coupon->get_description() ); ?></span><?php endif; ?></td>
 					<td><?php echo amouriq_bogo_badge( $state ); // phpcs:ignore ?></td>
-					<td><?php echo esc_html( $used ); ?>/<?php echo $limit ? esc_html( $limit ) : '∞'; ?> ครั้ง</td>
+					<td>
+						<?php if ( $expires ) : ?>
+							<?php echo esc_html( $expires->date_i18n( 'd/m/Y' ) ); ?>
+							<?php if ( $expires->getTimestamp() >= $now ) : ?><br><span class="description">อีก <?php echo esc_html( ceil( ( $expires->getTimestamp() - $now ) / DAY_IN_SECONDS ) ); ?> วัน</span><?php endif; ?>
+						<?php else : ?>
+							<span class="description">ไม่มีกำหนด</span>
+						<?php endif; ?>
+					</td>
+					<td>
+						<strong><?php echo esc_html( $used ); ?></strong> / <?php echo $limit ? esc_html( $limit ) : '∞'; ?> ครั้ง
+						<?php if ( $limit ) : ?>
+							<div style="height:5px;background:#e0e0e0;border-radius:3px;margin-top:4px"><div style="height:5px;border-radius:3px;background:<?php echo $used >= $limit ? '#d63638' : '#2271b1'; ?>;width:<?php echo esc_attr( min( 100, round( 100 * $used / $limit ) ) ); ?>%"></div></div>
+						<?php endif; ?>
+					</td>
+					<td>
+						<span class="description">สร้าง</span> <?php echo esc_html( wp_date( 'd/m/Y H:i', get_post_timestamp( $post, 'date' ) ) ); ?><br>
+						<span class="description">แก้ล่าสุด</span> <?php echo esc_html( wp_date( 'd/m/Y H:i', get_post_timestamp( $post, 'modified' ) ) ); ?>
+					</td>
 					<td style="white-space:normal">
 						<?php amouriq_bogo_action_form( 'toggle_coupon', 'coupon_id', $post->ID, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary' ); ?>
 						<a class="button" href="<?php echo esc_url( get_edit_post_link( $post->ID ) ); ?>">แก้ที่หน้าคูปอง</a>
