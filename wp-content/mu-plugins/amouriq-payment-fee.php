@@ -98,3 +98,21 @@ add_action(
 		<?php
 	}
 );
+
+/**
+ * WooCommerce sorts fees from the largest amount down, so a positive fee is worked out before the
+ * discount fees. A not-taxable fee then sits in the denominator when the tax of a discount is split
+ * over the items, and the discount comes out a few satang smaller (the customer paid 30.09 instead of
+ * 30). Putting discounts first makes the Payment fee change the total by exactly its amount.
+ */
+add_filter(
+	'woocommerce_sort_fees_callback',
+	static function ( $order, $a, $b ) {
+		if ( ( $a->amount < 0 ) !== ( $b->amount < 0 ) ) {
+			return $a->amount < 0 ? -1 : 1;
+		}
+		return $order;
+	},
+	10,
+	3
+);
