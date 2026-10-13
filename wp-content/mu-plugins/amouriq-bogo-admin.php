@@ -1211,25 +1211,20 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 						<span class="description">ไม่มีบันทึกวันที่<br>(สร้างก่อนเพิ่มระบบนี้ จะเริ่มบันทึกเมื่อแก้ไขครั้งถัดไป)</span>
 					<?php endif; ?>
 				</td>
-				<td style="white-space:normal">
-					<div class="amq-actions-main">
+				<td class="amq-act">
+					<div class="amq-act-row">
 						<a class="button button-primary" href="<?php echo esc_url( amouriq_bogo_page_url() . '&edit=' . $i . '#amq-form' ); ?>">แก้ไข</a>
-						<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'ปิด' : 'เปิด', $is_on ? 'button' : 'button button-primary', '', $id ); ?>
+						<?php amouriq_bogo_action_form( 'toggle_deal', 'index', $i, $is_on ? 'เปิดอยู่' : 'ปิดอยู่', 'amq-switch ' . ( $is_on ? 'amq-switch-on' : 'amq-switch-off' ), '', $id ); ?>
 					</div>
-					<div class="amq-actions-more">
-						<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'button button-small', '', $id ); ?>
-						<span class="amq-order" title="ลำดับ: ดีลบนทำก่อนดีลล่าง (สำคัญเมื่อใช้ Exclusive)">
-						<?php
-						if ( $i > 0 ) {
-							amouriq_bogo_action_form( 'move_up', 'index', $i, '↑', 'button button-small', '', $id );
-						}
-						if ( $i < count( $deals ) - 1 ) {
-							amouriq_bogo_action_form( 'move_down', 'index', $i, '↓', 'button button-small', '', $id );
-						}
-						?>
-						</span>
-						<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบ', 'button button-small button-link-delete', 'ลบดีลนี้?', $id ); ?>
-					</div>
+					<details class="amq-more">
+						<summary>เพิ่มเติม ▾</summary>
+						<div class="amq-menu">
+							<?php amouriq_bogo_action_form( 'duplicate', 'index', $i, 'ทำสำเนา', 'amq-menu-item', '', $id ); ?>
+							<?php if ( $i > 0 ) { amouriq_bogo_action_form( 'move_up', 'index', $i, '↑ ย้ายขึ้น (ทำก่อน)', 'amq-menu-item', '', $id ); } ?>
+							<?php if ( $i < count( $deals ) - 1 ) { amouriq_bogo_action_form( 'move_down', 'index', $i, '↓ ย้ายลง (ทำทีหลัง)', 'amq-menu-item', '', $id ); } ?>
+							<?php amouriq_bogo_action_form( 'delete', 'index', $i, 'ลบดีลนี้', 'amq-menu-item amq-menu-danger', 'ลบดีลนี้?', $id ); ?>
+						</div>
+					</details>
 				</td>
 			</tr>
 		<?php endforeach; ?>
@@ -1429,8 +1424,19 @@ function amouriq_bogo_admin_css() {
 		.amq-deal-title { font-size:15px; font-weight:600; color:#1d2327; margin-bottom:2px; }
 		.amq-deal-detail { margin:4px 0 2px; color:#3c434a; }
 		.amq-dates { font-size:12px; line-height:1.7; }
-		.amq-actions-main { margin-bottom:6px; } .amq-actions-more { display:flex; flex-wrap:wrap; gap:2px; align-items:center; opacity:.85; }
-		.amq-actions-more form, .amq-actions-main form { display:inline; margin:0; }
+		.amq-act-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+		.amq-act-row form { margin:0; display:inline; }
+		.amq-switch { cursor:pointer; border:1px solid #c3c4c7; background:#fff; border-radius:999px; padding:3px 12px 3px 30px; font-size:12px; font-weight:600; position:relative; line-height:1.8; }
+		.amq-switch::before { content:""; position:absolute; left:4px; top:50%; width:18px; height:18px; margin-top:-9px; border-radius:50%; background:#a7aaad; transition:left .15s; }
+		.amq-switch-on { background:#d7f0dd; border-color:#7fc58f; color:#14532d; padding:3px 30px 3px 12px; }
+		.amq-switch-on::before { left:auto; right:4px; background:#2e8b4b; }
+		.amq-switch:hover { filter:brightness(.96); }
+		.amq-more { margin-top:8px; } .amq-more summary { cursor:pointer; color:#2271b1; font-size:12px; list-style:none; } .amq-more summary::-webkit-details-marker { display:none; }
+		.amq-menu { margin-top:6px; border:1px solid #dcdcde; border-radius:6px; background:#fff; overflow:hidden; max-width:220px; }
+		.amq-menu form { display:block; margin:0; }
+		.amq-menu-item { display:block; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid #f0f0f1; padding:7px 12px; cursor:pointer; font:inherit; color:#1d2327; }
+		.amq-menu-item:hover { background:#f0f6fc; } .amq-menu form:last-child .amq-menu-item { border-bottom:0; }
+		.amq-menu-danger { color:#b32d2e; } .amq-menu-danger:hover { background:#fcf0f1; }
 		.amq-empty { text-align:center; color:#646970; padding:24px !important; }
 		.amq-badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; }
 		.amq-on { background:#d7f0dd; color:#14532d; }
