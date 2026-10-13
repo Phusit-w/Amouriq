@@ -156,6 +156,44 @@ html, body{ margin:0; padding:0; background:#fff; }
 ' . $pdf_css . '</style></head><body>' . $pages . '</body></html>';
 }
 
+/**
+ * The owner's options as the settings form posts them (already unslashed): a ticked box is posted, an
+ * unticked one is missing, so a missing switch means off. Everything is cleaned like a stored option.
+ * Shared by saving the form and by the live preview, so the preview shows exactly what saving would keep.
+ */
+function amouriq_label_options_from_input( array $in ) {
+	$raw = array();
+	foreach ( array( 'logo_url', 'logo_width', 'sender_name', 'sender_address', 'sender_phone', 'font_size', 'note', 'page_width', 'page_height' ) as $key ) {
+		$raw[ $key ] = isset( $in[ $key ] ) ? $in[ $key ] : '';
+	}
+	foreach ( array( 'show_logo', 'show_option', 'show_to_phone', 'show_sender', 'show_order_number', 'show_items', 'show_invoice_number', 'show_order_date', 'show_customer_note' ) as $key ) {
+		$raw[ $key ] = ! empty( $in[ $key ] );
+	}
+	return amouriq_label_clean_options( $raw );
+}
+
+/** A made-up order for the settings page preview, built with the owner's options. */
+function amouriq_label_sample( array $o ) {
+	return array(
+		'options'        => $o,
+		'logo_url'       => $o['logo_url'],
+		'sender'         => array(
+			'name'  => '' !== $o['sender_name'] ? $o['sender_name'] : '(ชื่อผู้ส่งจากปลั๊กอินพิมพ์เอกสาร)',
+			'lines' => '' !== $o['sender_address'] ? explode( "\n", $o['sender_address'] ) : array( '(ที่อยู่ผู้ส่งจากปลั๊กอินพิมพ์เอกสาร)' ),
+			'phone' => '' !== $o['sender_phone'] ? $o['sender_phone'] : '02-000-0000',
+		),
+		'recipient'      => array( 'lines' => array( 'สมชาย ใจดี', '99/9 หมู่ 1 ต.บางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310' ), 'phone' => '081-234-5678' ),
+		'order_number'   => '1234',
+		'invoice_number' => '1234',
+		'order_date'     => '13/10/2026',
+		'customer_note'  => 'ฝากไว้ที่ป้อมยาม',
+		'items'          => array(
+			array( 'name' => 'Organic Olive Castile Soap - Lavender', 'option' => 'ปริมาณ: 250 ml', 'qty' => 2 ),
+			array( 'name' => 'Organic Olive Castile Soap - Rosemary', 'option' => 'ปริมาณ: 100 ml', 'qty' => 1 ),
+		),
+	);
+}
+
 function amouriq_label_html( array $label ) {
 	$opt       = amouriq_label_clean_options( isset( $label['options'] ) ? $label['options'] : array() );
 	$sender    = isset( $label['sender'] ) ? $label['sender'] : array();

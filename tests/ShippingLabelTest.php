@@ -306,4 +306,41 @@ final class ShippingLabelTest extends TestCase {
 			$this->assertStringContainsString($text, $html);
 		}
 	}
+
+	// --- the settings form and the live preview share one reading of the form ---
+
+	public function test_an_unticked_box_is_off_and_a_ticked_one_is_on(): void {
+		$o = amouriq_label_options_from_input(['show_sender' => '1', 'font_size' => '13']);
+
+		$this->assertTrue($o['show_sender']);
+		$this->assertFalse($o['show_order_number']); // not in the form = unticked
+		$this->assertFalse($o['show_logo']);
+		$this->assertFalse($o['show_invoice_number']);
+		$this->assertSame(13, $o['font_size']);
+	}
+
+	public function test_form_values_are_cleaned_like_stored_ones(): void {
+		$o = amouriq_label_options_from_input(['font_size' => '99', 'page_width' => 'x', 'logo_url' => 'javascript:alert(1)', 'sender_name' => '<b>ร้าน</b>']);
+
+		$this->assertSame(14, $o['font_size']);
+		$this->assertSame(100, $o['page_width']);
+		$this->assertSame('', $o['logo_url']);
+		$this->assertSame('ร้าน', $o['sender_name']);
+	}
+
+	public function test_the_sample_label_follows_the_options(): void {
+		$o      = amouriq_label_options_from_input(['show_sender' => '1', 'show_invoice_number' => '1', 'sender_name' => 'ร้านทดลอง']);
+		$sample = amouriq_label_sample($o);
+		$html   = amouriq_label_html($sample);
+
+		$this->assertStringContainsString('ร้านทดลอง', $html);
+		$this->assertStringContainsString('เลขที่ใบแจ้งหนี้', $html);
+		$this->assertStringNotContainsString('เลขที่ออเดอร์', $html); // that box is unticked
+	}
+
+	public function test_an_empty_sender_in_the_sample_says_it_comes_from_the_print_plugin(): void {
+		$html = amouriq_label_html(amouriq_label_sample(amouriq_label_options_from_input(['show_sender' => '1'])));
+
+		$this->assertStringContainsString('ปลั๊กอินพิมพ์เอกสาร', $html);
+	}
 }
