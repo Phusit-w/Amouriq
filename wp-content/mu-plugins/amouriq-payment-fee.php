@@ -75,3 +75,26 @@ function amouriq_payment_fee_in_cart( $cart ) {
 	}
 	return $total;
 }
+
+/**
+ * Recalculate the checkout totals when the customer picks another payment method. WooCommerce used to do
+ * this itself; recent versions only announce `payment_method_selected` and leave the refresh to plugins,
+ * so without this the fee would not appear or disappear until something else changed.
+ */
+add_action(
+	'wp_footer',
+	static function () {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() || is_order_received_page() || ! amouriq_payment_fee_settings()['enabled'] ) {
+			return;
+		}
+		?>
+		<script>
+		jQuery(function ($) {
+			$(document.body).on('payment_method_selected', function () {
+				$(document.body).trigger('update_checkout');
+			});
+		});
+		</script>
+		<?php
+	}
+);
