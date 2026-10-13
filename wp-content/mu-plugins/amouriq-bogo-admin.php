@@ -1724,7 +1724,6 @@ function amouriq_bogo_admin_page() {
 				<aside class="amq-side">
 					<h2>สรุปให้ตรวจ</h2>
 					<div class="amq-summary" id="amq-live-summary"></div>
-					<p class="description">ดีลใหม่เริ่มที่ "ปิดอยู่" เสมอ ตรวจแล้วค่อยเปิดที่รายการดีล</p>
 					<p style="margin-top:14px">
 						<?php submit_button( $editing ? 'บันทึกการแก้ไข' : 'เพิ่มดีล', 'primary', 'submit', false ); ?>
 						<a class="button" href="<?php echo esc_url( $back ); ?>" style="margin-left:6px">ยกเลิก</a>
