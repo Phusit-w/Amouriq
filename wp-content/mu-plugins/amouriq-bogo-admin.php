@@ -587,6 +587,17 @@ function amouriq_bogo_admin_handle() {
 		}
 		wp_safe_redirect( $back . '&tab=member' );
 		exit;
+	} elseif ( 'save_payment_fee' === $action ) {
+		$amount = isset( $_POST['fee_amount'] ) ? str_replace( ',', '', sanitize_text_field( wp_unslash( $_POST['fee_amount'] ) ) ) : '';
+		if ( ! is_numeric( $amount ) || $amount <= 0 ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, 'ค่าธรรมเนียมเก็บเงินปลายทาง: จำนวนเงินต้องเป็นตัวเลขมากกว่า 0 ไม่ได้บันทึก', 60 );
+		} else {
+			update_option( 'amouriq_payment_fee_enabled', ! empty( $_POST['fee_enabled'] ) ? 'yes' : 'no', false );
+			update_option( 'amouriq_payment_fee_amount', (string) round( (float) $amount, 2 ), false );
+			set_transient( 'amouriq_bogo_notice_' . $uid, 'บันทึกค่าธรรมเนียมเก็บเงินปลายทางแล้ว', 60 );
+		}
+		wp_safe_redirect( $back . '&tab=fee' );
+		exit;
 	} elseif ( 'toggle_coupon' === $action ) {
 		$post = get_post( isset( $_POST['coupon_id'] ) ? (int) $_POST['coupon_id'] : 0 );
 		if ( $post && 'shop_coupon' === $post->post_type && in_array( $post->post_status, array( 'publish', 'draft' ), true ) ) {
@@ -972,6 +983,7 @@ function amouriq_bogo_admin_tabs() {
 		'deals'    => 'ดีลทั้งหมด',
 		'member'   => 'สิทธิพิเศษสมาชิก',
 		'shipping' => 'ส่งฟรี',
+		'fee'      => 'ค่าธรรมเนียม',
 	);
 }
 
@@ -1050,6 +1062,24 @@ function amouriq_bogo_deals_table( $deals, $report, $types ) {
 		</tbody>
 	</table></div>
 	<p class="description">ดีลที่อยู่ข้างบนทำงานก่อนดีลข้างล่าง (ใช้ลูกศร ↑ ↓ เรียงลำดับ) ส่วนลดรวมนับเฉพาะออเดอร์ที่ไม่ถูกยกเลิก ล้มเหลว หรือคืนเงิน</p>
+	<?php
+}
+
+/** The Payment fee (cash on delivery): the owner's switch and amount. */
+function amouriq_bogo_fee_panel() {
+	$fee = function_exists( 'amouriq_payment_fee_settings' ) ? amouriq_payment_fee_settings() : array( 'enabled' => false, 'amount' => 30.0 );
+	?>
+	<div class="amq-card">
+		<h2>ค่าธรรมเนียมเก็บเงินปลายทาง <?php echo amouriq_bogo_badge( $fee['enabled'] ? 'เปิดอยู่' : 'ปิดอยู่' ); // phpcs:ignore ?></h2>
+		<p>เมื่อลูกค้าเลือกชำระเงินปลายทาง ระบบบวกค่าธรรมเนียมคงที่เข้ายอดรวม คิดแม้ส่งฟรี คิดหลังหักส่วนลดทั้งหมด ไม่มีภาษีเพิ่ม และไม่นับเป็นยอดซื้อสำหรับแต้มสะสมหรือเงื่อนไข "ซื้อครบ"</p>
+		<form method="post" action="<?php echo esc_url( amouriq_bogo_page_url() . '&tab=fee' ); ?>">
+			<?php wp_nonce_field( 'amouriq_bogo_save' ); ?>
+			<input type="hidden" name="amouriq_bogo_action" value="save_payment_fee">
+			<p><label><input type="checkbox" name="fee_enabled" value="1" <?php checked( $fee['enabled'] ); ?>> เก็บค่าธรรมเนียมเมื่อชำระเงินปลายทาง</label></p>
+			<p><label>จำนวนเงิน (บาท) <input type="text" name="fee_amount" value="<?php echo esc_attr( amouriq_bogo_member_number( $fee['amount'] ) ); ?>" style="width:7em" required></label></p>
+			<p><button type="submit" class="button button-primary">บันทึก</button></p>
+		</form>
+	</div>
 	<?php
 }
 
@@ -1303,6 +1333,8 @@ function amouriq_bogo_admin_page() {
 				amouriq_bogo_member_panel();
 			} elseif ( 'shipping' === $tab ) {
 				amouriq_bogo_shipping_panel();
+			} elseif ( 'fee' === $tab ) {
+				amouriq_bogo_fee_panel();
 			} else {
 				amouriq_bogo_deals_table( $deals, $report, $types );
 			}

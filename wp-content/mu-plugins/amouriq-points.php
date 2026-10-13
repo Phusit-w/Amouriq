@@ -80,7 +80,9 @@ add_action( 'woocommerce_order_status_completed', 'amouriq_points_award', 10, 1 
 
 /** Paid item total of an order: what was charged, without shipping (points used and every discount are already off it). */
 function amouriq_points_order_eligible( WC_Order $order ) {
-	return max( 0.0, (float) $order->get_total() - (float) $order->get_shipping_total() - (float) $order->get_shipping_tax() );
+	$eligible = max( 0.0, (float) $order->get_total() - (float) $order->get_shipping_total() - (float) $order->get_shipping_tax() );
+	// The cash-on-delivery Payment fee is not purchase value.
+	return function_exists( 'amouriq_payment_fee_of_order' ) ? amouriq_payment_fee_core_eligible( $eligible, amouriq_payment_fee_of_order( $order ) ) : $eligible;
 }
 
 function amouriq_points_award( $order_id ) {
@@ -297,7 +299,7 @@ function amouriq_points_box() {
 	$figures  = amouriq_points_cart_figures( WC()->cart );
 	$limit    = amouriq_points_core_redeem_limit( $balance['points'], $figures['base_incl'], $settings );
 	$applied  = amouriq_points_applied();
-	$earn     = amouriq_points_core_earn( max( 0.0, (float) WC()->cart->get_total( 'edit' ) - (float) WC()->cart->get_shipping_total() - (float) WC()->cart->get_shipping_tax() ), $settings );
+	$earn     = amouriq_points_core_earn( max( 0.0, (float) WC()->cart->get_total( 'edit' ) - (float) WC()->cart->get_shipping_total() - (float) WC()->cart->get_shipping_tax() - ( function_exists( 'amouriq_payment_fee_in_cart' ) ? amouriq_payment_fee_in_cart( WC()->cart ) : 0.0 ) ), $settings );
 
 	echo '<div class="amouriq-points-box" style="margin:0 0 1.5em;padding:1em 1.2em;border:1px solid #d9d4c7;border-radius:6px;background:#fbf8f2">';
 	printf( '<p style="margin:0 0 .4em"><strong>แต้มสะสมของคุณ: %s แต้ม</strong></p>', esc_html( number_format_i18n( $balance['points'] ) ) );
