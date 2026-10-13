@@ -1934,7 +1934,11 @@ function amouriq_bogo_admin_page() {
 				var oldNote = form.querySelector('.amq-tpl-note');
 				if (oldNote) { oldNote.remove(); }
 				var radio = form.querySelector('input[name=type][value=' + tpl.type + ']');
-				if (radio) { radio.checked = true; }
+				if (radio) {
+					radio.checked = true;
+					var typeName = document.getElementById('amq-type-name'), typeLabel = radio.parentNode.querySelector('strong');
+					if (typeName && typeLabel) { typeName.textContent = typeLabel.textContent; }
+				}
 				Object.keys(tpl).forEach(function (k) { if (k !== 'type') { setField(k, tpl[k]); } });
 				var note = document.createElement('div');
 				note.className = 'notice notice-info inline amq-tpl-note';
