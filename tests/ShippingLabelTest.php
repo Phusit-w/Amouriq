@@ -92,6 +92,15 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertStringContainsString('<table class="items"><thead><tr class="running"><th colspan="4">ออเดอร์ #5390', $html);
 	}
 
+	public function test_print_page_shrinks_a_tall_label_to_fit_but_the_pdf_runs_no_script(): void {
+		$print = amouriq_label_document([$this->label()]);
+		$pdf   = amouriq_label_document([$this->label()], true);
+
+		$this->assertStringContainsString('.amq-page', $print);
+		$this->assertStringContainsString('style.zoom', $print);
+		$this->assertStringNotContainsString('<script', $pdf);
+	}
+
 	public function test_options_can_hide_the_option_column_logo_and_recipient_phone(): void {
 		$html = amouriq_label_html($this->label(['options' => ['show_option' => false, 'show_logo' => false, 'show_to_phone' => false]]));
 

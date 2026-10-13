@@ -148,12 +148,19 @@ function amouriq_label_document( array $labels, $for_pdf = false ) {
 	foreach ( $labels as $label ) {
 		$pages .= '<div class="amq-page">' . amouriq_label_html( $label ) . '</div>';
 	}
+	// The print page keeps the owner's type size when a label fits its page; one that is too tall is shrunk
+	// (down to 65%) to fit, and only what still does not fit continues on the next page. dompdf runs no scripts,
+	// so the PDF gets its compact type from $pdf_css instead.
+	$fit = '';
+	if ( ! $for_pdf ) {
+		$fit = '<script>(function(){function run(){var p=document.createElement("div");p.style.cssText="position:absolute;height:100mm;width:1px";document.body.appendChild(p);var mm=p.offsetHeight/100;p.remove();var m=/size:\s*([\d.]+)mm\s+([\d.]+)mm/.exec(document.querySelector("style").textContent);if(!m){return;}var avail=(parseFloat(m[2])-8)*mm;document.querySelectorAll(".amq-page").forEach(function(el){el.style.zoom=1;var z=1;for(var i=0;i<8;i++){var h=el.getBoundingClientRect().height;if(h<=avail){break;}z=Math.max(0.65,z*avail/h*0.98);el.style.zoom=z;if(z<=0.65){break;}}});}if(document.readyState==="complete"){run();}else{window.addEventListener("load",run);}})();</script>';
+	}
 	return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>ใบปะหน้าพัสดุ</title><style>
 @page{ size: ' . (int) $first['page_width'] . 'mm ' . (int) $first['page_height'] . 'mm; margin: ' . ( $for_pdf ? '0' : '4mm' ) . '; }
 html, body{ margin:0; padding:0; background:#fff; }
 .amq-page{ break-after:page; page-break-after:always; }
 .amq-page:last-child{ break-after:auto; page-break-after:auto; }
-' . $pdf_css . '</style></head><body>' . $pages . '</body></html>';
+' . $pdf_css . '</style></head><body>' . $pages . $fit . '</body></html>';
 }
 
 /**
