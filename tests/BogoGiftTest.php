@@ -174,4 +174,62 @@ final class BogoGiftTest extends TestCase {
 
 		$this->assertSame(0, $this->deal_result($this->deal(), $lines)['choices_left']);
 	}
+
+	// --- the Gift choice box (tickets 04, 05) ----------------------------
+
+	private function candidate($id, $parent, $name, $price, array $extra = []) {
+		return array_merge(['id' => $id, 'parent_id' => $parent, 'name' => $name, 'option' => '', 'regular_price' => $price, 'in_stock' => true], $extra);
+	}
+
+	public function test_a_simple_gift_shows_its_regular_price(): void {
+		$groups = amouriq_bogo_core_gift_choices([$this->candidate(31, 31, 'สบู่', 120.0)], []);
+
+		$this->assertCount(1, $groups);
+		$this->assertSame('สบู่', $groups[0]['name']);
+		$this->assertSame(120.0, $groups[0]['options'][0]['regular_price']);
+		$this->assertTrue($groups[0]['options'][0]['available']);
+		$this->assertTrue($groups[0]['available']);
+	}
+
+	public function test_options_of_one_product_share_a_group_each_with_its_own_price(): void {
+		$groups = amouriq_bogo_core_gift_choices([
+			$this->candidate(41, 40, 'ครีม', 200.0, ['option' => '50 มล.']),
+			$this->candidate(42, 40, 'ครีม', 350.0, ['option' => '100 มล.']),
+		], []);
+
+		$this->assertCount(1, $groups);
+		$this->assertSame(40, $groups[0]['product_id']);
+		$this->assertSame(['50 มล.', '100 มล.'], array_column($groups[0]['options'], 'option'));
+		$this->assertSame([200.0, 350.0], array_column($groups[0]['options'], 'regular_price'));
+	}
+
+	public function test_a_sold_out_option_is_unavailable_but_the_group_is_not(): void {
+		$groups = amouriq_bogo_core_gift_choices([
+			$this->candidate(41, 40, 'ครีม', 200.0, ['option' => 'S', 'in_stock' => false]),
+			$this->candidate(42, 40, 'ครีม', 350.0, ['option' => 'L']),
+		], []);
+
+		$this->assertFalse($groups[0]['options'][0]['available']);
+		$this->assertTrue($groups[0]['options'][1]['available']);
+		$this->assertTrue($groups[0]['available']);
+	}
+
+	public function test_a_group_with_every_option_sold_out_is_unavailable(): void {
+		$groups = amouriq_bogo_core_gift_choices([$this->candidate(31, 31, 'สบู่', 120.0, ['in_stock' => false])], []);
+
+		$this->assertFalse($groups[0]['available']);
+	}
+
+	public function test_a_gift_already_picked_is_marked_picked_and_not_available(): void {
+		$groups = amouriq_bogo_core_gift_choices([$this->candidate(31, 31, 'สบู่', 120.0), $this->candidate(32, 32, 'น้ำมัน', 90.0)], [31]);
+
+		$this->assertTrue($groups[0]['options'][0]['picked']);
+		$this->assertFalse($groups[0]['options'][0]['available']);
+		$this->assertFalse($groups[1]['options'][0]['picked']);
+		$this->assertTrue($groups[1]['options'][0]['available']);
+	}
+
+	public function test_no_candidates_gives_no_groups(): void {
+		$this->assertSame([], amouriq_bogo_core_gift_choices([], []));
+	}
 }

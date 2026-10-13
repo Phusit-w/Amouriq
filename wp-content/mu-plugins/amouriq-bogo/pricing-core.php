@@ -167,6 +167,36 @@ function amouriq_bogo_core_gifts_to_remove( $lines, $allowed ) {
 	return $remove;
 }
 
+/**
+ * The Gift choice box as plain data. $candidates are the items a customer can pick
+ * (id, parent_id, name, option label or '', regular_price shown to the customer, in_stock);
+ * $taken are the item ids already in the cart as this Deal's gift. Returns one group per
+ * product, in order: product_id, name, available (some option can still be picked), options
+ * (id, option, regular_price, picked, available). Each item stands on its own price, so
+ * choosing an option shows that option's regular price.
+ */
+function amouriq_bogo_core_gift_choices( $candidates, $taken ) {
+	$groups = array();
+	foreach ( $candidates as $item ) {
+		$parent = (int) $item['parent_id'];
+		if ( ! isset( $groups[ $parent ] ) ) {
+			$groups[ $parent ] = array( 'product_id' => $parent, 'name' => $item['name'], 'available' => false, 'options' => array() );
+		}
+		$picked    = in_array( (int) $item['id'], array_map( 'intval', $taken ), true );
+		$available = ! empty( $item['in_stock'] ) && ! $picked;
+
+		$groups[ $parent ]['options'][] = array(
+			'id'            => (int) $item['id'],
+			'option'        => isset( $item['option'] ) ? $item['option'] : '',
+			'regular_price' => (float) $item['regular_price'],
+			'picked'        => $picked,
+			'available'     => $available,
+		);
+		$groups[ $parent ]['available'] = $groups[ $parent ]['available'] || $available;
+	}
+	return array_values( $groups );
+}
+
 /** Member Privilege's rule: percent off Regular Price lines once the item total reaches min_spend. */
 function amouriq_bogo_member_rule() {
 	$rule = array( 'percent' => 5.0, 'min_spend' => 299.0 ) + amouriq_bogo_member_extra_clean( array() );

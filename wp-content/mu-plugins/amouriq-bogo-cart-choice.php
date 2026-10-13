@@ -93,6 +93,14 @@ function amouriq_bogo_gifts_in_cart( $deal ) {
 	return $ids;
 }
 
+/**
+ * The page a pick link comes from and returns to: the checkout when the box is shown there,
+ * the cart otherwise.
+ */
+function amouriq_bogo_choice_page_url() {
+	return function_exists( 'is_checkout' ) && is_checkout() ? wc_get_checkout_url() : wc_get_cart_url();
+}
+
 function amouriq_bogo_choice_pick_url( $deal, $item_id ) {
 	return add_query_arg(
 		array(
@@ -100,7 +108,7 @@ function amouriq_bogo_choice_pick_url( $deal, $item_id ) {
 			'amq_item' => $item_id,
 			'_wpnonce' => wp_create_nonce( 'amq_pick_' . $deal['id'] . '_' . $item_id ),
 		),
-		wc_get_cart_url()
+		amouriq_bogo_choice_page_url()
 	);
 }
 
@@ -114,58 +122,120 @@ function amouriq_bogo_choice_offer( $deal ) {
 		: 'ลด ฿' . $deal['get_value'];
 }
 
+/** The Deal's choice items as the plain candidates the Gift choice builder takes (see amouriq_bogo_core_gift_choices()). */
+function amouriq_bogo_choice_candidates( $deal ) {
+	$candidates = array();
+	foreach ( amouriq_bogo_choice_items( $deal ) as $item_id => $item ) {
+		$is_variation = $item->is_type( 'variation' );
+		$parent       = $is_variation ? wc_get_product( $item->get_parent_id() ) : $item;
+		$candidates[] = array(
+			'id'            => $item_id,
+			'parent_id'     => $parent ? $parent->get_id() : $item_id,
+			'name'          => $parent ? $parent->get_name() : $item->get_name(),
+			'option'        => $is_variation ? wc_get_formatted_variation( $item, true, false ) : '',
+			'regular_price' => (float) wc_get_price_to_display( $item, array( 'price' => (float) $item->get_regular_price() ) ),
+			'in_stock'      => $item->is_in_stock() && $item->is_purchasable(),
+		);
+	}
+	return $candidates;
+}
+
 add_action( 'woocommerce_before_cart_table', 'amouriq_bogo_render_choices' );
+// Mini-cart shoppers go straight to the checkout, so the same box is there too (in place of the old notice).
+add_action( 'woocommerce_before_checkout_form', 'amouriq_bogo_render_choices', 5 );
 
 function amouriq_bogo_render_choices() {
 	foreach ( amouriq_bogo_open_choices() as $open ) {
-		$deal   = $open['deal'];
-		$label  = ! empty( $deal['label'] ) ? $deal['label'] : 'ดีลพิเศษ';
+		$deal    = $open['deal'];
+		$label   = ! empty( $deal['label'] ) ? $deal['label'] : 'ดีลพิเศษ';
 		$is_gift = amouriq_bogo_is_gift_deal( $deal );
-		$taken  = $is_gift ? amouriq_bogo_gifts_in_cart( $deal ) : array();
+		$groups  = amouriq_bogo_core_gift_choices( amouriq_bogo_choice_candidates( $deal ), $is_gift ? amouriq_bogo_gifts_in_cart( $deal ) : array() );
 		?>
 		<div class="amq-choice" style="border:2px solid #b8860b;background:#fff8e6;border-radius:6px;padding:14px 16px;margin:0 0 20px">
 			<strong><?php echo esc_html( $label ); ?></strong>:
 			คุณได้สิทธิ์เลือก<?php echo $is_gift ? 'ของแถม' : 'สินค้า'; ?>อีก <strong><?php echo esc_html( $open['left'] ); ?></strong> ชิ้น <?php echo $is_gift ? '(ฟรี)' : esc_html( amouriq_bogo_choice_offer( $deal ) ); ?>
 			(เลือกหรือไม่เลือกก็ได้ ไม่ติดขัดการชำระเงิน)
 			<ul style="list-style:none;margin:10px 0 0;padding:0">
-			<?php foreach ( amouriq_bogo_choice_items( $deal ) as $item_id => $item ) :
-				$in_stock = $item->is_in_stock() && $item->is_purchasable();
-				$have     = in_array( $item_id, $taken, true );
+			<?php foreach ( $groups as $group ) :
+				// The option shown first: the first one still pickable, else the first.
+				$shown = $group['options'][0];
+				foreach ( $group['options'] as $option ) {
+					if ( $option['available'] ) {
+						$shown = $option;
+						break;
+					}
+				}
+				$multi = count( $group['options'] ) > 1;
 			?>
-				<li style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 0;border-top:1px solid #ecd9a8<?php echo ( $in_stock && ! $have ) ? '' : ';opacity:.6'; ?>">
-					<span><?php echo esc_html( $item->get_name() ); ?><?php echo $is_gift ? '' : ' — ' . wp_kses_post( wc_price( wc_get_price_to_display( $item ) ) ); ?></span>
-					<?php if ( $have ) : ?>
+				<li class="amq-choice-row" data-gift="<?php echo $is_gift ? '1' : '0'; ?>" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #ecd9a8<?php echo $group['available'] ? '' : ';opacity:.6'; ?>">
+					<span>
+						<?php echo esc_html( $group['name'] ); ?>
+						<?php if ( $multi ) : ?>
+							<select class="amq-choice-option" aria-label="ตัวเลือก">
+								<?php foreach ( $group['options'] as $option ) : ?>
+									<option value="<?php echo esc_attr( $option['id'] ); ?>"
+										data-href="<?php echo esc_attr( $option['available'] ? amouriq_bogo_choice_pick_url( $deal, $option['id'] ) : '' ); ?>"
+										data-state="<?php echo esc_attr( $option['picked'] ? 'picked' : ( $option['available'] ? 'ok' : 'out' ) ); ?>"
+										data-price="<?php echo esc_attr( wc_price( $option['regular_price'] ) ); ?>"
+										<?php selected( $option['id'], $shown['id'] ); ?>>
+										<?php echo esc_html( $option['option'] . ( $option['available'] ? '' : ( $option['picked'] ? ' (เลือกแล้ว)' : ' (สินค้าหมด)' ) ) ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						<?php elseif ( '' !== $shown['option'] ) : ?>
+							<small>(<?php echo esc_html( $shown['option'] ); ?>)</small>
+						<?php endif; ?>
+						&mdash;
+						<span class="amq-choice-price">
+						<?php if ( $is_gift ) : ?>
+							<del><?php echo wp_kses_post( wc_price( $shown['regular_price'] ) ); ?></del> <strong>ฟรี</strong>
+						<?php else : ?>
+							<?php echo wp_kses_post( wc_price( $shown['regular_price'] ) ); ?>
+						<?php endif; ?>
+						</span>
+					</span>
+					<span class="amq-choice-action">
+					<?php if ( $shown['picked'] ) : ?>
 						<span class="button disabled" aria-disabled="true">เลือกแล้ว</span>
-					<?php elseif ( $in_stock ) : ?>
-						<a class="button amq-pick" href="<?php echo esc_url( amouriq_bogo_choice_pick_url( $deal, $item_id ) ); ?>">เลือกชิ้นนี้</a>
+					<?php elseif ( $shown['available'] ) : ?>
+						<a class="button amq-pick" href="<?php echo esc_url( amouriq_bogo_choice_pick_url( $deal, $shown['id'] ) ); ?>">เลือกชิ้นนี้</a>
 					<?php else : ?>
 						<span class="button disabled" aria-disabled="true" style="cursor:not-allowed">สินค้าหมด</span>
 					<?php endif; ?>
+					</span>
 				</li>
 			<?php endforeach; ?>
 			</ul>
 		</div>
 		<?php
+		amouriq_bogo_choice_script();
 	}
 }
 
-add_action( 'woocommerce_before_checkout_form', 'amouriq_bogo_checkout_choice_notice', 5 );
-
-function amouriq_bogo_checkout_choice_notice() {
-	foreach ( amouriq_bogo_open_choices() as $open ) {
-		$deal = $open['deal'];
-		wc_print_notice(
-			sprintf(
-				'%s: คุณยังไม่ได้เลือก%s %d ชิ้น (%s) <a href="%s">เลือกในตะกร้า</a> หรือชำระเงินต่อได้เลย',
-				esc_html( ! empty( $deal['label'] ) ? $deal['label'] : 'ดีลพิเศษ' ),
-				amouriq_bogo_is_gift_deal( $deal ) ? 'ของแถม' : 'สินค้าที่ได้ส่วนลด',
-				(int) $open['left'],
-				esc_html( amouriq_bogo_choice_offer( $deal ) ),
-				esc_url( wc_get_cart_url() )
-			),
-			'notice'
-		);
+/** Once per page: changing the option in a row shows that option's price and the right button. */
+function amouriq_bogo_choice_script() {
+	static $printed = false;
+	if ( $printed ) {
+		return;
 	}
+	$printed = true;
+	?>
+	<script>
+	document.addEventListener('change', function (e) {
+		if (!e.target.classList || !e.target.classList.contains('amq-choice-option')) { return; }
+		var opt = e.target.options[e.target.selectedIndex], row = e.target.closest('.amq-choice-row');
+		var gift = row.dataset.gift === '1';
+		row.querySelector('.amq-choice-price').innerHTML = gift ? '<del>' + opt.dataset.price + '</del> <strong>ฟรี</strong>' : opt.dataset.price;
+		var box = row.querySelector('.amq-choice-action'), state = opt.dataset.state;
+		box.innerHTML = '';
+		var el = document.createElement(state === 'ok' ? 'a' : 'span');
+		el.className = 'button' + (state === 'ok' ? ' amq-pick' : ' disabled');
+		if (state === 'ok') { el.href = opt.dataset.href; el.textContent = 'เลือกชิ้นนี้'; }
+		else { el.setAttribute('aria-disabled', 'true'); el.textContent = state === 'picked' ? 'เลือกแล้ว' : 'สินค้าหมด'; }
+		box.appendChild(el);
+	});
+	</script>
+	<?php
 }
 
 add_action( 'template_redirect', 'amouriq_bogo_handle_pick' );
@@ -179,7 +249,7 @@ function amouriq_bogo_handle_pick() {
 	if ( empty( $_GET['amq_pick'] ) || empty( $_GET['amq_item'] ) || ! function_exists( 'WC' ) || ! WC()->cart ) {
 		return;
 	}
-	$back    = wc_get_cart_url();
+	$back    = amouriq_bogo_choice_page_url();
 	$deal_id = sanitize_text_field( wp_unslash( $_GET['amq_pick'] ) );
 	$item_id = absint( $_GET['amq_item'] );
 
