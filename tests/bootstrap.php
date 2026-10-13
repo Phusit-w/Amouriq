@@ -41,6 +41,7 @@ require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-coupon-first-order/ne
 require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-shipping-label/label-html.php';
 require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-points/points-core.php';
 require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-payment-fee/fee-core.php';
+require dirname(__DIR__) . '/wp-content/mu-plugins/amouriq-bogo/coupon-core.php';
 
 /** @var array<string, mixed> Option values for get_option(), set per test. */
 $GLOBALS['amq_test_options'] = [];

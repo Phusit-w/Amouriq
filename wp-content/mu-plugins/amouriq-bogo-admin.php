@@ -10,6 +10,8 @@
 
 defined( 'ABSPATH' ) || exit;
 
+require_once __DIR__ . '/amouriq-bogo/coupon-core.php';
+
 // How many Condition rows the form offers.
 const AMOURIQ_BOGO_CONDITION_ROWS = 5;
 
@@ -244,11 +246,9 @@ function amouriq_bogo_build_deal( array $in ) {
 
 	if ( 'coupon' === $trigger ) {
 		$code = isset( $in['coupon_code'] ) ? wc_format_coupon_code( wp_unslash( $in['coupon_code'] ) ) : '';
-		if ( '' === $code ) {
-			return 'เลือกให้ทำงานด้วยคูปองแต่ยังไม่ได้ใส่รหัสคูปอง';
-		}
-		if ( ! wc_get_coupon_id_by_code( $code ) ) {
-			return 'ไม่พบคูปองรหัส "' . $code . '" ในระบบ ให้สร้างคูปองก่อน หรือแก้รหัสให้ตรง';
+		$decision = amouriq_bogo_core_coupon_decision( $code, 'amouriq_bogo_coupon_lookup', 'save' );
+		if ( 'refuse' === $decision['action'] ) {
+			return $decision['message'];
 		}
 		$deal['coupon_code'] = $code;
 	}
@@ -492,6 +492,124 @@ function amouriq_bogo_build_deal( array $in ) {
 	return $deal;
 }
 
+/** Meta on a coupon that a Deal created (its value is the Deal id): only such a coupon is edited from the Deal form. */
+const AMOURIQ_BOGO_COUPON_META = '_amouriq_created_by_deal';
+
+/** Whether a coupon code is taken: null, or array( 'id', 'status' ) for the coupon post, trash included. */
+function amouriq_bogo_coupon_lookup( $code ) {
+	$ids = get_posts(
+		array(
+			'post_type'   => 'shop_coupon',
+			'post_status' => array( 'publish', 'draft', 'pending', 'private', 'future', 'trash' ),
+			'title'       => $code,
+			'numberposts' => 1,
+			'fields'      => 'ids',
+		)
+	);
+	return $ids ? array( 'id' => (int) $ids[0], 'status' => get_post_status( $ids[0] ) ) : null;
+}
+
+/**
+ * Check the coupon part of a Deal form before anything is saved (ADR-0009). Returns a Thai
+ * error string, null when the Deal has no coupon, or the plan array( 'decision', 'expires', 'limit' )
+ * for amouriq_bogo_coupon_commit(). Nothing is written here.
+ */
+function amouriq_bogo_coupon_prepare( array $deal, array $in ) {
+	if ( empty( $deal['trigger'] ) || 'coupon' !== $deal['trigger'] ) {
+		return null;
+	}
+	$decision = amouriq_bogo_core_coupon_decision( isset( $deal['coupon_code'] ) ? $deal['coupon_code'] : '', 'amouriq_bogo_coupon_lookup', 'save' );
+	if ( 'refuse' === $decision['action'] ) {
+		return $decision['message'];
+	}
+	$expires = amouriq_bogo_valid_date( isset( $in['coupon_expires'] ) ? $in['coupon_expires'] : '' );
+	if ( false === $expires || ( $expires && strlen( $expires ) > 10 ) ) {
+		return 'วันหมดอายุของคูปองต้องเป็นวันที่ (ปปปป-ดด-วว)';
+	}
+	$limit = isset( $in['coupon_limit'] ) ? trim( (string) $in['coupon_limit'] ) : '';
+	if ( '' !== $limit && ( ! ctype_digit( $limit ) || (int) $limit > 1000000 ) ) {
+		return 'จำนวนครั้งที่ใช้คูปองได้ต้องเป็นจำนวนเต็ม 0 ขึ้นไป (เว้นว่าง = ไม่จำกัด)';
+	}
+	return array(
+		'decision' => $decision,
+		'expires'  => $expires,
+		'limit'    => '' === $limit ? 0 : (int) $limit,
+		'posted'   => isset( $in['coupon_expires'] ) || isset( $in['coupon_limit'] ),
+	);
+}
+
+/**
+ * Do the plan: create the empty coupon, or link to the existing one. The expiry and usage limit
+ * are written only to a coupon this Deal (or a Deal before it) created; a coupon made elsewhere is
+ * left exactly as it is.
+ */
+function amouriq_bogo_coupon_commit( array $deal, array $plan ) {
+	$decision = $plan['decision'];
+	if ( 'create' === $decision['action'] ) {
+		$coupon = new WC_Coupon();
+		$coupon->set_code( $decision['code'] );
+		$coupon->set_discount_type( 'fixed_cart' );
+		$coupon->set_amount( 0 );
+		$coupon->add_meta_data( AMOURIQ_BOGO_COUPON_META, $deal['id'], true );
+	} else {
+		$coupon = new WC_Coupon( $decision['coupon_id'] );
+		if ( ! $coupon->get_meta( AMOURIQ_BOGO_COUPON_META ) || ! $plan['posted'] ) {
+			return;
+		}
+	}
+	$coupon->set_date_expires( $plan['expires'] ? $plan['expires'] : null );
+	$coupon->set_usage_limit( $plan['limit'] );
+	$coupon->save();
+}
+
+/** For the form: expiry and usage limit of the Deal's coupon, and whether the form may edit them. */
+function amouriq_bogo_coupon_form_values( $deal ) {
+	$none = array( 'editable' => true, 'expires' => '', 'limit' => '', 'exists' => false );
+	if ( empty( $deal['coupon_code'] ) ) {
+		return $none;
+	}
+	$found = amouriq_bogo_coupon_lookup( $deal['coupon_code'] );
+	if ( ! $found ) {
+		return $none;
+	}
+	$coupon  = new WC_Coupon( $found['id'] );
+	$expires = $coupon->get_date_expires();
+	return array(
+		'editable' => (bool) $coupon->get_meta( AMOURIQ_BOGO_COUPON_META ),
+		'expires'  => $expires ? $expires->date( 'Y-m-d' ) : '',
+		'limit'    => $coupon->get_usage_limit() ? (string) $coupon->get_usage_limit() : '',
+		'exists'   => true,
+		'edit_url' => get_edit_post_link( $found['id'], 'raw' ),
+	);
+}
+
+/**
+ * A copied Deal gets its own new empty coupon (code plus -2, -3 ...), with the original coupon's
+ * expiry and usage limit. Returns the new code, or '' when the Deal has no coupon.
+ */
+function amouriq_bogo_coupon_copy( array $copy, array $original ) {
+	if ( empty( $copy['trigger'] ) || 'coupon' !== $copy['trigger'] || empty( $original['coupon_code'] ) ) {
+		return '';
+	}
+	$decision = amouriq_bogo_core_coupon_decision( $original['coupon_code'], 'amouriq_bogo_coupon_lookup', 'copy' );
+	if ( 'create' !== $decision['action'] ) {
+		return '';
+	}
+	$source = amouriq_bogo_coupon_lookup( $original['coupon_code'] );
+	$old    = $source ? new WC_Coupon( $source['id'] ) : null;
+	$new    = new WC_Coupon();
+	$new->set_code( $decision['code'] );
+	$new->set_discount_type( 'fixed_cart' );
+	$new->set_amount( 0 );
+	$new->add_meta_data( AMOURIQ_BOGO_COUPON_META, $copy['id'], true );
+	if ( $old ) {
+		$new->set_date_expires( $old->get_date_expires() );
+		$new->set_usage_limit( $old->get_usage_limit() );
+	}
+	$new->save();
+	return $decision['code'];
+}
+
 function amouriq_bogo_admin_handle() {
 	if ( ! isset( $_POST['amouriq_bogo_action'] ) || ! current_user_can( 'manage_woocommerce' ) ) {
 		return;
@@ -529,8 +647,12 @@ function amouriq_bogo_admin_handle() {
 		$copy['id']      = 'b' . wp_generate_password( 10, false, false );
 		$copy['label']   = ( isset( $copy['label'] ) ? $copy['label'] : '' ) . ' (สำเนา)';
 		$copy['enabled'] = false; // a copy starts off, so it cannot change prices before it is checked
+		$new_code        = amouriq_bogo_coupon_copy( $copy, $deals[ $index ] );
+		if ( '' !== $new_code ) {
+			$copy['coupon_code'] = $new_code;
+		}
 		array_splice( $deals, $index + 1, 0, array( $copy ) );
-		set_transient( 'amouriq_bogo_notice_' . $uid, 'ทำสำเนาดีลแล้ว (ปิดอยู่ ตรวจแล้วค่อยเปิด)', 60 );
+		set_transient( 'amouriq_bogo_notice_' . $uid, 'ทำสำเนาดีลแล้ว (ปิดอยู่ ตรวจแล้วค่อยเปิด)' . ( '' !== $new_code ? ' สร้างคูปองใหม่ "' . $new_code . '" ให้แล้ว' : '' ), 60 );
 	} elseif ( in_array( $action, array( 'move_up', 'move_down' ), true ) && isset( $deals[ $index ] ) ) {
 		$to = 'move_up' === $action ? $index - 1 : $index + 1;
 		if ( isset( $deals[ $to ] ) ) {
@@ -614,7 +736,16 @@ function amouriq_bogo_admin_handle() {
 			wp_safe_redirect( $back );
 			exit;
 		}
+		$plan = amouriq_bogo_coupon_prepare( $result, $_POST );
+		if ( is_string( $plan ) ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, $plan, 60 );
+			wp_safe_redirect( $back );
+			exit;
+		}
 		$result['id'] = 'b' . wp_generate_password( 10, false, false );
+		if ( $plan ) {
+			amouriq_bogo_coupon_commit( $result, $plan );
+		}
 		$deals[]      = $result;
 		set_transient( 'amouriq_bogo_notice_' . $uid, 'เพิ่มดีลแล้ว: ' . amouriq_bogo_summary( $result ), 60 );
 	} elseif ( 'update' === $action ) {
@@ -629,7 +760,16 @@ function amouriq_bogo_admin_handle() {
 			wp_safe_redirect( $back . '&edit=' . $index );
 			exit;
 		}
+		$plan = amouriq_bogo_coupon_prepare( $result, $_POST );
+		if ( is_string( $plan ) ) {
+			set_transient( 'amouriq_bogo_error_' . $uid, $plan, 60 );
+			wp_safe_redirect( $back . '&edit=' . $index );
+			exit;
+		}
 		$result['id'] = $deals[ $index ]['id'];
+		if ( $plan ) {
+			amouriq_bogo_coupon_commit( $result, $plan );
+		}
 		if ( isset( $deals[ $index ]['enabled'] ) ) {
 			$result['enabled'] = $deals[ $index ]['enabled'];
 		}
@@ -1505,7 +1645,20 @@ function amouriq_bogo_admin_page() {
 					</div>
 					<label class="k amq-row" data-trigger="coupon" for="bogo_coupon">รหัสคูปอง</label>
 					<div class="v amq-row" data-trigger="coupon"><input type="text" name="coupon_code" id="bogo_coupon" class="regular-text" value="<?php echo esc_attr( $v( 'coupon_code' ) ); ?>">
-						<p class="description">ต้องสร้างคูปองไว้แล้วที่ การตลาด &gt; คูปอง ระบบตรวจตอนบันทึก (สร้างเป็นส่วนลดคงที่ 0 ได้ถ้าใช้คูปองเป็นแค่ตัวเปิดดีล)</p></div>
+						<p class="description">พิมพ์รหัสที่ต้องการ ถ้ายังไม่มีคูปองรหัสนี้ ระบบสร้างให้ตอนบันทึก (คูปองเปล่า ไม่ลดราคาเอง) ถ้ามีอยู่แล้วจะเชื่อมกับคูปองนั้น ไม่สร้างซ้ำ</p></div>
+					<?php $cv = amouriq_bogo_coupon_form_values( $editing ? $editing : array() ); ?>
+					<label class="k amq-row" data-trigger="coupon" for="bogo_coupon_expires">คูปองหมดอายุ</label>
+					<div class="v amq-row" data-trigger="coupon"><input type="date" name="coupon_expires" id="bogo_coupon_expires" value="<?php echo esc_attr( $cv['expires'] ); ?>" <?php disabled( ! $cv['editable'] ); ?>>
+						<span class="description">เว้นว่าง = ไม่มีวันหมดอายุ</span></div>
+					<label class="k amq-row" data-trigger="coupon" for="bogo_coupon_limit">ใช้ได้ทั้งหมด (ครั้ง)</label>
+					<div class="v amq-row" data-trigger="coupon"><input type="number" min="0" name="coupon_limit" id="bogo_coupon_limit" value="<?php echo esc_attr( $cv['limit'] ); ?>" <?php disabled( ! $cv['editable'] ); ?>>
+						<span class="description">เว้นว่าง = ไม่จำกัด</span>
+						<?php if ( ! $cv['editable'] ) : ?>
+							<p class="description">คูปองนี้สร้างที่หน้าคูปองเอง จึงไม่แก้ที่นี่ <a href="<?php echo esc_url( isset( $cv['edit_url'] ) ? $cv['edit_url'] : '' ); ?>">แก้ที่หน้าคูปอง</a></p>
+						<?php else : ?>
+							<p class="description">ตั้งค่าอื่นของคูปอง (ส่งฟรี ขั้นต่ำ ฯลฯ) แก้ที่ การตลาด &gt; คูปอง</p>
+						<?php endif; ?>
+					</div>
 				</div>
 
 				<details <?php echo ( $editing && ! empty( $editing['conditions'] ) ) ? 'open' : ''; ?>>
