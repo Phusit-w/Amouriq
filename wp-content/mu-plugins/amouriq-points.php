@@ -388,6 +388,35 @@ add_filter(
 	}
 );
 
+/**
+ * The header's account dropdown (Blocksy) has a "แต้มสะสมของฉัน" link kept in the theme settings, pointing at
+ * /my-points/. The Points switch decides whether it shows, and it points at the real Points page in My Account.
+ * Only the front end's copy of the setting is changed; nothing is written back to the theme settings.
+ */
+add_filter(
+	'theme_mod_header_placements',
+	static function ( $placements ) {
+		if ( is_admin() || ( function_exists( 'is_customize_preview' ) && is_customize_preview() ) || ! function_exists( 'wc_get_account_endpoint_url' ) ) {
+			return $placements;
+		}
+		$walk = static function ( $node ) use ( &$walk ) {
+			if ( ! is_array( $node ) ) {
+				return $node;
+			}
+			if ( isset( $node['id'], $node['link'] ) && 'custom_link' === $node['id'] && is_string( $node['link'] ) && false !== strpos( $node['link'], '/my-points' ) ) {
+				$node['enabled'] = amouriq_points_enabled();
+				$node['link']    = wc_get_account_endpoint_url( 'points' );
+				return $node;
+			}
+			foreach ( $node as $key => $child ) {
+				$node[ $key ] = $walk( $child );
+			}
+			return $node;
+		};
+		return $walk( $placements );
+	}
+);
+
 add_action( 'woocommerce_account_points_endpoint', 'amouriq_points_account_page' );
 
 function amouriq_points_account_page() {

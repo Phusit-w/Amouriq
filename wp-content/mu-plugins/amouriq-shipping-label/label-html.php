@@ -203,7 +203,7 @@ function amouriq_label_html( array $label ) {
 	foreach ( array_values( isset( $label['items'] ) ? $label['items'] : array() ) as $i => $item ) {
 		$rows .= '<tr><td class="num">' . ( $i + 1 ) . '</td>'
 			. '<td>' . amouriq_label_escape( $item['name'] ) . '</td>'
-			. ( $opt['show_option'] ? '<td>' . amouriq_label_escape( isset( $item['option'] ) ? $item['option'] : '' ) . '</td>' : '' )
+			. ( $opt['show_option'] ? '<td class="opt">' . amouriq_label_escape( isset( $item['option'] ) ? $item['option'] : '' ) . '</td>' : '' )
 			. '<td class="qty">' . (int) $item['qty'] . '</td></tr>';
 	}
 
@@ -212,13 +212,16 @@ function amouriq_label_html( array $label ) {
 	$sender_lines = amouriq_label_lines( array_merge( array( isset( $sender['name'] ) ? $sender['name'] : '' ), isset( $sender['lines'] ) ? $sender['lines'] : array() ) );
 	$sender_phone = ! empty( $sender['phone'] ) ? '<br>โทร ' . amouriq_label_escape( $sender['phone'] ) : '';
 	$to_phone     = ( $opt['show_to_phone'] && ! empty( $recipient['phone'] ) ) ? '<br>โทร ' . amouriq_label_escape( $recipient['phone'] ) : '';
-	$option_th    = $opt['show_option'] ? '<th>ตัวเลือก</th>' : '';
-	$note         = '' !== $opt['note'] ? '<tr><td class="block note">' . str_replace( "\n", '<br>', amouriq_label_escape( $opt['note'] ) ) . '</td></tr>' : '';
+	$option_th    = $opt['show_option'] ? '<th class="opt">ตัวเลือก</th>' : '';
+	$note         = '' !== $opt['note'] ? '<div class="block note">' . str_replace( "\n", '<br>', amouriq_label_escape( $opt['note'] ) ) . '</div>' : '';
 	$font         = (int) $opt['font_size'];
 	$logo_width   = (int) $opt['logo_width'];
 
 	// The owner chooses what the label shows; the recipient is always there.
-	$sender_row = $opt['show_sender'] ? '<tr><td class="block">' . $logo . '<span class="tag">ผู้ส่ง (From)</span><br>' . $sender_lines . $sender_phone . '</td></tr>' : '';
+	// The parts are plain blocks and the items table is not nested in a cell: a table inside a cell cannot be
+	// split, so it jumped whole to the next page. Now the label fills the first page and only the items that
+	// do not fit continue on the next one, with the order number and the column heads repeated.
+	$sender_row = $opt['show_sender'] ? '<div class="block">' . $logo . '<span class="tag">ผู้ส่ง (From)</span><br>' . $sender_lines . $sender_phone . '</div>' : '';
 
 	$order_bits = array();
 	if ( $opt['show_order_number'] ) {
@@ -233,11 +236,13 @@ function amouriq_label_html( array $label ) {
 	if ( $opt['show_customer_note'] && ! empty( $label['customer_note'] ) ) {
 		$order_bits[] = '<span class="tag">หมายเหตุจากลูกค้า (Note)</span><br>' . str_replace( "\n", '<br>', amouriq_label_escape( $label['customer_note'] ) );
 	}
-	$order_row = $order_bits ? '<tr><td class="block">' . implode( '<div style="height:6px"></div>', $order_bits ) . '</td></tr>' : '';
-	$items_row = $opt['show_items'] ? '<tr><td><table class="items"><thead><tr><th class="num">ลำดับ</th><th>สินค้า</th>' . $option_th . '<th class="qty">จำนวน</th></tr></thead><tbody>' . $rows . '</tbody></table></td></tr>' : '';
+	$order_row = $order_bits ? '<div class="block">' . implode( '<div style="height:6px"></div>', $order_bits ) . '</div>' : '';
+	$cols      = $opt['show_option'] ? 4 : 3;
+	$running   = $opt['show_order_number'] ? '<tr class="running"><th colspan="' . $cols . '">ออเดอร์ #' . amouriq_label_escape( isset( $label['order_number'] ) ? $label['order_number'] : '' ) . ' · รายการสินค้า</th></tr>' : '';
+	$items_row = $opt['show_items'] ? '<table class="items"><thead>' . $running . '<tr><th class="num">ลำดับ</th><th>สินค้า</th>' . $option_th . '<th class="qty">จำนวน</th></tr></thead><tbody>' . $rows . '</tbody></table>' : '';
 
 	return '<style type="text/css">
-.amq-label{ width:100%; table-layout:fixed; border-collapse:collapse; font-family:Sarabun,Tahoma,"Helvetica Neue",Arial,sans-serif; font-size:' . $font . 'px; line-height:1.5; color:#111; }
+.amq-label{ width:100%; font-family:Sarabun,Tahoma,"Helvetica Neue",Arial,sans-serif; font-size:' . $font . 'px; line-height:1.5; color:#111; }
 .amq-label td, .amq-label th{ word-wrap:break-word; overflow-wrap:anywhere; vertical-align:top; }
 .amq-label .logo{ max-width:' . $logo_width . 'px; max-height:70px; display:block; margin-bottom:6px; }
 .amq-label .tag{ font-size:12px; color:#555; letter-spacing:.04em; }
@@ -247,13 +252,16 @@ function amouriq_label_html( array $label ) {
 .amq-label table.items{ width:100%; table-layout:fixed; border-collapse:collapse; margin-top:6px; }
 .amq-label table.items th, .amq-label table.items td{ border:1px solid #777; padding:5px 7px; text-align:left; }
 .amq-label table.items th{ background:#eee; }
+.amq-label table.items tr.running th{ background:#fff; border:0; padding:4px 0; font-size:12px; text-align:left; }
+.amq-label table.items thead{ display:table-header-group; }
 .amq-label table.items tr{ page-break-inside:avoid; }
-.amq-label .num{ width:46px; text-align:center !important; }
-.amq-label .qty{ width:70px; text-align:center !important; }
+.amq-label .num{ width:34px; text-align:center !important; }
+.amq-label .qty{ width:48px; text-align:center !important; }
+.amq-label .opt{ width:27%; }
 </style>
-<table class="amq-label"><tbody>
+<div class="amq-label">
 ' . $sender_row . '
-<tr><td class="block"><span class="tag">ผู้รับ (To)</span><br><span class="to">' . amouriq_label_lines( isset( $recipient['lines'] ) ? $recipient['lines'] : array() ) . '</span>' . $to_phone . '</td></tr>
+<div class="block"><span class="tag">ผู้รับ (To)</span><br><span class="to">' . amouriq_label_lines( isset( $recipient['lines'] ) ? $recipient['lines'] : array() ) . '</span>' . $to_phone . '</div>
 ' . $order_row . $items_row . $note . '
-</tbody></table>';
+</div>';
 }

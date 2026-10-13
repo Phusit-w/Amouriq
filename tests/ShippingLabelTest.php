@@ -35,8 +35,8 @@ final class ShippingLabelTest extends TestCase {
 	public function test_every_item_is_numbered_with_name_option_and_quantity(): void {
 		$html = amouriq_label_html($this->label());
 
-		$this->assertMatchesRegularExpression('#<td class="num">1</td><td>Organic Olive Castile Soap - Rosemary</td><td>ปริมาณ: 250 ml</td><td class="qty">2</td>#u', $html);
-		$this->assertMatchesRegularExpression('#<td class="num">2</td><td>Organic Olive Castile Soap - Lavender</td><td>ปริมาณ: 100 ml</td><td class="qty">1</td>#u', $html);
+		$this->assertMatchesRegularExpression('#<td class="num">1</td><td>Organic Olive Castile Soap - Rosemary</td><td class="opt">ปริมาณ: 250 ml</td><td class="qty">2</td>#u', $html);
+		$this->assertMatchesRegularExpression('#<td class="num">2</td><td>Organic Olive Castile Soap - Lavender</td><td class="opt">ปริมาณ: 100 ml</td><td class="qty">1</td>#u', $html);
 	}
 
 	public function test_a_free_gift_is_listed_like_any_other_item(): void {
@@ -82,6 +82,14 @@ final class ShippingLabelTest extends TestCase {
 
 		$this->assertStringNotContainsString('<img', $html);
 		$this->assertStringContainsString('<tbody></tbody>', $html);
+	}
+
+	public function test_items_table_is_not_inside_a_cell_so_it_can_continue_on_the_next_page(): void {
+		$html = amouriq_label_html($this->label());
+
+		// A table nested in a table cell cannot be split by the PDF library: it jumped whole to the next page.
+		$this->assertStringNotContainsString('<td><table', $html);
+		$this->assertStringContainsString('<table class="items"><thead><tr class="running"><th colspan="4">ออเดอร์ #5390', $html);
 	}
 
 	public function test_options_can_hide_the_option_column_logo_and_recipient_phone(): void {
