@@ -11,6 +11,7 @@
  *   'sender'       => array( 'name' => string, 'lines' => string[], 'phone' => string ),
  *   'recipient'    => array( 'lines' => string[] (name first, then address), 'phone' => string ),
  *   'order_number' => string,
+ *   'invoice_number', 'order_date', 'customer_note' => string (optional; shown only when the owner's options switch them on and the order has them),
  *   'items'        => array( array( 'name' => string, 'option' => string, 'qty' => int ) ),
  * )
  */
@@ -48,6 +49,12 @@ function amouriq_label_defaults() {
 		'font_size'       => 14,
 		'show_option'     => true,
 		'show_to_phone'   => true,
+		'show_sender'     => true,
+		'show_order_number' => true,
+		'show_items'      => true,
+		'show_invoice_number' => false, // extras: off until the owner switches them on
+		'show_order_date' => false,
+		'show_customer_note' => false,
 		'note'            => '',
 		'page_width'      => 100, // mm, the paper the label prints on
 		'page_height'     => 150,
@@ -80,7 +87,7 @@ function amouriq_label_clean_options( $raw ) {
 			$out[ $key ] = (int) round( $raw[ $key ] );
 		}
 	}
-	foreach ( array( 'show_logo', 'show_option', 'show_to_phone' ) as $key ) {
+	foreach ( array( 'show_logo', 'show_option', 'show_to_phone', 'show_sender', 'show_order_number', 'show_items', 'show_invoice_number', 'show_order_date', 'show_customer_note' ) as $key ) {
 		if ( isset( $raw[ $key ] ) ) {
 			$out[ $key ] = ! in_array( $raw[ $key ], array( false, 0, '0', 'no', '' ), true );
 		}
@@ -172,6 +179,25 @@ function amouriq_label_html( array $label ) {
 	$font         = (int) $opt['font_size'];
 	$logo_width   = (int) $opt['logo_width'];
 
+	// The owner chooses what the label shows; the recipient is always there.
+	$sender_row = $opt['show_sender'] ? '<tr><td class="block">' . $logo . '<span class="tag">ผู้ส่ง (From)</span><br>' . $sender_lines . $sender_phone . '</td></tr>' : '';
+
+	$order_bits = array();
+	if ( $opt['show_order_number'] ) {
+		$order_bits[] = '<span class="tag">เลขที่ออเดอร์ (Order No.)</span><br><span class="order">' . amouriq_label_escape( isset( $label['order_number'] ) ? $label['order_number'] : '' ) . '</span>';
+	}
+	if ( $opt['show_invoice_number'] && ! empty( $label['invoice_number'] ) ) {
+		$order_bits[] = '<span class="tag">เลขที่ใบแจ้งหนี้ (Invoice No.)</span><br>' . amouriq_label_escape( $label['invoice_number'] );
+	}
+	if ( $opt['show_order_date'] && ! empty( $label['order_date'] ) ) {
+		$order_bits[] = '<span class="tag">วันที่สั่งซื้อ (Date)</span><br>' . amouriq_label_escape( $label['order_date'] );
+	}
+	if ( $opt['show_customer_note'] && ! empty( $label['customer_note'] ) ) {
+		$order_bits[] = '<span class="tag">หมายเหตุจากลูกค้า (Note)</span><br>' . str_replace( "\n", '<br>', amouriq_label_escape( $label['customer_note'] ) );
+	}
+	$order_row = $order_bits ? '<tr><td class="block">' . implode( '<div style="height:6px"></div>', $order_bits ) . '</td></tr>' : '';
+	$items_row = $opt['show_items'] ? '<tr><td><table class="items"><thead><tr><th class="num">ลำดับ</th><th>สินค้า</th>' . $option_th . '<th class="qty">จำนวน</th></tr></thead><tbody>' . $rows . '</tbody></table></td></tr>' : '';
+
 	return '<style type="text/css">
 .amq-label{ width:100%; table-layout:fixed; border-collapse:collapse; font-family:Sarabun,Tahoma,"Helvetica Neue",Arial,sans-serif; font-size:' . $font . 'px; line-height:1.5; color:#111; }
 .amq-label td, .amq-label th{ word-wrap:break-word; overflow-wrap:anywhere; vertical-align:top; }
@@ -188,9 +214,8 @@ function amouriq_label_html( array $label ) {
 .amq-label .qty{ width:70px; text-align:center !important; }
 </style>
 <table class="amq-label"><tbody>
-<tr><td class="block">' . $logo . '<span class="tag">ผู้ส่ง (From)</span><br>' . $sender_lines . $sender_phone . '</td></tr>
+' . $sender_row . '
 <tr><td class="block"><span class="tag">ผู้รับ (To)</span><br><span class="to">' . amouriq_label_lines( isset( $recipient['lines'] ) ? $recipient['lines'] : array() ) . '</span>' . $to_phone . '</td></tr>
-<tr><td class="block"><span class="tag">เลขที่ออเดอร์ (Order No.)</span><br><span class="order">' . amouriq_label_escape( isset( $label['order_number'] ) ? $label['order_number'] : '' ) . '</span></td></tr>
-<tr><td><table class="items"><thead><tr><th class="num">ลำดับ</th><th>สินค้า</th>' . $option_th . '<th class="qty">จำนวน</th></tr></thead><tbody>' . $rows . '</tbody></table></td></tr>' . $note . '
+' . $order_row . $items_row . $note . '
 </tbody></table>';
 }

@@ -220,4 +220,90 @@ final class ShippingLabelTest extends TestCase {
 		$this->assertStringContainsString('margin: 4mm', $print);
 		$this->assertStringNotContainsString('div.amq-page{ padding', $print);
 	}
+
+	// --- what the label shows is the owner's choice ---
+
+	private function full(array $options = []) {
+		return $this->label([
+			'options'        => $options,
+			'invoice_number' => 'INV-5398',
+			'order_date'     => '11/10/2026',
+			'customer_note'  => 'ฝากไว้ที่ป้อมยาม',
+		]);
+	}
+
+	public function test_invoice_number_date_and_customer_note_are_off_until_switched_on(): void {
+		$html = amouriq_label_html($this->full());
+
+		$this->assertStringNotContainsString('INV-5398', $html);
+		$this->assertStringNotContainsString('11/10/2026', $html);
+		$this->assertStringNotContainsString('ฝากไว้ที่ป้อมยาม', $html);
+	}
+
+	public function test_each_extra_can_be_switched_on(): void {
+		$html = amouriq_label_html($this->full(['show_invoice_number' => true, 'show_order_date' => true, 'show_customer_note' => true]));
+
+		$this->assertStringContainsString('INV-5398', $html);
+		$this->assertStringContainsString('11/10/2026', $html);
+		$this->assertStringContainsString('ฝากไว้ที่ป้อมยาม', $html);
+	}
+
+	public function test_an_extra_that_is_on_but_empty_for_this_order_leaves_no_blank_label(): void {
+		$html = amouriq_label_html($this->label(['options' => ['show_invoice_number' => true, 'show_order_date' => true, 'show_customer_note' => true]]));
+
+		$this->assertStringNotContainsString('เลขที่ใบแจ้งหนี้', $html);
+		$this->assertStringNotContainsString('หมายเหตุจากลูกค้า', $html);
+	}
+
+	public function test_the_sender_block_can_be_switched_off(): void {
+		$html = amouriq_label_html($this->full(['show_sender' => false]));
+
+		$this->assertStringNotContainsString('Nature Kernel Co., Ltd.', $html);
+		$this->assertStringNotContainsString('020233284', $html);
+		$this->assertStringNotContainsString('logo.webp', $html);
+		$this->assertStringContainsString('สมชาย ใจดี', $html);
+	}
+
+	public function test_the_order_number_can_be_switched_off(): void {
+		$html = amouriq_label_html($this->full(['show_order_number' => false]));
+
+		$this->assertStringNotContainsString('เลขที่ออเดอร์', $html);
+		$this->assertStringNotContainsString('>5390<', $html);
+	}
+
+	public function test_the_item_table_can_be_switched_off(): void {
+		$html = amouriq_label_html($this->full(['show_items' => false]));
+
+		$this->assertStringNotContainsString('Castile Soap - Rosemary', $html);
+		$this->assertStringNotContainsString('ลำดับ', $html);
+		$this->assertStringContainsString('สมชาย ใจดี', $html);
+	}
+
+	public function test_the_recipient_always_shows(): void {
+		$html = amouriq_label_html($this->full(['show_sender' => false, 'show_order_number' => false, 'show_items' => false]));
+
+		$this->assertStringContainsString('สมชาย ใจดี', $html);
+		$this->assertStringContainsString('99/9 หมู่ 1', $html);
+	}
+
+	public function test_the_new_switches_default_like_the_old_label(): void {
+		$o = amouriq_label_clean_options([]);
+
+		foreach (['show_sender', 'show_order_number', 'show_items'] as $on) {
+			$this->assertTrue($o[$on], $on);
+		}
+		foreach (['show_invoice_number', 'show_order_date', 'show_customer_note'] as $off) {
+			$this->assertFalse($o[$off], $off);
+		}
+		$this->assertTrue(amouriq_label_clean_options(['show_invoice_number' => '1'])['show_invoice_number']);
+		$this->assertFalse(amouriq_label_clean_options(['show_sender' => '0'])['show_sender']);
+	}
+
+	public function test_without_the_new_options_the_label_is_the_same_as_before(): void {
+		$html = amouriq_label_html($this->label());
+
+		foreach (['Nature Kernel Co., Ltd.', 'logo.webp', 'สมชาย ใจดี', '5390', 'Castile Soap - Rosemary', 'ลำดับ'] as $text) {
+			$this->assertStringContainsString($text, $html);
+		}
+	}
 }

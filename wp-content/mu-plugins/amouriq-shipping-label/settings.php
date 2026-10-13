@@ -44,6 +44,12 @@ function amouriq_label_settings_save() {
 				'font_size'      => isset( $in['font_size'] ) ? $in['font_size'] : '',
 				'show_option'    => ! empty( $in['show_option'] ),
 				'show_to_phone'  => ! empty( $in['show_to_phone'] ),
+				'show_sender'    => ! empty( $in['show_sender'] ),
+				'show_order_number' => ! empty( $in['show_order_number'] ),
+				'show_items'     => ! empty( $in['show_items'] ),
+				'show_invoice_number' => ! empty( $in['show_invoice_number'] ),
+				'show_order_date' => ! empty( $in['show_order_date'] ),
+				'show_customer_note' => ! empty( $in['show_customer_note'] ),
 				'note'           => isset( $in['note'] ) ? $in['note'] : '',
 				'page_width'     => isset( $in['page_width'] ) ? $in['page_width'] : '',
 				'page_height'    => isset( $in['page_height'] ) ? $in['page_height'] : '',
@@ -78,6 +84,9 @@ function amouriq_label_settings_page() {
 		),
 		'recipient'    => array( 'lines' => array( 'สมชาย ใจดี', '99/9 หมู่ 1 ต.บางกะปิ เขตห้วยขวาง กรุงเทพฯ 10310' ), 'phone' => '081-234-5678' ),
 		'order_number' => '1234',
+		'invoice_number' => '1234',
+		'order_date'   => '13/10/2026',
+		'customer_note' => 'ฝากไว้ที่ป้อมยาม',
 		'items'        => array(
 			array( 'name' => 'Organic Olive Castile Soap - Lavender', 'option' => 'ปริมาณ: 250 ml', 'qty' => 2 ),
 			array( 'name' => 'Organic Olive Castile Soap - Rosemary', 'option' => 'ปริมาณ: 100 ml', 'qty' => 1 ),
@@ -92,6 +101,16 @@ function amouriq_label_settings_page() {
 		<form method="post" style="flex:1 1 360px;max-width:520px">
 			<?php wp_nonce_field( 'amouriq_label_save' ); ?>
 			<input type="hidden" name="amouriq_label_save" value="1">
+			<h2 style="margin-top:0">เลือกว่าใบปะหน้าแสดงอะไร</h2>
+			<p class="description">ติ๊กเฉพาะส่วนที่ต้องการให้พิมพ์ ผู้รับแสดงเสมอ ส่วนที่ติ๊กแต่ออเดอร์นั้นไม่มีข้อมูลจะไม่พิมพ์ช่องว่าง</p>
+			<p>
+				<label><input type="checkbox" name="show_sender" value="1" <?php checked( $o['show_sender'] ); ?>> ผู้ส่ง (ชื่อ ที่อยู่ เบอร์ โลโก้)</label><br>
+				<label><input type="checkbox" name="show_order_number" value="1" <?php checked( $o['show_order_number'] ); ?>> เลขที่ออเดอร์</label><br>
+				<label><input type="checkbox" name="show_invoice_number" value="1" <?php checked( $o['show_invoice_number'] ); ?>> เลขที่ใบแจ้งหนี้ (จากปลั๊กอิน Print Invoices)</label><br>
+				<label><input type="checkbox" name="show_order_date" value="1" <?php checked( $o['show_order_date'] ); ?>> วันที่สั่งซื้อ</label><br>
+				<label><input type="checkbox" name="show_items" value="1" <?php checked( $o['show_items'] ); ?>> ตารางสินค้า</label><br>
+				<label><input type="checkbox" name="show_customer_note" value="1" <?php checked( $o['show_customer_note'] ); ?>> หมายเหตุจากลูกค้า</label>
+			</p>
 			<table class="form-table" role="presentation">
 				<tr><th><label for="lb_logo">ลิงก์รูปโลโก้</label></th><td><input type="url" class="regular-text" id="lb_logo" name="logo_url" value="<?php echo esc_attr( $o['logo_url'] ); ?>" placeholder="https://…"><p class="description">เว้นว่าง = ใช้โลโก้ของปลั๊กอินพิมพ์เอกสาร</p></td></tr>
 				<tr><th>แสดงโลโก้</th><td><label><input type="checkbox" name="show_logo" value="1" <?php checked( $o['show_logo'] ); ?>> แสดงโลโก้</label> &nbsp; กว้างสูงสุด <input type="number" name="logo_width" min="40" max="400" value="<?php echo esc_attr( $o['logo_width'] ); ?>" style="width:70px"> px</td></tr>

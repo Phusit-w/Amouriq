@@ -263,6 +263,10 @@ function amouriq_shipping_label_data( WC_Order $order ) {
 		),
 		'recipient'    => $recipient,
 		'order_number' => $order->get_order_number(),
+		// Shown only when the owner switches them on (see amouriq_label_html()).
+		'invoice_number' => (string) $order->get_meta( 'wf_invoice_number', true ),
+		'order_date'   => $order->get_date_created() ? $order->get_date_created()->date_i18n( 'd/m/Y' ) : '',
+		'customer_note' => (string) $order->get_customer_note(),
 		'items'        => $items,
 	);
 }
