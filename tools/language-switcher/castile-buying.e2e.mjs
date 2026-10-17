@@ -1,5 +1,6 @@
 // The CASTILE buying block in English mode on the Local site: choose a scent and a size,
 // see the English labels and the price, add to cart, and see the cart count go up.
+// Also checks the Thai /castile/ buying block still shows Thai labels (no English leaking in).
 //   node tools/language-switcher/castile-buying.e2e.mjs
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -36,10 +37,21 @@ try {
 	await send('Network.enable');
 	await send('Network.setCacheDisabled', { cacheDisabled: true });
 	await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-	const done = new Promise((r) => (loaded = r));
-	await send('Page.navigate', { url: BASE + '/en/castile/' });
-	await done;
-	await sleep(3500);
+	const open = async (path) => {
+		const done = new Promise((r) => (loaded = r));
+		await send('Page.navigate', { url: BASE + path });
+		await done;
+		await sleep(3500);
+	};
+
+	await open('/castile/');
+	const thai = await evaluate(`(() => {
+		const vis = (e) => e.getBoundingClientRect().width > 0;
+		return [...document.querySelectorAll('.amq-buying-block button, .amq-buying-block a')].filter(vis).map((b) => b.textContent.trim());
+	})()`);
+	check('Thai page keeps its Thai buying block (no English "Add to cart")', thai.some((t) => /[฀-๿]/.test(t)) && !thai.some((t) => /^add to cart$/i.test(t)), JSON.stringify(thai));
+
+	await open('/en/castile/');
 
 	const info = await evaluate(`(() => {
 		const q = (s) => [...document.querySelectorAll(s)];

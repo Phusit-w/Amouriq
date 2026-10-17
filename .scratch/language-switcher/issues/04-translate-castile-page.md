@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 (Language switcher flips one page end to end)
 
-**Status:** in progress (drafts, checks and review list done; waiting for the owner's corrections)
+**Status:** ready-for-human (drafts, checks and review list done; waiting for the owner's corrections)
 
 - [x] Draft English text delivered to the owner (`translations/castile-page.json`, 178 lines; readable list for the owner: `translations/castile-page.md`, flags at the top)
 - [ ] Owner's corrections applied

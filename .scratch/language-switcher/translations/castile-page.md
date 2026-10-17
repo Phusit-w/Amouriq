@@ -1,6 +1,6 @@
 # English draft: CASTILE sales page (ticket 04)
 
-Drafted by Claude for the owner to review. **Change any English line you want** (reply with the number and the new text); lines you leave are treated as approved. Loaded on Local as drafts; nothing is on the live site.
+Drafted by Claude for the owner to review. **Change any English line you want** (reply with the number and the new text); please finish with an explicit "all other lines approved" so nothing goes live unreviewed. Loaded on Local as drafts; nothing is on the live site.
 
 178 lines: every visible text on the CASTILE page (hero, table, FAQ, reviews, buying block).
 
