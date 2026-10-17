@@ -234,3 +234,9 @@ html {
 	color: #3a322ab3;
 	line-height: 1.6;
 }
+
+/* Footnote markers (†, ‡, *) inherit the colour of the text they follow instead of the theme's link colour. */
+.elementor-5309 sup a {
+	color: inherit;
+	text-decoration: none;
+}

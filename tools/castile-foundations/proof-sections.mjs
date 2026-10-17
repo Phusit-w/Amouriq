@@ -1,5 +1,5 @@
 // Ticket 11 record: rebuilds the chart rows, numbered eyebrows, evidence-note card and key-takeaway blocks of the
-// CASTILE proof sections (05 moisture, 06 water loss, 07 barrier) to match the Claude Design reference.
+// CASTILE proof sections (05 moisture, 06 water loss, 07 barrier, 08 memory lock 2, 04 not enough, 09 free alkali, 10 finished soap, 11 proof bridge) to match the Claude Design reference.
 //
 // Input : current _elementor_data JSON of page 5309, as it stands after ticket 10
 // Output: new _elementor_data JSON, written with write-page.php (raw $wpdb->update, never update_post_meta).
@@ -7,7 +7,7 @@
 //
 // Usage: node tools/castile-foundations/proof-sections.mjs --page page.json --out new.json
 import { readFileSync, writeFileSync } from 'node:fs';
-import { INK, BG, ACCENT, RULE, px, box, gap, pct, toolkit } from './elementor-helpers.mjs';
+import { INK, BG, SURFACE, ACCENT, RULE, px, box, gap, pct, toolkit } from './elementor-helpers.mjs';
 
 const arg = (n) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : undefined; };
 const page = JSON.parse(readFileSync(arg('page'), 'utf8'));
@@ -58,6 +58,19 @@ function chart({ header, list, track, fills }) {
     type(value, { fs: 22, fw: 700, lh: 1.55, ls: 0, color: f.hi ? HI : INK, margin: null });
     value.settings.align = 'right';
   });
+}
+
+// ---- 04 not enough (dark intro to the proof sections) ---------------------------------------------------------------------
+{
+  get('e01ebd2').settings.flex_gap = gap(0);
+  const h2 = get('1ae4342');
+  h2.settings.title = 'แต่สำหรับเรา การเป็น “สบู่เหลวแท้” ยังไม่พอ';
+  type(h2, { margin: m(0, 18), free: true });
+  type(get('5c51b2e'), { fs: 26, fw: 700, lh: 1.5, ls: 0, margin: m(0, 24) });
+  const p = get('7f68ed5');
+  p.settings.editor = 'AMOURIQ ไม่ได้หยุดอยู่ที่วัตถุดิบ สูตร หรือคำว่า Castile เราเลือกทดสอบ<br><strong style="font-weight:500">ผลิตภัณฑ์สำเร็จรูปบนผิวจริง</strong>';
+  type(p, { fs: 16.5, fw: 400, lh: 1.85, ls: 0, margin: m(0, 13.2) });
+  type(get('c4f8a7f'), { fs: 26, fw: 400, lh: 1.55, ls: 0, margin: box(31, 0, 0, 0) });
 }
 
 // ---- 05 moisture ------------------------------------------------------------------------------------------------------
@@ -144,9 +157,145 @@ function chart({ header, list, track, fills }) {
   p2.settings.editor = p2.settings.editor.replace(/"Repair\/Restore\/Rebuild Skin Barrier"/, '“Repair / Restore / Rebuild Skin Barrier”');
 }
 
+// ---- 08 memory lock (dark, three columns) -----------------------------------------------------------------------------
+{
+  get('b548825').settings.flex_gap = gap(0);
+  const h2 = get('49c49a3');
+  h2.settings.title = '100% REAL SOAP<sup><a href="#fn-dagger">†</a></sup> ที่คิดถึงสิ่งที่เกิดขึ้นกับผิว<br>หลังล้าง';
+  h2.settings._margin = m(0, 36);
+  get('3d9e6e8').settings.flex_gap = gap(36);
+  for (const [colId, svgId, headId, descId] of [['7e202ea', '217cbf3', 'd2565c5', '5d7e7f4'], ['0b65c83', 'adbb6a8', 'b300d2a', '975b6f9'], ['681a8aa', '43137da', '00e6794', '5cf3133']]) {
+    const col = get(colId);
+    Object.assign(col.settings, {
+      flex_gap: gap(0), padding: box(14, 0, 0, 0),
+      border_border: 'solid', border_width: box(1, 0, 0, 0), border_color: '#fbf8f24d',
+    });
+    const svg = get(svgId), head = get(headId), desc = get(descId);
+    delete svg.settings._margin;
+    delete head.settings._margin;
+    type(head, { fs: 22, fw: 700, lh: 1.55, ls: 0, margin: null });
+    type(desc, { fs: 14.5, fw: 400, lh: 1.55, ls: 0, margin: null });
+    const header = container({ flex_direction: 'row', flex_align_items: 'center', flex_gap: gap(9), margin: m(0, 6) }, [svg, head]);
+    col.elements = [header, desc];
+  }
+}
+
+// ---- 09 free alkali ---------------------------------------------------------------------------------------------------
+{
+  const sec = get('5552040');
+  sec.settings.flex_gap = gap(0);
+  const eyebrow = get('9e97b46');
+  eyebrow.settings._margin = m(0, 14);
+  const h2 = get('815f34b');
+  h2.settings.title = 'มี KOH ในกระบวนการทำสบู่ แต่ผลตรวจ<br>"ไม่พบด่างอิสระ" ในสบู่สำเร็จรูป';
+  h2.settings._margin = m(0, 20);
+  widthOf(h2, 912);
+  const intro = get('0791c27');
+  type(intro, { fs: 17, fw: 400, lh: 1.85, color: MUTED, margin: m(0, 0) });
+  widthOf(intro, 680);
+  intro.settings.editor = intro.settings.editor.replace(' AMOURIQ แต่', ' AMOURIQ<br>แต่').replace(/<strong[^>]*>/g, `<strong style="font-weight:500;color:${INK}">`);
+
+  const big = get('fd11604');
+  big.settings.title = 'NOT DETECTED';
+  type(big, { fs: 76, fw: 700, lh: 1, ls: -2.28, tt: 'none', color: '#4a5b32', margin: null, free: true });
+  const note = get('6c1d7e9');
+  type(note, { fs: 14.5, fw: 400, lh: 1.85, ls: 0, color: MUTED, margin: m(18, 0) });
+  widthOf(note, 551);
+  note.settings.editor = note.settings.editor.replace('โดยมวล) ', 'โดยมวล)<br>').replace(/<strong[^>]*>/g, `<strong style="font-weight:500;color:${INK}">`);
+  const card = container({
+    flex_direction: 'column', flex_gap: gap(0), padding: box(44, 44, 44, 44), margin: box(48, 0, 48, 0),
+    background_background: 'classic', background_color: SURFACE,
+    border_border: 'solid', border_width: box(1, 1, 1, 1), border_color: RULE, border_radius: box(8, 8, 8, 8),
+  }, [
+    heading('FREE ALKALI', { fs: 11, fw: 400, lh: 1.55, ls: 1.54, tt: 'uppercase', color: INK, margin: m(0, 10) }),
+    big, note,
+  ]);
+  sec.elements = sec.elements.flatMap((e) => (e === big ? [card] : e === note ? [] : [e]));
+
+  const quote = get('d668473');
+  quote.settings.editor = 'คุณภาพของกระบวนการ ควรมีสิ่งที่ตรวจสอบได้ในผลิตภัณฑ์สำเร็จรูป';
+  type(quote, { fs: 17, fw: 400, lh: 1.85, ls: 0, color: MUTED, margin: m(0, 13.2) });
+  widthOf(quote, 544);
+  Object.assign(quote.settings, { _padding: box(0, 0, 0, 18), _border_border: 'solid', _border_width: box(0, 0, 0, 2), _border_color: ACCENT });
+  const foot = get('b987653');
+  type(foot, { fs: 12.5, fw: 400, lh: 1.85, ls: 0, color: '#3a322a8c', margin: box(24, 0, 13.2, 0) });
+  widthOf(foot, 550);
+}
+
+// ---- 10 finished-soap analysis (four cards in one row) -----------------------------------------------------------------
+{
+  const sec = get('d7c3001');
+  sec.settings.flex_gap = gap(0);
+  get('e0b583f').settings._margin = m(0, 14);
+  const h2 = get('4afef18');
+  h2.settings.title = 'เราไม่ได้หยุดตรวจแค่วัตถุดิบ แต่ตรวจสิ่งที่อยู่ในสบู่<br>หลังผลิตเสร็จจริง';
+  h2.settings._margin = m(0, 14);
+  widthOf(h2, 912);
+  type(get('d22f640'), { fs: 22, fw: 500, lh: 1.5, ls: 0, color: MUTED, margin: m(0, 40), free: true });
+
+  const cards = [['eea2af7', 'dc0d24e', '5b07abb', '5c54e43'], ['3819d29', 'f62bc01', 'b89bc3e', '3b720f1'],
+    ['6af3969', '512663d', '4d43fc7', '566a26d'], ['f3d0ec2', 'bca3e50', '3725c01', 'f0f986d']]
+    .map(([cardId, titleId, tagId, descId]) => {
+      const card = get(cardId), title = get(titleId), tag = get(tagId), desc = get(descId);
+      Object.assign(card.settings, {
+        width: pct(25), flex_gap: gap(8.8), padding: box(17.6, 17.6, 17.6, 17.6),
+        background_color: BG, border_border: 'solid', border_width: box(1, 1, 1, 1), border_color: RULE, border_radius: box(8, 8, 8, 8),
+      });
+      type(tag, { fs: 10, fw: 400, lh: 1.55, ls: 1, tt: 'uppercase', color: '#4a5b32', margin: null });
+      type(title, { fs: 17, fw: 700, lh: 1.2, ls: 0, color: INK, margin: null });
+      type(desc, { fs: 13, fw: 400, lh: 1.85, ls: 0, color: MUTED, margin: null });
+      card.elements = [tag, title, desc];
+      return card;
+    });
+  const row = get('f8698cc');
+  Object.assign(row.settings, { flex_gap: gap(14) });
+  row.elements = cards;
+  const note = get('f52f025');
+  note.settings.editor = note.settings.editor.replace('ใน Section 09', 'ด้านบน');
+  type(note, { fs: 13, fw: 400, lh: 1.85, ls: 0, color: MUTED, margin: box(24, 0, 13.2, 0) });
+  widthOf(note, 598);
+  sec.elements = sec.elements.filter((e) => e.id !== 'ab07809');
+}
+
+// ---- 11 proof bridge (finished soap → what happens on skin) ----------------------------------------------------------------
+{
+  const sec = get('0173364');
+  sec.settings.flex_gap = gap(0);
+  const h2 = get('c997d8e');
+  h2.settings.title = 'แต่การตรวจพบสิ่งที่อยู่ในสบู่<br>ยังไม่ใช่คำตอบสุดท้าย';
+  h2.settings._margin = m(0, 54);
+  widthOf(h2, 960);
+  const row = get('4a2fcc6');
+  row.settings.flex_gap = gap(28);
+
+  const side = (cardId, eyebrowId, listId, items, color, itemColor, bg) => {
+    const card = get(cardId);
+    Object.assign(card.settings, {
+      content_width: 'full', width: pct(45.4), flex_gap: gap(10), padding: box(32, 32, 32, 32),
+      background_color: bg, border_border: 'solid', border_width: box(1, 1, 1, 1), border_color: RULE, border_radius: box(8, 8, 8, 8),
+    });
+    const eyebrow = get(eyebrowId);
+    type(eyebrow, { fs: 11, fw: 400, lh: 1.55, ls: 1.32, tt: 'uppercase', color, margin: m(0, 6) });
+    const list = items.map((t) => heading(t, { fs: 20, fw: 700, lh: 1.55, color: itemColor }));
+    card.elements = [eyebrow, ...list];
+    return card;
+  };
+  const left = side('17cc6f0', 'cb4d0b7', 'ace8142', ['Squalene', 'Beta-carotene', 'Glycerine<sup><a href="#fn-ddagger">‡</a></sup>', 'Alpha-tocopherol<sup><a href="#fn-ddagger">‡</a></sup>'], '#4a5b32', INK, BG);
+  const right = side('0f8b5cc', '7b09715', '1a166c5', ['Moisture ↑', 'Water Loss ↓', 'Barrier-Friendly'], HI, '#41574f', '#f0f8f5');
+  void left; void right;
+  const arrowCol = get('e920b4d');
+  Object.assign(arrowCol.settings, { content_width: 'full', width: px(44), flex_align_items: 'center', flex_justify_content: 'center' });
+  type(get('53a8ec9'), { fs: 26, fw: 400, lh: 1.55, ls: 0, color: ACCENT, margin: null });
+
+  const quote = get('15133a6');
+  type(quote, { fs: 20, fw: 400, lh: 1.85, ls: 0, color: INK, margin: box(44, 0, 0, 0) });
+  widthOf(quote, 680);
+  Object.assign(quote.settings, { _padding: box(0, 0, 0, 20), _border_border: 'solid', _border_width: box(0, 0, 0, 2), _border_color: ACCENT });
+}
+
 // Elementor gives every nested container 10px padding by default; the design has none.
 const zeroPad = (nodes) => nodes.forEach((n) => { if (n.elType === 'container' && n.isInner && !n.settings.padding) n.settings.padding = box(0, 0, 0, 0); zeroPad(n.elements || []); });
-zeroPad(page.slice(5, 8));
+zeroPad(page.slice(4, 12));
 
 writeFileSync(arg('out'), JSON.stringify(page));
 console.log('ok');
