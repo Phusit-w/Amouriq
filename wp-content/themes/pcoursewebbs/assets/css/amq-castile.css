@@ -240,3 +240,26 @@ html {
 	color: inherit;
 	text-decoration: none;
 }
+
+/* The theme sets `font-family: Amouriq` on every div, which beats the font a text-editor widget's own typography
+   control puts on the widget wrapper; the inner container takes the widget's font instead. */
+.elementor-5309 .elementor-widget-text-editor .elementor-widget-container {
+	font-family: inherit;
+}
+
+/* Same for the inline spans some heading widgets hold (numbered card eyebrows): the theme's blanket span rule would
+   otherwise swap them back to Amouriq. */
+.elementor-5309 .elementor-widget-heading .elementor-heading-title span {
+	font-family: inherit;
+}
+
+/* Section 21 (FAQ): the list opens with a hairline, rows carry 18px padding and the question is bold (ticket 12). */
+.amq-faq-item {
+	padding: 18px 0;
+}
+.amq-faq-item summary {
+	font-weight: 700;
+}
+.elementor-element-16f0450 .amq-faq-item {
+	border-top: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
+}
