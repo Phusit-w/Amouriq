@@ -84,7 +84,9 @@
 	// latter, which ticket 03's sections never used.
 	var COUNT_PATTERN = /^([+\-−])?\s*([\d.]+)(%|\+)?$/;
 
-	revealOnce(elements(IDS.count), function (el) {
+	// The widget wrapper also holds the Elementor container and the heading element carrying the typography, so
+	// the number is written into the heading itself; replacing the wrapper's text would strip that markup.
+	revealOnce(elements(IDS.count).map(function (w) { return w.querySelector('.elementor-heading-title') || w; }), function (el) {
 		var raw = el.textContent.trim();
 		var match = raw.match(COUNT_PATTERN);
 		if (!match) return; // not a parseable number (e.g. the "✓" card) — leave as-is
