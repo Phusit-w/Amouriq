@@ -10,11 +10,11 @@
  * block CSS still names it (to be dropped with ticket 13).
  *
  * Loaded here rather than relying on amq-lang-font.php's sitewide Thai/English
- * font switch: that mu-plugin keys off Polylang's pll_current_language(),
- * which isn't installed on this site (TranslatePress is) — so it always
- * falls through to the English branch and never loads Prompt. Not fixed
- * here (separate, pre-existing issue, out of scope); this page loads its
- * own Prompt weights defensively instead.
+ * font switch: that mu-plugin used to key off Polylang's pll_current_language(),
+ * which isn't installed on this site (TranslatePress is), so it always fell
+ * through to the English branch and never loaded Prompt. It now reads the
+ * TranslatePress language (ADR-0010); this page still loads its own Prompt
+ * weights defensively.
  *
  * Modeled on amouriq-single-product.php's is_product()-gated conditional
  * enqueue.

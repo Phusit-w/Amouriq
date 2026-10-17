@@ -17,9 +17,10 @@ add_shortcode('lang_switcher', function () {
 	}
 	$converter = TRP_Translate_Press::get_trp_instance()->get_component('url_converter');
 
-	$lang_part = function ($locale) use ($labels, $converter) {
+	$current = $TRP_LANGUAGE;
+	$lang_part = function ($locale) use ($labels, $converter, $current) {
 		$label = $labels[$locale];
-		if ($GLOBALS['TRP_LANGUAGE'] === $locale) {
+		if ($current === $locale) {
 			return '<span style="opacity:1;">' . esc_html($label) . '</span>';
 		}
 		// Keep TranslatePress's default link marker: without it the page's link rewriting

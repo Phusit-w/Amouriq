@@ -126,6 +126,12 @@ try {
 	s = await readSwitcher();
 	check('English browser: a fresh visit still opens in Thai', s && s.path === '/' && s.lang === 'th', JSON.stringify(s));
 
+	// Having visited English earlier in this same browser profile, the home page still opens in Thai
+	await go('/en/');
+	await go('/');
+	s = await readSwitcher();
+	check('revisit: after browsing /en/, opening / again shows Thai (no remembered language)', s && s.path === '/' && s.lang === 'th', JSON.stringify(s));
+
 	// Mobile
 	await viewport(390, true);
 	await go('/');

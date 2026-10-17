@@ -7,7 +7,7 @@ A WordPress + WooCommerce site for AMOURIQ, a Thai organic skincare brand. This 
 ## Language
 
 **Language switcher**:
-The "EN / TH" control in the site header. The current language shows as plain text, the other as a link to that page's translation (or the other language's home page when the page has no translation). Thai is the default language at the original addresses and English lives under `/en/`; the site always opens in Thai and changes language only when the customer clicks the switcher, never by guessing from the browser. Prices stay in baht and orders ship within Thailand only.
+The "EN / TH" control in the site header. The current language shows as plain text, the other as a link to the same page in that language (text not yet translated simply shows in Thai). Thai is the default language at the original addresses and English lives under `/en/`; the site always opens in Thai and changes language only when the customer clicks the switcher, never by guessing from the browser. Prices stay in baht and orders ship within Thailand only.
 _Avoid_: "Translate button", "Google Translate" (the translations are our own, reviewed text)
 
 **Castile Soap**:
