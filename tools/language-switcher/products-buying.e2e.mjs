@@ -1,5 +1,7 @@
 // Product pages in English mode on the Local site: choose a Size, see the price in baht,
 // add to cart, then the English cart and checkout still list the item with baht prices.
+// Each Scent is its own product (e.g. the Lavender castile soap); Size is the only choice.
+// Also checks a category grid's buttons lead to the English product pages.
 // Raw CDP over Node's global WebSocket: no npm install. Needs the ticket-05 translations loaded.
 //   node tools/language-switcher/products-buying.e2e.mjs
 import { spawn } from 'node:child_process';
@@ -48,6 +50,12 @@ try {
 	await send('Network.setCacheDisabled', { cacheDisabled: true });
 	await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 
+	// category grid: every product is variable, so its button leads to the English product page
+	await open('/en/product-category/castile-soap/');
+	const grid = await evaluate(`[...document.querySelectorAll('a.add_to_cart_button')].map((a) => ({ text: a.textContent.trim(), href: a.href }))`);
+	check('category page: English "Select options" buttons to /en/ product pages',
+		grid.length > 0 && grid.every((b) => /^select options$/i.test(b.text) && b.href.startsWith(BASE + '/en/product/')), JSON.stringify(grid));
+
 	const added = [];
 	for (const path of PRODUCTS) {
 		await open(path);
@@ -73,7 +81,8 @@ try {
 			after = await evaluate(`+document.querySelector('.ct-dynamic-count-cart')?.dataset.count || 0`);
 		}
 		check(`${path}: cart count goes up`, after > before, `${before} -> ${after}`);
-		added.push(name);
+		check(`${path}: product title shown`, !!name, String(name));
+		if (name && after > before) added.push(name);
 	}
 
 	for (const page of ['/en/cart-page/', '/en/checkout/']) {
