@@ -9,6 +9,7 @@
 //
 // Usage: node tools/castile-foundations/foundations.mjs --page page.json --design design-measure.json --out new.json [--report report.txt]
 import { readFileSync, writeFileSync } from 'node:fs';
+import { strip, norm, matchTexts } from './text-match.mjs';
 
 const arg = (n) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : undefined; };
 const page = JSON.parse(readFileSync(arg('page'), 'utf8'));
@@ -18,8 +19,6 @@ const FONT = 'DM Sans';
 // Sections whose own element is a two-column grid with no content wrapper (design sections 15 and 22): left to ticket 12.
 const SKIP_FRAME = new Set([15, 22]);
 
-const strip = (h) => String(h ?? '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&amp;|&#?\w+;/g, ' ');
-const norm = (h) => strip(h).toLowerCase().replace(/[^\p{L}\p{M}]+/gu, '');
 const px = (size) => ({ unit: 'px', size, sizes: [] });
 const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 const report = [];
@@ -29,26 +28,8 @@ const log = (m) => report.push(m);
 function matchWidgets(sectionIdx, widgets) {
   const per = {};
   for (const [name, vp] of Object.entries(VP)) per[name] = design[vp][sectionIdx];
-  const cands = per.desktop.texts.map((t, k) => ({ k, key: norm(t.text), used: false }));
-  const result = new Map();
-  for (const w of widgets) {
-    const key = norm(w.widgetType === 'heading' ? w.settings.title : w.settings.editor);
-    if (key.length < 2) continue;
-    let best = null;
-    for (const c of cands) {
-      if (c.used || c.key.length < 2) continue;
-      let score = -1;
-      if (c.key === key) score = 3;
-      else if (c.key.startsWith(key.slice(0, 24)) && key.length >= 8) score = 2;
-      else if (key.startsWith(c.key.slice(0, 24)) && c.key.length >= 8) score = 2;
-      else if (c.key.includes(key) && key.length >= 6) score = 1;
-      if (score < 0) continue;
-      const diff = Math.abs(c.key.length - key.length);
-      if (!best || score > best.score || (score === best.score && diff < best.diff)) best = { c, score, diff };
-    }
-    if (best) { best.c.used = true; result.set(w, best.c.k); }
-  }
-  return { result, per, unusedDesign: cands.filter((c) => !c.used).length };
+  const { result, unused } = matchTexts(per.desktop.texts, widgets);
+  return { result, per, unusedDesign: unused };
 }
 
 // --- apply ---------------------------------------------------------------------------------------------------------

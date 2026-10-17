@@ -296,15 +296,15 @@
 		gap: 28px;
 	}
 	.amq-buying-block__name {
-		font-size: 28px;
+		font-size: 24px;
 	}
 }
 @media (max-width: 520px) {
 	.amq-buying-block__triad {
-		grid-template-columns: minmax(0, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.amq-buying-block__scent-row {
-		grid-template-columns: minmax(0, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.amq-buying-block__total-value {
 		font-size: 24px;
