@@ -2,9 +2,9 @@
 /**
  * AMOURIQ language-driven global font.
  *
- * Polylang's current language decides the sitewide font:
- *  - English (en): Plus Jakarta Sans
- *  - Thai (th):    Prompt
+ * TranslatePress's current language decides the sitewide font (ADR-0010):
+ *  - English (en_US): Plus Jakarta Sans
+ *  - Thai (th):       Prompt
  *
  * Follows the same hand-printed wp_head asset pattern as the other AMOURIQ
  * mu-plugins (e.g. amouriq-header-hover.php) — a Google Fonts <link> plus a
@@ -12,8 +12,8 @@
  * amq-lang-font-th.css) that sets font-family on body.
  */
 add_action('wp_head', function () {
-	$lang = function_exists('pll_current_language') ? pll_current_language() : 'en';
-	$lang = ($lang === 'th') ? 'th' : 'en';
+	global $TRP_LANGUAGE;
+	$lang = ($TRP_LANGUAGE === 'th') ? 'th' : 'en';
 
 	$fonts = [
 		'en' => [

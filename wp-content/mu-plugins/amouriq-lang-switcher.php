@@ -1,28 +1,35 @@
 <?php
 /**
  * [lang_switcher] — "EN / TH" text toggle. The current language renders as
- * plain (non-clickable) text; the other language is a link to the Polylang
- * translation of the current page. Placed via a native Elementor Shortcode
- * widget (no plugin ships a ready-made widget for this look).
+ * plain (non-clickable) text; the other language is a link to the same page in
+ * that language (TranslatePress, ADR-0010). Placed through the header's HTML
+ * element (Blocksy header builder), which runs shortcodes.
  */
 add_shortcode('lang_switcher', function () {
-	if (!function_exists('pll_current_language')) {
+	global $TRP_LANGUAGE;
+	if (empty($TRP_LANGUAGE) || !class_exists('TRP_Translate_Press')) {
 		return '';
 	}
-	$cur = pll_current_language();
-	$post_id = get_the_ID();
+	// TranslatePress locale => label shown in the switcher.
+	$labels = ['en_US' => 'EN', 'th' => 'TH'];
+	if (!isset($labels[$TRP_LANGUAGE])) {
+		return '';
+	}
+	$converter = TRP_Translate_Press::get_trp_instance()->get_component('url_converter');
 
-	$lang_part = function ($code) use ($cur, $post_id) {
-		if ($cur === $code) {
-			return '<span style="opacity:1;">' . esc_html(strtoupper($code)) . '</span>';
+	$lang_part = function ($locale) use ($labels, $converter) {
+		$label = $labels[$locale];
+		if ($GLOBALS['TRP_LANGUAGE'] === $locale) {
+			return '<span style="opacity:1;">' . esc_html($label) . '</span>';
 		}
-		$target_id = $post_id ? pll_get_post($post_id, $code) : 0;
-		$url = $target_id ? get_permalink($target_id) : pll_home_url($code);
-		return '<a href="' . esc_url($url) . '" style="opacity:0.5;color:inherit;text-decoration:none;">' . esc_html(strtoupper($code)) . '</a>';
+		// Keep TranslatePress's default link marker: without it the page's link rewriting
+		// would add the current language back onto this link.
+		$url = $converter->get_url_for_language($locale);
+		return '<a href="' . esc_url($url) . '" style="opacity:0.5;color:inherit;text-decoration:none;">' . esc_html($label) . '</a>';
 	};
 
 	return '<span class="amq-lang-switch" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;letter-spacing:0.04em;">'
-		. $lang_part('en')
+		. $lang_part('en_US')
 		. '<span style="opacity:0.35;">/</span>'
 		. $lang_part('th')
 		. '</span>';
