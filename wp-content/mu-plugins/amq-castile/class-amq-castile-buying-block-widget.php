@@ -60,8 +60,16 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 			}
 		}
 
+		// The design shows whole-baht prices ("฿779"); wc_price() always adds ".00".
+		$whole = static fn($html) => preg_replace('/\.00(?=<)/', '', $html);
+		foreach ($combos as $scent_key => $by_size) {
+			foreach ($by_size as $size_key => $combo) {
+				if ($combo) $combos[$scent_key][$size_key]['price_html'] = $whole($combo['price_html']);
+			}
+		}
+
 		$default_scent = 'lavender';
-		$default_size = '100';
+		$default_size = '250'; // the design opens on 250 ML
 		$default = $combos[$default_scent][$default_size];
 
 		$data = [
@@ -83,11 +91,15 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 			<div class="amq-buying-block__info-col">
 				<p class="amq-buying-block__brand">AMOURIQ</p>
 				<h2 class="amq-buying-block__name" id="amq-bb-name"><?php echo esc_html($default ? $default['name'] : ''); ?></h2>
-				<p class="amq-buying-block__tag">100% REAL SOAP†</p>
-				<p class="amq-buying-block__triad"><strong>MOISTURE ↑</strong> ผิวชุ่มชื้นเพิ่มขึ้น · <strong>WATER LOSS ↓</strong> การสูญเสียน้ำลดลง · <strong>BARRIER-FRIENDLY</strong> เป็นมิตรต่อเกราะป้องกันผิว</p>
-				<p class="amq-buying-block__oils" id="amq-bb-oils"><?php echo esc_html($scents[$default_scent]['oils']); ?></p>
-
-				<div class="amq-buying-block__divider"></div>
+				<div class="amq-buying-block__chips">
+					<span class="amq-buying-block__tag">100% REAL SOAP†</span>
+					<span class="amq-buying-block__oils" id="amq-bb-oils"><?php echo esc_html($scents[$default_scent]['oils']); ?></span>
+				</div>
+				<div class="amq-buying-block__triad">
+					<p><strong>MOISTURE ↑</strong><span>ผิวชุ่มชื้นเพิ่มขึ้น</span></p>
+					<p><strong>WATER LOSS ↓</strong><span>การสูญเสียน้ำลดลง</span></p>
+					<p><strong>BARRIER-FRIENDLY</strong><span>เป็นมิตรต่อเกราะป้องกันผิว</span></p>
+				</div>
 
 				<div class="amq-buying-block__scent">
 					<h3 class="amq-buying-block__section-heading">กลิ่น</h3>
@@ -132,8 +144,6 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 						<?php endforeach; ?>
 					</div>
 					<p class="amq-buying-block__price-note">ราคาเท่ากันทุกกลิ่นในไซส์เดียวกัน — Lavender / Rosemary / Rose Geranium</p>
-					<div class="amq-buying-block__price" id="amq-bb-price"><?php echo $default ? wp_kses_post($default['price_html']) : ''; ?></div>
-					<p class="amq-buying-block__sku">SKU: <span id="amq-bb-sku"><?php echo esc_html($default ? $default['sku'] : ''); ?></span></p>
 				</div>
 
 				<div class="amq-buying-block__purchase-row">
@@ -147,10 +157,10 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 					</div>
 					<div class="amq-buying-block__total">
 						<span class="amq-buying-block__total-label">รวม</span>
-						<span class="amq-buying-block__total-value" id="amq-bb-total"><?php echo $default ? wp_kses_post(wc_price($default['price'])) : ''; ?></span>
+						<span class="amq-buying-block__total-value" id="amq-bb-total"><?php echo $default ? wp_kses_post($whole(wc_price($default['price']))) : ''; ?></span>
 					</div>
-					<button type="button" class="amq-buying-block__add-to-cart" id="amq-bb-add-to-cart">เพิ่มลงตะกร้า</button>
 				</div>
+				<button type="button" class="amq-buying-block__add-to-cart" id="amq-bb-add-to-cart">เพิ่มลงตะกร้า</button>
 				<p class="amq-buying-block__oos-message" id="amq-bb-oos-message" hidden>ขนาดนี้หมดชั่วคราว กรุณาเลือกขนาดอื่น</p>
 				<p class="amq-buying-block__success-message" id="amq-bb-success-message" hidden>เพิ่มลงตะกร้าแล้ว</p>
 
@@ -175,6 +185,7 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 					<a href="#evidence">ดูผลการทดสอบ</a>
 					<a href="#">ข้อมูลการจัดส่ง</a>
 				</div>
+				<p class="amq-buying-block__sku">SKU: <span id="amq-bb-sku"><?php echo esc_html($default ? $default['sku'] : ''); ?></span></p>
 			</div>
 		</div>
 

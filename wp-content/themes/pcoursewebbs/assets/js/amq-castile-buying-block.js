@@ -27,7 +27,6 @@
 		image: document.getElementById('amq-bb-image'),
 		name: document.getElementById('amq-bb-name'),
 		oils: document.getElementById('amq-bb-oils'),
-		price: document.getElementById('amq-bb-price'),
 		sku: document.getElementById('amq-bb-sku'),
 		qtyInput: document.getElementById('amq-bb-qty'),
 		total: document.getElementById('amq-bb-total'),
@@ -52,7 +51,8 @@
 	// consistently with the unit price shown just above it, not a
 	// differently-formatted number.
 	function formatTotal(amount) {
-		return '฿' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+		var whole = amount % 1 === 0; // whole baht shows without ".00", as the server-rendered prices do
+		return '฿' + amount.toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
 	}
 
 	function updateTotal() {
@@ -70,7 +70,6 @@
 			if (el.image) el.image.src = combo.image_url;
 			if (el.name) el.name.textContent = combo.name;
 			if (el.oils) el.oils.textContent = data.scents[state.scent].oils;
-			if (el.price) el.price.innerHTML = combo.price_html;
 			if (el.sku) el.sku.textContent = combo.sku;
 
 			if (el.stickyImage) el.stickyImage.src = combo.image_url;

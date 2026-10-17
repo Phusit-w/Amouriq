@@ -1,90 +1,113 @@
 /**
- * CASTILE sales page, Section 19 (Buying Block) — ticket 06. Styles the
+ * CASTILE sales page, Section 19 (Buying Block) — tickets 06 and 13. Styles the
  * custom Elementor widget's own markup (Amq_Castile_Buying_Block_Widget),
  * not Elementor-generated content, so this targets plain BEM-ish classes
  * rather than ".elementor-element-<id>" selectors (there's nothing to
- * target by id — the widget owns its whole subtree).
+ * target by id — the widget owns its whole subtree). The section around it
+ * already provides the 1120px column and the page's section padding.
  */
 
 .amq-buying-block {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 48px;
-	align-items: flex-start;
-	max-width: 1120px;
-	margin: 0 auto;
-	padding: clamp(48px, 7vw, 96px) clamp(16px, 4vw, 48px);
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 56px;
+	align-items: start;
+	font-family: "DM Sans", system-ui, sans-serif;
 }
 
 .amq-buying-block__image-col {
-	flex: 1 1 360px;
-	min-width: 280px;
+	border: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
+	border-radius: 8px;
+	background: #fbf8f2;
+	aspect-ratio: 1 / 1;
+	overflow: hidden;
 }
 .amq-buying-block__image-col img {
 	width: 100%;
-	height: auto;
-	border-radius: 8px;
+	height: 100%;
+	object-fit: contain;
 	display: block;
 }
 
 .amq-buying-block__info-col {
-	flex: 1 1 400px;
-	min-width: 280px;
+	min-width: 0;
 	color: #3a322a;
-	font-family: Prompt, "IBM Plex Sans Thai", "DM Sans", system-ui, sans-serif;
 }
 
 .amq-buying-block__brand {
-	font-size: 13px;
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	color: #c1673f;
-	margin: 0 0 4px 0;
+	font-size: 21px;
+	font-weight: 500;
+	letter-spacing: 0.2em;
+	line-height: 1.55;
+	color: #3a322a;
+	margin: 0;
 }
 .amq-buying-block__name {
-	font-size: 26px;
+	font-size: 36px;
 	font-weight: 700;
-	line-height: 1.15;
-	margin: 0 0 8px 0;
+	line-height: 1.5;
+	margin: 6px 0 14px 0;
 	color: #3a322a;
 }
-.amq-buying-block__tag {
-	font-size: 13px;
-	font-weight: 600;
-	color: #4a5b32;
-	margin: 0 0 12px 0;
+
+.amq-buying-block__chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 22px 0;
 }
-.amq-buying-block__triad {
-	font-size: 14px;
-	line-height: 1.6;
-	margin: 0 0 8px 0;
-}
+.amq-buying-block__tag,
 .amq-buying-block__oils {
-	font-size: 14px;
-	color: #3a322ab3;
-	margin: 0 0 16px 0;
+	font-size: 11.5px;
+	line-height: 1.55;
+	padding: 3px 10px;
+	border-radius: 4.5px;
+	background: #f0f8f5;
+	color: #4f6d63;
 }
 
-.amq-buying-block__divider {
-	height: 1px;
-	background: color-mix(in srgb, #3a322a 16%, transparent);
-	margin: 16px 0;
+.amq-buying-block__triad {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 16px;
+	padding: 16px 0;
+	margin: 0 0 22px 0;
+	border-top: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
+	border-bottom: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
+}
+.amq-buying-block__triad p {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.amq-buying-block__triad strong {
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1.55;
+	color: #4f6d63;
+}
+.amq-buying-block__triad span {
+	font-size: 13px;
+	line-height: 1.55;
+	color: #3a322aa6;
 }
 
 .amq-buying-block__section-heading {
-	font-size: 13px;
-	font-weight: 700;
+	font-size: 12px;
+	font-weight: 400;
 	letter-spacing: 0.04em;
-	color: #4a5b32;
+	line-height: 1.55;
+	color: #3a322a8c;
 	margin: 0 0 10px 0;
 }
 
 .amq-buying-block__scent-row,
 .amq-buying-block__size-row {
-	display: flex;
-	flex-wrap: wrap;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 10px;
-	margin-bottom: 16px;
+	margin-bottom: 22px;
 }
 
 .amq-bb-scent-btn,
@@ -95,92 +118,89 @@
 	gap: 4px;
 	font-family: inherit;
 	color: #3a322a;
-	background: #ffffff;
+	background: #fbf8f2;
 	border: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
 	border-radius: 4px;
-	padding: 10px 16px;
+	padding: 14px 15px;
 	cursor: pointer;
-	white-space: nowrap;
 	text-align: left;
 }
 .amq-bb-scent-btn.is-selected,
 .amq-bb-size-btn.is-selected {
 	border-color: #c1673f;
-	background: #fbf8f2;
+	background: #fff4ef;
 }
-.amq-bb-scent-btn.is-selected .amq-bb-scent-btn__name,
-.amq-bb-size-btn.is-selected .amq-bb-size-btn__label {
+.amq-bb-size-btn.is-selected .amq-bb-size-btn__label,
+.amq-bb-size-btn.is-selected .amq-bb-size-btn__price {
 	color: #c1673f;
 }
 
-.amq-bb-scent-btn__name,
+.amq-bb-scent-btn__name {
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.55;
+}
 .amq-bb-size-btn__label {
-	font-size: 14px;
+	font-size: 16px;
 	font-weight: 600;
+	line-height: 1.55;
 }
-/* Design brief: each scent button shows its own descriptive note
-   ("ดอกลาเวนเดอร์ นุ่ม สงบ" etc.) at all times, not just for the selected
-   scent — this is reference copy, not per-selection state, so it needs no
-   JS to stay in sync. */
+/* Each scent button shows its own descriptive note at all times, not just for the selected
+   scent — this is reference copy, not per-selection state, so it needs no JS to stay in sync. */
 .amq-bb-scent-btn__note {
-	font-size: 12px;
+	font-size: 12.5px;
 	font-weight: 400;
-	color: #3a322ab3;
-	white-space: normal;
+	line-height: 1.7;
+	color: #3a322aa6;
 }
-/* Design brief: size buttons show their own price inline (all three sizes
-   at once) since price only depends on size, never on the selected scent —
-   same "static reference copy" reasoning as the scent note above. */
+/* Size buttons show their own price inline (all three sizes at once) since price only
+   depends on size, never on the selected scent — same "static reference copy" reasoning. */
 .amq-bb-size-btn__price {
-	font-size: 13px;
-	font-weight: 600;
-	color: #4f6d63;
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1.55;
+	color: #3a322aa6;
 }
 
 .amq-buying-block__price-note {
 	font-size: 12px;
-	color: #3a322ab3;
-	margin: 0 0 12px 0;
-}
-
-.amq-buying-block__price {
-	font-size: 24px;
-	font-weight: 700;
-	color: #3a322a;
-	margin-bottom: 4px;
-}
-.amq-buying-block__sku {
-	font-size: 12px;
-	color: #3a322ab3;
-	margin: 0 0 20px 0;
+	line-height: 1.9;
+	color: #3a322a8c;
+	margin: -10px 0 22px 0;
 }
 
 .amq-buying-block__purchase-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 12px;
-	align-items: center;
-	margin-bottom: 12px;
+	gap: 16px;
+	align-items: flex-end;
+	margin-bottom: 20px;
 }
 
-.amq-buying-block__qty {
+.amq-buying-block__qty,
+.amq-buying-block__total {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 6px;
 }
-.amq-buying-block__qty-label {
+.amq-buying-block__qty-label,
+.amq-buying-block__total-label {
 	font-size: 12px;
-	font-weight: 600;
-	color: #4a5b32;
+	line-height: 1.55;
+	color: #3a322a8c;
 }
 .amq-buying-block__qty-controls {
 	display: flex;
 	align-items: center;
+	width: 140px;
+	height: 50px;
 	border: 1px solid color-mix(in srgb, #3a322a 16%, transparent);
 	border-radius: 4px;
+	background: #fbf8f2;
 }
 .amq-buying-block__qty-btn {
 	width: 40px;
+	height: 100%;
 	background: none;
 	border: none;
 	font-size: 18px;
@@ -188,43 +208,42 @@
 	color: #3a322a;
 }
 .amq-buying-block__qty-input {
-	width: 44px;
+	flex: 1;
+	min-width: 0;
+	width: 100%;
+	background: none;
 	border: none;
 	text-align: center;
+	font-family: inherit;
 	font-size: 15px;
+	font-weight: 500;
 	color: #3a322a;
 	-moz-appearance: textfield;
 }
-
-.amq-buying-block__total {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-}
-.amq-buying-block__total-label {
-	font-size: 12px;
-	font-weight: 600;
-	color: #4a5b32;
+.amq-buying-block__qty-input::-webkit-outer-spin-button,
+.amq-buying-block__qty-input::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
 }
 .amq-buying-block__total-value {
-	font-size: 18px;
+	font-size: 28px;
 	font-weight: 700;
+	line-height: 1.5;
 	color: #3a322a;
 }
 
 .amq-buying-block__add-to-cart {
-	flex: 1;
-	min-width: 160px;
+	display: block;
+	width: 100%;
+	height: 54px;
 	background: #c1673f;
 	color: #ffffff;
 	border: none;
 	border-radius: 4px;
 	font-family: inherit;
-	font-size: 15px;
-	font-weight: 600;
-	padding: 14px 24px;
+	font-size: 16px;
+	font-weight: 700;
 	cursor: pointer;
-	align-self: stretch;
 }
 .amq-buying-block__add-to-cart:hover:not(:disabled) {
 	background: #a7512a;
@@ -237,44 +256,58 @@
 .amq-buying-block__oos-message {
 	color: #a7512a;
 	font-size: 13px;
-	margin: 0 0 12px 0;
+	margin: 12px 0 0 0;
 }
 .amq-buying-block__success-message {
 	color: #4a5b32;
 	font-weight: 600;
 	font-size: 13px;
-	margin: 0 0 12px 0;
+	margin: 12px 0 0 0;
 }
 
 .amq-buying-block__trust-chips {
-	font-size: 12px;
-	color: #3a322ab3;
-	margin: 0 0 12px 0;
+	font-size: 11.5px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	text-align: center;
+	color: #3a322a8c;
+	margin: 16px 0 22px 0;
 }
 
 .amq-buying-block__secondary-links {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 16px;
+	gap: 20px;
 }
 .amq-buying-block__secondary-links a {
-	font-size: 13px;
-	color: #4f6d63;
+	font-size: 14px;
+	color: #c1673f;
 	text-decoration: underline;
 }
+.amq-buying-block__sku {
+	font-size: 12px;
+	color: #3a322a8c;
+	margin: 16px 0 0 0;
+}
 
-@media (max-width: 640px) {
+@media (max-width: 860px) {
 	.amq-buying-block {
-		gap: 24px;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 28px;
 	}
-	/* Brief: "ปุ่ม Sunbaked Clay เต็มความกว้างบนมือถือ" (Add to Cart full
-	   width on mobile) — stack the qty stepper above the button instead of
-	   shrinking the button to fit alongside it. */
-	.amq-buying-block__purchase-row {
-		flex-direction: column;
+	.amq-buying-block__name {
+		font-size: 28px;
 	}
-	.amq-buying-block__qty {
-		align-self: flex-start;
+}
+@media (max-width: 520px) {
+	.amq-buying-block__triad {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.amq-buying-block__scent-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.amq-buying-block__total-value {
+		font-size: 24px;
 	}
 }
 
@@ -314,7 +347,7 @@
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	font-family: Prompt, "IBM Plex Sans Thai", "DM Sans", system-ui, sans-serif;
+	font-family: "DM Sans", system-ui, sans-serif;
 	font-size: 13px;
 	color: #3a322a;
 	overflow: hidden;
@@ -350,4 +383,10 @@
  */
 body.amq-castile-sticky-bar-visible {
 	padding-bottom: 64px;
+}
+
+/* The theme sets `font-family: Amouriq` on every div/span/p/button, which beats plain inheritance. */
+.amq-buying-block *,
+.amq-castile-sticky-bar * {
+	font-family: "DM Sans", system-ui, sans-serif;
 }
