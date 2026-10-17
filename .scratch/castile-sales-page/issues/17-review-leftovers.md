@@ -34,3 +34,11 @@
 - [x] Sticky-bar Add to Cart tested locally
 - [x] Kit prepared (page-data.json + widget + CSS) with rollback and sha256
 - [ ] Owner uploads and installs; read-only live check
+
+## Comments
+
+- **Done (2026-10-17), local:** section 23 footnotes merged per the design (the two removed notes' statistics are already body text in sections 5 and 6, so no caveat is lost); the † quotes are curly and the FDA line follows the design verbatim; the TEWL marker in section 1 points to the single * note. Buy-box triad icons added (droplet, arrow-down-to-line, shield, as in the design). Section 11's arrow is vertical on phones (CSS rotate on the arrow widget's element id, ADR-0003). The trust line on a phone no longer wraps. **Scent buttons: no change.** The design at 390px also shows two columns with one button below (checked with the compare harness crops), so the review's concern was wrong.
+- **Bug found while comparing:** the 250 ML size button was not highlighted on page load (the PHP compared the integer array key 250 with the string '250' using ===); fixed with a string cast.
+- **Sticky-bar Add to Cart tested** in real Chrome (390px emulation, throwaway profile): chose Rosemary + 500 ML, scrolled away from the buy box, the bar showed "Organic Olive Castile Soap - Rosemary ฿1,199", and its button added one Rosemary 500 ml at ฿1,199.00 to the WooCommerce cart.
+- **Page data:** written with raw `$wpdb`, read back byte-identical from a fresh process (sha256 `672b37cd38eac1f4188011f51c2bd01ca9ab23566d910473821adb68bd86297f`). Kit `D:\Local\app\deploy-castile-content\` (castile-content.zip, rollback.zip, test-checklist.md): page-data.json + widget class + both CSS files. The owner uploads and clicks Install, then a read-only live check.
+- **Left for the owner:** the Lavender variation images (WooCommerce catalog data).
