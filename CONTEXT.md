@@ -19,7 +19,7 @@ The bottle volume (100/250/500 ML) a customer picks within a chosen Scent's prod
 _Avoid_: Variant, option
 
 **Sales page**:
-A long-form, evidence-led marketing/landing page for one product line (e.g. the CASTILE sales page), built as a fully Elementor-editable page reproducing a Claude Design handoff pixel-for-pixel. Distinct from a **Product page** (see below): a Sales page argues the case for buying and ends in an embedded buy box; it is not the WooCommerce single-product template.
+A long-form, evidence-led marketing/landing page for one product line (e.g. the CASTILE sales page), built as a fully Elementor-editable page reproducing a Claude Design handoff: structure, colours, type and copy must match the design; complex animations may be simplified. Distinct from a **Product page** (see below): a Sales page argues the case for buying and ends in an embedded buy box; it is not the WooCommerce single-product template.
 _Avoid_: Landing page (used interchangeably but "Sales page" is this project's term)
 
 **Product page**:
@@ -44,10 +44,17 @@ In Thai screens it is called **สิทธิพิเศษสมาชิก*
 The cart item total, before any discount and excluding shipping, that a Deal, Coupon or Member Privilege requires. It counts every item, Sale Price items included, even when the discount itself only applies to some of them.
 
 **Trigger**:
-What makes a Deal apply: **auto** (applies as soon as the cart qualifies) or **coupon** (applies only while a named WooCommerce coupon code is in the cart). A coupon-trigger Deal references an existing coupon code; it never creates the coupon.
+What makes a Deal apply: **auto** (applies as soon as the cart qualifies) or **coupon** (applies only while a named WooCommerce coupon code is in the cart). A coupon-trigger Deal names a coupon code; if no such coupon exists yet, saving the Deal creates it (an empty coupon with no discount of its own). If the code already exists, the Deal links to it instead of creating another.
 
 **Coupon**:
-A WooCommerce coupon created under Marketing → Coupons. The source of truth for coupon codes, expiry, usage limits and its own free-shipping flag. Deals reference coupon codes but never own them.
+A WooCommerce coupon (Marketing → Coupons). The source of truth for everything beyond the code itself: its own discount, free-shipping flag and finer settings. A coupon-trigger Deal may create the coupon and set its code, expiry and usage limit from the Deal form; those three are then edited on the Deal.
+
+**Payment fee** (ค่าธรรมเนียมเก็บเงินปลายทาง):
+A fixed ฿30 charge added to the order total when the customer picks cash on delivery. Charged even when shipping is free, added after all discounts, with no extra tax, and never counted as purchase value for Points or "spend X" tests.
+_Avoid_: Surcharge, COD fee
+
+**Gift choice**:
+The box where a customer picks the free item(s) a spend-threshold gift Deal allows. Shown on both the cart and checkout pages; each candidate shows its regular price struck through and "ฟรี". Not choosing never blocks checkout.
 
 **Stacking**:
 Deals and Coupons combine on the same cart by default, and each is computed from regular price, not from a price already reduced by another discount. A coupon's minimum spend is also measured before Deals. A Deal can be marked as not combinable with other Coupons; when another Coupon is in the cart (not the Deal's own trigger coupon), that Deal gives no discount and the cart says why. **Member Privilege is the exception: it never stacks with anything, and the larger discount wins.** Against a Deal the comparison is per cart line (the Deal's item gets the Deal, other items still get Member Privilege); against a Coupon it is whole-cart.
