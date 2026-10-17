@@ -30,7 +30,7 @@ Install a translation system, give the site an English copy of its market pages 
 12. As an English-speaking visitor, I want the Castile Soap sales page fully in English, so that I understand the product
 13. As an English-speaking visitor, I want product names, descriptions, Scent and Size labels in English, so that I can choose what to buy
 14. As an English-speaking visitor, I want to add a Size to the cart from the English page with prices in baht, so that ordering works
-15. As a visitor using English, I want the English pages to use the English font and the Thai pages the Thai font, so that text looks right in both languages
+15. As a Thai customer, I want the Thai pages to look exactly as they do today, fonts included, so that adding English changes nothing for me
 16. As the owner, I want the Thai Castile page content left untouched by the install, so that the sales page is not damaged again
 17. As the owner, I want search engines to be told which page is the Thai and which the English version, so that each language appears for the right searchers
 18. As the owner, I want cart, checkout and Points to keep working in Thai exactly as today, so that revenue is not at risk during this project
@@ -41,7 +41,7 @@ Install a translation system, give the site an English copy of its market pages 
 - **Language rule:** Thai is the default language at the original addresses; English lives under `/en/`. The site always opens in Thai and changes language only when the customer clicks the switcher, never from the browser's language.
 - **Switcher behaviour:** shows the current language as plain text and the other as a link to the same page in that language. Under TranslatePress every page has an `/en/` address (text not yet translated shows in Thai), so there is no "page without a translation" case. The existing shortcode look is kept; only its source of "current language" and "same page in the other language" changes.
 - **Placement:** the existing shortcode is placed in the active theme's header builder, in the desktop header and the mobile menu. Nothing is moved to the redesign theme.
-- **Font:** the sitewide font follows the language (Thai: Prompt; English: Plus Jakarta Sans). The existing language-font code is moved from the old plugin's language detection to the chosen system's.
+- **Font:** unchanged. The live Thai pages load the English font set today (the old language-detection code asked a plugin that is not installed), so every page, Thai and English, keeps loading that set. Owner's decision, 2026-10-17.
 - **Translation system:** direction is TranslatePress (text-level translation of rendered pages; works with Elementor and WooCommerce without duplicating pages; free tier covers one extra language). Polylang is the fallback if the check fails. The check and the ADR are ticket 01. The decision is hard to reverse, surprising to a later reader (the old code assumed Polylang) and a real trade-off, so it gets an ADR.
 - **CASTILE page:** its stored Elementor data must never be written with the normal post-meta function (it destroyed the content twice). Every change that touches it is verified from a fresh process.
 - **Scope of phase one:** the home page, header menu, footer, the CASTILE sales page, all products (all variable: three Scents by three Sizes) and category pages. Cart, checkout, Points, messages written by our own plugins (Deals, Member Privilege, Payment fee), order emails and the shipping label are out of this phase.

@@ -98,14 +98,14 @@ try {
 	check('desktop: switcher is in the header on the Thai home page', !!s && s.visible, JSON.stringify(s));
 	check('desktop: Thai page shows TH as plain text and EN as the link', s && s.plain.includes('TH') && s.linkText === 'EN', JSON.stringify(s));
 	check('desktop: EN link goes to /en/', s && s.linkPath === '/en/', JSON.stringify(s));
-	check('desktop: Thai page loads the Thai font (Prompt)', s && s.fontSheet.includes('amq-lang-font-th.css') && s.fontGoogle.includes('Prompt'), s && s.fontSheet);
+	check('desktop: Thai page keeps the current font set (English stylesheet, as on the live site)', s && s.fontSheet.includes('amq-lang-font-en.css') && s.fontGoogle.includes('Plus+Jakarta+Sans') && !s.fontGoogle.includes('Prompt'), s && s.fontSheet);
 
 	// Click EN
 	await clickSwitcherLink();
 	s = await readSwitcher();
 	check('desktop: clicking EN lands on /en/ in English', s && s.path === '/en/' && /^en/i.test(s.lang), JSON.stringify(s));
 	check('desktop: English page shows EN as plain text and TH as the link', s && s.plain.includes('EN') && s.linkText === 'TH', JSON.stringify(s));
-	check('desktop: English page loads the English font (Plus Jakarta Sans)', s && s.fontSheet.includes('amq-lang-font-en.css') && s.fontGoogle.includes('Plus+Jakarta+Sans'), s && s.fontSheet);
+	check('desktop: English page loads the same font set (Plus Jakarta Sans)', s && s.fontSheet.includes('amq-lang-font-en.css') && s.fontGoogle.includes('Plus+Jakarta+Sans'), s && s.fontSheet);
 
 	// Click TH goes back to the same Thai page
 	await clickSwitcherLink();
