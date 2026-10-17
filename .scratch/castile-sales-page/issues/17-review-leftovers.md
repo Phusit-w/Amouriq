@@ -4,7 +4,7 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 ## Decisions
 
@@ -15,7 +15,7 @@
 | Buy-box benefit icons (three columns) | Add them, as inline SVG like the other 16 icons | The design has them; only the build was missing them |
 | Hero image caption omitted | Keep omitted | The design's caption is a placeholder note, not real copy |
 | Section 11 arrow is horizontal, design is vertical on a phone | Fix on mobile (vertical arrow below 768px) | Cheap, and it is most of that section's +120px |
-| Scent buttons in two columns under 520px leave an orphan | Measure the design's buy box at 390px first; match it. If the design shows three in a row or one column, change the CSS to that | Nothing in the notes shows the design does two columns |
+| Scent buttons in two columns under 520px leave an orphan | Measure the design's buy box at 390px first; match it. Measured: the design also shows two columns plus one, so no change | Nothing in the notes shows the design does two columns |
 | Olive-grove photo in section 12 (+386px / +163px) | Keep | Already kept by the owner's earlier decision |
 | Other mobile height gaps (08, 06, 02, 18 at 60-85px; 19 -92px from the missing icons; 22 crop only) | Accept; 19 closes when the benefit icons are added | Within tolerance, no unintended difference left |
 | Installer extras (backup, rollback, postmeta fill-in, full cache clear) | Keep | Safety for a repeat install; the cache clear is needed for the page cache, the postmeta fill is guarded to "only a gap" |
@@ -27,9 +27,10 @@
 
 ## Steps
 
-- [ ] Footnotes merged verbatim from the design (section 23)
-- [ ] Benefit icons added to the buy box; section 19 height gap closes
-- [ ] Section 11 vertical arrow on mobile
-- [ ] Scent buttons match the design's mobile layout
-- [ ] Sticky-bar Add to Cart tested locally
-- [ ] Kit prepared (page-data.json + CSS) with rollback and sha256; owner uploads and installs; read-only live check
+- [x] Footnotes merged verbatim from the design (section 23)
+- [x] Benefit icons added to the buy box; section 19 height gap closes
+- [x] Section 11 vertical arrow on mobile
+- [x] Scent buttons match the design's mobile layout
+- [x] Sticky-bar Add to Cart tested locally
+- [x] Kit prepared (page-data.json + widget + CSS) with rollback and sha256
+- [ ] Owner uploads and installs; read-only live check

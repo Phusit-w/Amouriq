@@ -96,9 +96,9 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 					<span class="amq-buying-block__oils" id="amq-bb-oils"><?php echo esc_html($scents[$default_scent]['oils']); ?></span>
 				</div>
 				<div class="amq-buying-block__triad">
-					<p><strong>MOISTURE ↑</strong><span>ผิวชุ่มชื้นเพิ่มขึ้น</span></p>
-					<p><strong>WATER LOSS ↓</strong><span>การสูญเสียน้ำลดลง</span></p>
-					<p><strong>BARRIER-FRIENDLY</strong><span>เป็นมิตรต่อเกราะป้องกันผิว</span></p>
+					<p><strong><svg class="amq-buying-block__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg>MOISTURE ↑</strong><span>ผิวชุ่มชื้นเพิ่มขึ้น</span></p>
+					<p><strong><svg class="amq-buying-block__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17V3"></path><path d="m6 11 6 6 6-6"></path><path d="M19 21H5"></path></svg>WATER LOSS ↓</strong><span>การสูญเสียน้ำลดลง</span></p>
+					<p><strong><svg class="amq-buying-block__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>BARRIER-FRIENDLY</strong><span>เป็นมิตรต่อเกราะป้องกันผิว</span></p>
 				</div>
 
 				<div class="amq-buying-block__scent">
@@ -135,7 +135,7 @@ class Amq_Castile_Buying_Block_Widget extends \Elementor\Widget_Base {
 							?>
 							<button
 								type="button"
-								class="amq-bb-size-btn<?php echo $size_key === $default_size ? ' is-selected' : ''; ?>"
+								class="amq-bb-size-btn<?php echo (string) $size_key === $default_size ? ' is-selected' : ''; ?>"
 								data-size="<?php echo esc_attr($size_key); ?>"
 							>
 								<span class="amq-bb-size-btn__label"><?php echo esc_html($label); ?></span>

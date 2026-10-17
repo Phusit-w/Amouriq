@@ -273,3 +273,11 @@ html {
 		width: 100%;
 	}
 }
+
+/* Section 11 bridge arrow: the cards stack on a phone, so the design's arrow points down (ticket 17). The arrow widget is
+   found by its element id (ADR-0003). */
+@media (max-width: 767px) {
+	.elementor-element-53a8ec9 {
+		transform: rotate(90deg);
+	}
+}

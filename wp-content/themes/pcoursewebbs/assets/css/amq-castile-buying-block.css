@@ -82,10 +82,18 @@
 	gap: 2px;
 }
 .amq-buying-block__triad strong {
+	display: flex;
+	align-items: center;
+	gap: 6px;
 	font-size: 13px;
 	font-weight: 700;
 	line-height: 1.55;
 	color: #4f6d63;
+}
+.amq-buying-block__icon {
+	flex: none;
+	width: 16px;
+	height: 16px;
 }
 .amq-buying-block__triad span {
 	font-size: 13px;
@@ -308,6 +316,10 @@
 	}
 	.amq-buying-block__total-value {
 		font-size: 24px;
+	}
+	.amq-buying-block__trust-chips {
+		font-size: 11px;
+		letter-spacing: 0.04em;
 	}
 }
 
