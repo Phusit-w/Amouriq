@@ -6,6 +6,10 @@ A WordPress + WooCommerce site for AMOURIQ, a Thai organic skincare brand. This 
 
 ## Language
 
+**Language switcher**:
+The "EN / TH" control in the site header. The current language shows as plain text, the other as a link to that page's translation (or the other language's home page when the page has no translation). Thai is the default language at the original addresses and English lives under `/en/`; the site always opens in Thai and changes language only when the customer clicks the switcher, never by guessing from the browser. Prices stay in baht and orders ship within Thailand only.
+_Avoid_: "Translate button", "Google Translate" (the translations are our own, reviewed text)
+
 **Castile Soap**:
 AMOURIQ's olive-oil soap product line, sold as three separate WooCommerce products distinguished by **scent** — Lavender (product id 2278), Rosemary (2285), Rose Geranium (2293) — each further split by **size** (100/250/500 ML) as WooCommerce variations on the `pa_quantity` attribute.
 _Avoid_: "Variant" alone (ambiguous — see Scent vs. Size below)
