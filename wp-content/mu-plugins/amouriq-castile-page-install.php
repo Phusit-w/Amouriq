@@ -9,6 +9,8 @@
  * once (it logged success and dropped fields), so the value is written byte for byte with $wpdb->update() and read
  * straight back. No wp_slash() on this path: slashing belongs only in front of update_post_meta().
  * The first install keeps the content that was live in the postmeta row _amq_castile_data_backup; roll back restores it.
+ * Every install also keeps what it is about to replace in _amq_castile_data_prev (when that differs from the new
+ * content), so a repeat install never silently drops Elementor edits made since; "Restore content before last install" puts it back.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -16,6 +18,7 @@ defined( 'ABSPATH' ) || exit;
 // The page data was built on the local copy of the site; the two image URLs inside it carry that host.
 const AMQ_CASTILE_LOCAL_ORIGIN = 'http://amouriq-backup.local';
 const AMQ_CASTILE_BACKUP_KEY   = '_amq_castile_data_backup';
+const AMQ_CASTILE_PREV_KEY     = '_amq_castile_data_prev';
 
 add_action( 'admin_menu', function () {
 	add_management_page( 'CASTILE page', 'CASTILE page', 'manage_options', 'amq-castile-page', 'amq_castile_install_screen' );
@@ -25,6 +28,9 @@ add_action( 'admin_post_amq_castile_install', function () {
 } );
 add_action( 'admin_post_amq_castile_rollback', function () {
 	amq_castile_install_run( 'rollback' );
+} );
+add_action( 'admin_post_amq_castile_restore_prev', function () {
+	amq_castile_install_run( 'restore_prev' );
 } );
 
 function amq_castile_install_page_id() {
@@ -43,6 +49,9 @@ function amq_castile_install_shipped() {
 		return null;
 	}
 	$json = file_get_contents( $file );
+	if ( false === $json ) {
+		return null;
+	}
 	$home = untrailingslashit( home_url() );
 	$json = str_replace(
 		array( str_replace( '/', '\/', AMQ_CASTILE_LOCAL_ORIGIN ), AMQ_CASTILE_LOCAL_ORIGIN ),
@@ -51,6 +60,18 @@ function amq_castile_install_shipped() {
 	);
 	$data = json_decode( $json, true );
 	return ( is_array( $data ) && $data ) ? $json : null;
+}
+
+/** Store $value in postmeta row $key (one row per post), read it back; true when it reads back identical. */
+function amq_castile_install_keep( $id, $key, $value ) {
+	global $wpdb;
+	if ( null === amq_castile_install_read( $id, $key ) ) {
+		$wpdb->insert( $wpdb->postmeta, array( 'post_id' => $id, 'meta_key' => $key, 'meta_value' => $value ) );
+	} else {
+		$wpdb->update( $wpdb->postmeta, array( 'meta_value' => $value ), array( 'post_id' => $id, 'meta_key' => $key ) );
+	}
+	wp_cache_delete( $id, 'post_meta' );
+	return amq_castile_install_read( $id, $key ) === $value;
 }
 
 /** Replace the page content with $json (raw), read it back, drop the caches Elementor and the cache plugin keep. */
@@ -95,16 +116,16 @@ function amq_castile_install_run( $action ) {
 			amq_castile_install_back( 'error', 'amq-castile/page-data.json is missing or not valid.' );
 		}
 		$current = amq_castile_install_read( $id, '_elementor_data' );
-		if ( null !== $current && null === amq_castile_install_read( $id, AMQ_CASTILE_BACKUP_KEY ) ) {
-			$wpdb->insert( $wpdb->postmeta, array( 'post_id' => $id, 'meta_key' => AMQ_CASTILE_BACKUP_KEY, 'meta_value' => $current ) );
-		}
-		if ( null !== $current && null === amq_castile_install_read( $id, AMQ_CASTILE_BACKUP_KEY ) ) {
-			amq_castile_install_back( 'error', 'The current content could not be backed up, so nothing was changed.' );
+		if ( null !== $current && $current !== $json ) {
+			$first = null === amq_castile_install_read( $id, AMQ_CASTILE_BACKUP_KEY );
+			if ( ( $first && ! amq_castile_install_keep( $id, AMQ_CASTILE_BACKUP_KEY, $current ) )
+				|| ! amq_castile_install_keep( $id, AMQ_CASTILE_PREV_KEY, $current ) ) {
+				amq_castile_install_back( 'error', 'The current content could not be backed up, so nothing was changed.' );
+			}
 		}
 		if ( ! amq_castile_install_write( $id, $json ) ) {
-			$backup = amq_castile_install_read( $id, AMQ_CASTILE_BACKUP_KEY );
-			if ( null !== $backup ) {
-				amq_castile_install_write( $id, $backup );
+			if ( null !== $current ) {
+				amq_castile_install_write( $id, $current );
 			}
 			amq_castile_install_back( 'error', 'The content did not read back identical; the previous content was put back.' );
 		}
@@ -122,9 +143,14 @@ function amq_castile_install_run( $action ) {
 		amq_castile_install_back( 'ok', 'CASTILE page content installed.' );
 	}
 
-	$backup = amq_castile_install_read( $id, AMQ_CASTILE_BACKUP_KEY );
+	$key    = 'restore_prev' === $action ? AMQ_CASTILE_PREV_KEY : AMQ_CASTILE_BACKUP_KEY;
+	$backup = amq_castile_install_read( $id, $key );
 	if ( null === $backup ) {
 		amq_castile_install_back( 'error', 'There is no backup to restore (the install was never run here).' );
+	}
+	$current = amq_castile_install_read( $id, '_elementor_data' );
+	if ( null !== $current && $current !== $backup && ! amq_castile_install_keep( $id, AMQ_CASTILE_PREV_KEY, $current ) ) {
+		amq_castile_install_back( 'error', 'The current content could not be backed up, so nothing was changed.' );
 	}
 	if ( ! amq_castile_install_write( $id, $backup ) ) {
 		amq_castile_install_back( 'error', 'The previous content did not read back identical.' );
@@ -145,6 +171,7 @@ function amq_castile_install_screen() {
 	$shipped = amq_castile_install_shipped();
 	$current = $id ? amq_castile_install_read( $id, '_elementor_data' ) : null;
 	$backup  = $id ? amq_castile_install_read( $id, AMQ_CASTILE_BACKUP_KEY ) : null;
+	$prev    = $id ? amq_castile_install_read( $id, AMQ_CASTILE_PREV_KEY ) : null;
 	$count   = static function ( $json ) {
 		$d = null === $json ? null : json_decode( $json, true );
 		return is_array( $d ) ? count( $d ) . ' sections, ' . size_format( strlen( $json ) ) : 'none';
@@ -166,10 +193,12 @@ function amq_castile_install_screen() {
 	printf( '<tr><td>Content on this site now</td><td>%s</td></tr>', esc_html( $count( $current ) ) );
 	printf( '<tr><td>Content in the install file</td><td>%s</td></tr>', esc_html( $count( $shipped ) ) );
 	printf( '<tr><td>Same as the install file</td><td>%s</td></tr>', ( $shipped && $current === $shipped ) ? 'yes' : 'no' );
-	printf( '<tr><td>Backup of the previous content</td><td>%s</td></tr>', esc_html( $count( $backup ) ) );
-	echo '</tbody></table><p>Install keeps the content that is live now as the backup (only the first time), then writes the new content. '
-		. 'Roll back puts that backup back and drops any Elementor edits made after the install.</p>';
+	printf( '<tr><td>Original content (kept at the first install)</td><td>%s</td></tr>', esc_html( $count( $backup ) ) );
+	printf( '<tr><td>Content before the last install</td><td>%s</td></tr>', esc_html( $count( $prev ) ) );
+	echo '</tbody></table><p>Install keeps the content that is live now (the original once, and the content before each install), then writes the new content. '
+		. 'Roll back puts the original back and drops any Elementor edits made after the install; "Restore content before last install" puts back what the last install replaced.</p>';
 	$post( 'install', 'Install page content', ! $id || ! $shipped );
-	$post( 'rollback', 'Roll back to previous content', null === $backup );
+	$post( 'restore_prev', 'Restore content before last install', null === $prev );
+	$post( 'rollback', 'Roll back to original content', null === $backup );
 	echo '</div>';
 }

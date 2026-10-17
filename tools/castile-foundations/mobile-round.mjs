@@ -9,6 +9,7 @@
 // Usage: node tools/castile-foundations/mobile-round.mjs --page page.json --design design-measure.json --out new.json [--report r.txt]
 import { readFileSync, writeFileSync } from 'node:fs';
 import { matchTexts, widgetText, strip } from './text-match.mjs';
+import { px, em, pct, gap, toolkit } from './elementor-helpers.mjs';
 
 const arg = (n) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : undefined; };
 const page = JSON.parse(readFileSync(arg('page'), 'utf8'));
@@ -37,14 +38,15 @@ page.forEach(cardPadding);
 
 // Chart rows (label | bar | value, sections 05 and 06): Elementor gives a child container 100% width on a phone unless
 // it has its own mobile width, so the three cells stacked. They keep one row, as in the design.
+// Cell width in the desktop build (%) -> its width on a phone (%): label, bar track, value.
 const CHART_CELLS = { 31.3: 26, 56: 48, 8.7: 18 };
 function chartRows(el) {
   const kids = el.elements || [];
   if (el.elType === 'container' && el.settings.flex_direction === 'row' && kids.length === 3 && kids.every((k) => k.elType === 'container' && CHART_CELLS[k.settings.width?.size])) {
-    el.settings.flex_gap_mobile = { unit: 'px', size: 12, column: '12', row: '12' };
+    el.settings.flex_gap_mobile = gap(12);
     // the bar fill inside the track cell has a percentage width of its own, which also falls back to 100% on a phone
     kids[1].elements?.[0]?.elements?.forEach((fill) => { if (fill.settings.width) fill.settings.width_mobile = fill.settings.width; });
-    kids.forEach((k) => { k.settings.width_mobile = { unit: '%', size: CHART_CELLS[k.settings.width.size], sizes: [] }; });
+    kids.forEach((k) => { k.settings.width_mobile = pct(CHART_CELLS[k.settings.width.size]); });
   }
   kids.forEach(chartRows);
 }
@@ -52,9 +54,8 @@ page.forEach(chartRows);
 
 // The photo slots of sections 15 and 22 keep the design's 320px minimum height on a phone.
 for (const id of ['eb1321e', '33f9cd5']) {
-  const find = (nodes) => nodes.reduce((f, n) => f || (n.id === id ? n : find(n.elements || [])), null);
-  const slot = find(page);
-  if (slot) slot.settings.min_height_mobile = { unit: 'px', size: 320, sizes: [] };
+  const slot = toolkit(page).find(id);
+  if (slot) slot.settings.min_height_mobile = px(320);
 }
 
 page.forEach((sec, i) => {
@@ -69,9 +70,9 @@ page.forEach((sec, i) => {
     for (const [device, vp] of Object.entries(VIEWPORTS)) {
       const t = design[vp][i].texts[k] ?? d;
       const set = (key, value) => { if (value === undefined) delete s[`${key}_${device}`]; else s[`${key}_${device}`] = value; };
-      set('typography_font_size', Math.abs(t.fs - buildSize) > 0.4 ? { unit: 'px', size: round(t.fs, 1), sizes: [] } : undefined);
+      set('typography_font_size', Math.abs(t.fs - buildSize) > 0.4 ? px(round(t.fs, 1)) : undefined);
       const ratio = t.lh ? round(t.lh / t.fs) : null;
-      set('typography_line_height', ratio && buildLh && Math.abs(ratio - buildLh) > 0.03 ? { unit: 'em', size: ratio, sizes: [] } : undefined);
+      set('typography_line_height', ratio && buildLh && Math.abs(ratio - buildLh) > 0.03 ? em(ratio) : undefined);
       set('align', alignOf(t.ta) !== alignOf(d.ta) ? alignOf(t.ta) : undefined);
     }
   }
@@ -85,7 +86,7 @@ page.forEach((sec, i) => {
     for (const [device, vp] of Object.entries(VIEWPORTS)) {
       const sizes = new Set(desktop.texts.map((t, k) => (Math.abs(t.fs - size) < 0.5 ? round(design[vp][i].texts[k].fs, 1) : null)).filter((v) => v !== null));
       const [only] = sizes;
-      if (sizes.size === 1 && Math.abs(only - size) > 0.4) w.settings[`typography_font_size_${device}`] = { unit: 'px', size: only, sizes: [] };
+      if (sizes.size === 1 && Math.abs(only - size) > 0.4) w.settings[`typography_font_size_${device}`] = px(only);
     }
   }
   report.push(`section ${String(i).padStart(2, '0')} ${desktop.label}: ${result.size} matched, ${unmatched.length} unmatched`);

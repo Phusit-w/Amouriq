@@ -266,8 +266,10 @@ html {
 
 /* Blocksy's `.ct-elementor-default-template .e-con > .e-con-inner` sets the inner width to its own container width
    (about 88% of a phone), overriding Elementor's 100%. The sections already carry their padding, so the content box
-   takes the full width left inside it, as in the design (ticket 15: the extra ~7px per side was the text-column
+   takes the full width left inside it, as in the design; tablet and phone only, desktop keeps Blocksy's width (ticket 15: the extra ~7px per side was the text-column
    narrowing seen on phones). */
-.elementor-5309 > .e-con > .e-con-inner {
-	width: 100%;
+@media (max-width: 1024px) {
+	.elementor-5309 > .e-con > .e-con-inner {
+		width: 100%;
+	}
 }
