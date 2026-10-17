@@ -8,60 +8,11 @@
 //
 // Usage: node tools/castile-foundations/opening-sections.mjs --page page.json --out new.json
 import { readFileSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { FONT, INK, BG, SURFACE, ACCENT, RULE, px, box, gap, toolkit } from './elementor-helpers.mjs';
 
 const arg = (n) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : undefined; };
 const page = JSON.parse(readFileSync(arg('page'), 'utf8'));
-
-const FONT = 'DM Sans';
-const INK = '#3a322a';
-const BG = '#fbf8f2';
-const SURFACE = '#f5efe4';
-const ACCENT = '#c1673f';
-const RULE = '#3a322a29'; // ink at 16%
-const px = (size) => ({ unit: 'px', size, sizes: [] });
-const em = (size) => ({ unit: 'em', size, sizes: [] });
-const box = (t, r, b, l) => ({ unit: 'px', top: String(t), right: String(r), bottom: String(b), left: String(l), isLinked: false });
-const gap = (n, row = n) => ({ unit: 'px', size: n, column: String(n), row: String(row) });
-
-const used = new Set();
-const collect = (nodes) => nodes.forEach((n) => { used.add(n.id); collect(n.elements || []); });
-collect(page);
-const find = (id, nodes = page) => {
-  for (const n of nodes) {
-    if (n.id === id) return n; const f = find(id, n.elements || []); if (f) return f; }
-  return null;
-};
-const get = (id) => { const e = find(id); if (!e) throw new Error(`element ${id} not found`); return e; };
-const newId = () => { let id; do { id = randomBytes(4).toString('hex').slice(0, 7); } while (used.has(id)); used.add(id); return id; };
-
-const container = (settings, elements) => ({ id: newId(), elType: 'container', isInner: true, settings: { content_width: 'full', ...settings }, elements });
-const heading = (title, o) => {
-  const s = {
-    title, header_size: o.tag || 'span',
-    typography_typography: 'custom', typography_font_family: FONT, typography_font_weight: String(o.fw),
-    typography_font_size: px(o.fs), typography_line_height: em(o.lh ?? 1.55), typography_letter_spacing: px(o.ls ?? 0),
-    typography_text_transform: o.tt ?? '', title_color: o.color, align: 'left',
-  };
-  if (o.margin) s._margin = o.margin;
-  if (o.bg) { s._background_background = 'classic'; s._background_color = o.bg; s._padding = o.padding; s._border_radius = o.radius; }
-  return { id: newId(), elType: 'widget', isInner: false, settings: s, elements: [], widgetType: 'heading' };
-};
-
-// Typography on an existing heading / text-editor widget.
-function type(w, { fs, fw, lh, ls, tt, color, margin, free }) {
-  const s = w.settings;
-  s.typography_typography = 'custom';
-  s.typography_font_family = FONT;
-  if (fw !== undefined) s.typography_font_weight = String(fw);
-  if (fs !== undefined) s.typography_font_size = px(fs);
-  if (lh !== undefined) s.typography_line_height = em(lh);
-  if (ls !== undefined) s.typography_letter_spacing = px(ls);
-  if (tt !== undefined) s.typography_text_transform = tt;
-  if (color) { if (w.widgetType === 'heading') s.title_color = color; else s.text_color = color; }
-  if (margin) s._margin = margin; else if (margin === null) delete s._margin;
-  if (free) { delete s._element_width; delete s._element_custom_width; delete s._flex_align_self; }
-}
+const { get, newId, container, heading, type } = toolkit(page);
 
 // The hero button is the template for every button widget on the page.
 const buttonTemplate = JSON.parse(JSON.stringify(get('efa0a8a')));
