@@ -4,7 +4,7 @@
 
 ### Issue tracker
 
-Local markdown — issues and specs live as files under `.scratch/<feature-slug>/` (no git remote configured for this repo). See `docs/agents/issue-tracker.md`.
+Local markdown — issues and specs live as files under `.scratch/<feature-slug>/` (the repo has a GitHub remote, `origin` = `Phusit-w/Amouriq`, but issues are not kept there). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

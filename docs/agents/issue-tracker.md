@@ -31,4 +31,4 @@ Used by `/wayfinder`. The **map** is a file with one **child** file per ticket.
 
 ## PRs as a request surface
 
-Off. This repo has no git remote, so there is no PR flow to draw requests from.
+Off. The repo has a GitHub remote (`origin`), but issues and specs are local files and no PR flow is used to draw requests from.
