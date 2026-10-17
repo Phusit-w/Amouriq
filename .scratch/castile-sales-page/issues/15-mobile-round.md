@@ -4,7 +4,7 @@
 
 **Blocked by:** 14 (Whole-page check and live upload kit)
 
-**Status:** ready-for-human (built and checked locally; waiting for the owner to upload kit 14 and then this kit, then the read-only live check on a phone width)
+**Status:** done
 
 - [x] Root cause of the clipping identified by inspecting the actual layout, and fixed
 - [x] Mobile side-by-side crops match the design's mobile layout
@@ -22,3 +22,4 @@
 - **Mobile section heights vs the design** (390px): within about 60px for most sections; larger: 12 (+163, the olive-grove photo), 11 (+120, an arrow glyph between two cards is a horizontal → in the build, a vertical placement in the design), 08 (+84), 06 (+81), 02 (+76), 18 (+73), 19 (-92, the build has no icon row in the buy box benefits), 22 (-167 in the crop only; the design crop includes the footnotes).
 - **Kit:** `D:\Local\app\deploy-castile-mobile\` (`castile-mobile.zip`, `rollback.zip`, `test-checklist.md`): new `page-data.json` and the two CSS files; the installer from kit 14 writes it (second Install keeps the original backup). Rollback restores kit 14's CSS and its `page-data.json` (then Install again). Kit 14 must be on the site first.
 - **Not done:** a real phone and a real live check (after the owner uploads). The unmatched text widgets (footnotes 23, card numbers 01-05, stars) keep their desktop size, which equals the design's on a phone.
+- **Live check (2026-10-17, after the owner uploaded kit 15 and clicked Install):** CSS and `page-data.json` on live match the kit; installer showed "Same as the install file: yes" with the original backup kept; real Chrome phone emulation on amouriq.co.th shows no horizontal overflow at 320, 360, 390, 414 and 768, the section content box is viewport minus 32px (the Blocksy override fix works live), and all 24 mobile section heights equal the local build. Not tested: a real phone; Add to Cart on live (kept off the live cart). The owner closed the ticket.
