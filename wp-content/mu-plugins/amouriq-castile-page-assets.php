@@ -6,6 +6,9 @@
  * every heading/text widget — see build notes in
  * .scratch/castile-sales-page/issues/03-content-trust-bar-to-free-alkali.md).
  *
+ * Page text itself now uses DM Sans (see amq-castile-fonts.css, ticket 09); Prompt stays only because the buying
+ * block CSS still names it (to be dropped with ticket 13).
+ *
  * Loaded here rather than relying on amq-lang-font.php's sitewide Thai/English
  * font switch: that mu-plugin keys off Polylang's pll_current_language(),
  * which isn't installed on this site (TranslatePress is) — so it always
@@ -34,6 +37,17 @@ if (!defined('ABSPATH')) exit;
 
 add_action('wp_enqueue_scripts', function () {
 	if (!is_page('castile')) return;
+
+	// DM Sans (Latin) + IBM Plex Sans Thai (Thai, registered under the name "DM Sans"), self-hosted — ticket 09.
+	$fonts_path = get_stylesheet_directory() . '/assets/css/amq-castile-fonts.css';
+	if (file_exists($fonts_path)) {
+		wp_enqueue_style(
+			'amq-castile-fonts',
+			get_stylesheet_directory_uri() . '/assets/css/amq-castile-fonts.css',
+			[],
+			filemtime($fonts_path)
+		);
+	}
 
 	wp_enqueue_style(
 		'amq-castile-prompt-font',

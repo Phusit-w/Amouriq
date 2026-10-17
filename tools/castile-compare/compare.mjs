@@ -3,11 +3,11 @@
 // Usage: node tools/castile-compare/compare.mjs [--out DIR] [--only design,local,live]
 //        [--width 1440] [--local URL] [--live URL] [--design FILE]
 // Needs Node 22+ (global WebSocket/fetch) and Google Chrome. Uses a throwaway Chrome profile.
-import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { openBrowser, sleep } from './cdp.mjs';
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -16,7 +16,7 @@ const arg = (name, dflt) => {
 const out = arg('out', join(tmpdir(), 'castile-compare'));
 const width = Number(arg('width', 1440));
 const only = arg('only', 'design,local,live').split(',');
-const chrome = arg('chrome', 'C:/Program Files/Google/Chrome/Application/chrome.exe');
+const chrome = arg('chrome', undefined);
 const designFile = arg('design', 'D:/Local/app/AMOURIQ Lavender Soap Sales Page/AMOURIQ Lavender Sales Page.dc.html');
 
 const targets = {
@@ -25,45 +25,9 @@ const targets = {
   live: { url: arg('live', 'https://amouriq.co.th/castile/'), sections: '[data-elementor-id="5309"] > .e-parent' },
 };
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const port = 9300 + Math.floor(Math.random() * 500);
-const profile = mkdtempSync(join(tmpdir(), 'castile-chrome-'));
-const proc = spawn(chrome, [
-  '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-  `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--allow-file-access-from-files',
-  'about:blank',
-], { stdio: 'ignore' });
-
-async function connect() {
-  for (let i = 0; i < 50; i++) {
-    try {
-      const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
-      const page = list.find((t) => t.type === 'page');
-      if (page) return page.webSocketDebuggerUrl;
-    } catch {}
-    await sleep(200);
-  }
-  throw new Error('Chrome did not start');
-}
-
-const ws = new WebSocket(await connect());
-await new Promise((r) => (ws.onopen = r));
-let id = 0;
-const pending = new Map();
-ws.onmessage = (m) => {
-  const d = JSON.parse(m.data);
-  if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
-};
-const send = (method, params = {}) => new Promise((res, rej) => {
-  const i = ++id;
-  pending.set(i, (d) => (d.error ? rej(new Error(`${method}: ${d.error.message}`)) : res(d.result)));
-  ws.send(JSON.stringify({ id: i, method, params }));
-});
-const evaluate = async (expression) =>
-  (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result.value;
+const { send, evaluate, close } = await openBrowser({ chrome });
 
 try {
-  await send('Page.enable');
   // Capturing beyond the viewport re-fires scroll triggers, which would start count-up tweens mid-capture.
   // Make every requestAnimationFrame callback see a time far in the future so tweens jump to their final value.
   await send('Page.addScriptToEvaluateOnNewDocument', {
@@ -89,7 +53,7 @@ try {
     }); document.querySelectorAll('[data-seq-bar]').forEach((b) => { b.style.transform = 'scaleX(1)'; });`;
     await evaluate(finalize); await sleep(400); await evaluate(finalize); await sleep(400); await evaluate(finalize);
     await evaluate(`(() => { const st = document.createElement('style');
-      st.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+      st.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; } #cmplz-cookiebanner-container, .cmplz-cookiebanner { display: none !important; }';
       document.head.appendChild(st); })()`);
     await evaluate('window.scrollTo(0, 0)');
     await sleep(500);
@@ -112,8 +76,5 @@ try {
     console.log(`${name}: ${rects.length} sections -> ${dir}`);
   }
 } finally {
-  ws.close();
-  proc.kill();
-  await sleep(500);
-  try { rmSync(profile, { recursive: true, force: true }); } catch {}
+  await close();
 }
