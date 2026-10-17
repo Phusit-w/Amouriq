@@ -4,22 +4,19 @@
 
 **Blocked by:** 02 (Language switcher flips one page end to end)
 
-**Status:** in progress (drafts done and loaded on Local; checks and owner review left, see "Next session")
+**Status:** in progress (drafts, checks and review list done; waiting for the owner's corrections)
 
-- [x] Draft English text delivered to the owner (`translations/castile-page.json`, 178 lines; the readable list for the owner is still to be generated, see below)
+- [x] Draft English text delivered to the owner (`translations/castile-page.json`, 178 lines; readable list for the owner: `translations/castile-page.md`, flags at the top)
 - [ ] Owner's corrections applied
 - [x] Every section of the English page shows no leftover visible Thai (`english-leftover.e2e.mjs /en/castile/`: desktop and mobile pass)
 - [x] The Thai page is unchanged: `_elementor_data` of page 5309 is 257861 bytes, hash `6c46de0f...`, identical before and after (the translations are database rows in TranslatePress's own tables; no page was written)
 - [x] The buying block (Scent and Size choice, price, add to cart) works in English mode (`castile-buying.e2e.mjs`: 6 checks pass)
-- [ ] Desktop and mobile layouts hold (not looked at yet: take full-page screenshots of `/en/castile/` and check long English text in the table, FAQ and buying block)
+- [x] Desktop and mobile layouts hold: at 1440 and 390 no element runs past the viewport on `/en/castile/` (only visually hidden social-link labels clip, same as on the Thai page); the Thai `/castile/` shows none of the English lines
 
 ## Next session
 
-1. Generate the owner's reviewable list from `translations/castile-page.json` (same format as `home-menu-footer.md`, with the flags below), then ask the owner to review.
-2. Screenshot `/en/castile/` at 1440 and 390 width and check the layout.
-3. Check the Thai `/castile/` page shows no English text from the translations (it should not).
-4. Apply the owner's corrections with `apply-translations.php <file> 2`, re-run the three browser checks.
-5. Run `/code-review`.
+1. Owner reviews `translations/castile-page.md`; apply corrections with `apply-translations.php <file> 2`, re-run the `english-leftover` and `castile-buying` e2e checks.
+2. Run `/code-review`, then tick the last box.
 
 ## Flags for the owner (put these at the top of the review list)
 
