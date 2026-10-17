@@ -86,16 +86,27 @@
 
 	// The widget wrapper also holds the Elementor container and the heading element carrying the typography, so
 	// the number is written into the heading itself; replacing the wrapper's text would strip that markup.
-	revealOnce(elements(IDS.count).map(function (w) { return w.querySelector('.elementor-heading-title') || w; }), function (el) {
+	var counters = elements(IDS.count).map(function (w) { return w.querySelector('.elementor-heading-title') || w; });
+	var willAnimate = !reduceMotion && typeof IntersectionObserver !== 'undefined';
+
+	// Until its number scrolls into view the final value must not show, or it flashes and then restarts from 0.
+	// Hidden (not removed) so the layout keeps its size; if this script never runs nothing is hidden.
+	if (willAnimate) counters.forEach(function (el) { el.style.visibility = 'hidden'; });
+
+	revealOnce(counters, function (el) {
 		var raw = el.textContent.trim();
 		var match = raw.match(COUNT_PATTERN);
-		if (!match) return; // not a parseable number (e.g. the "✓" card) — leave as-is
-		if (reduceMotion) return; // text is already the final value — nothing to animate
+		if (!match || reduceMotion) { el.style.visibility = ''; return; } // "✓" card, or the text is already the final value
+
+		// Digits differ in width, so the number would shake while it counts; hold the final width.
+		el.style.minWidth = el.getBoundingClientRect().width + 'px';
 
 		var sign = match[1] || '';
 		var target = parseFloat(match[2]);
 		var decimals = (match[2].split('.')[1] || '').length;
 		var suffix = match[3] || '';
+		el.textContent = sign + (0).toFixed(decimals) + suffix; // start from 0 before it becomes visible, not a frame of the final value
+		el.style.visibility = '';
 		var duration = 1400;
 		var start = null;
 

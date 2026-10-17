@@ -62,6 +62,8 @@ body.page-id-5309 .elementor-widget-heading .elementor-heading-title {
 .elementor-element-ef1e6e0, .elementor-element-500a59f, .elementor-element-6357f22,
 .elementor-element-a653aba {
 	font-variant-numeric: tabular-nums;
+	/* the value cells are narrow: a number that wraps mid count-up made the row jump taller for a moment */
+	white-space: nowrap;
 }
 
 .elementor-element-7466111, .elementor-element-b0edbed, .elementor-element-9dd8676,
@@ -135,6 +137,7 @@ body.page-id-5309 .elementor-widget-heading .elementor-heading-title {
 /* Ticket 04 count-up numerals (Section 13 stat row: 3 / 72 / 10+). */
 .elementor-element-56cdf52, .elementor-element-89cc922, .elementor-element-2b69f5d {
 	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
 }
 
 /*
