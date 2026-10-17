@@ -4,7 +4,7 @@
 
 **Blocked by:** 10, 11, 12, 13
 
-**Status:** ready-for-human (kit built; waiting for the owner to upload and click Install, then the read-only live check)
+**Status:** done
 
 - [x] Full-page side-by-side check from 08 shows only deliberate differences (placeholders, simplified animations), each listed
 - [x] Audit: every text, image, colour, button and link is editable in the Elementor panel; the custom buy box is covered by its own fields; exceptions listed
@@ -12,7 +12,7 @@
 - [x] Kit verified locally from a fresh process (page data intact after write)
 - [x] Page-title/hero postmeta for page 5309 included or confirmed already live
 - [x] CASTILE menu item is NOT part of this kit
-- [ ] After owner uploads, read-only check of live page against the design
+- [x] After owner uploads, read-only check of live page against the design
 
 ## Comments
 
@@ -35,3 +35,4 @@
 - **Verified locally from fresh wp-cli processes:** old content -> install -> content identical to the shipped file and backup identical to the old content -> roll back -> identical to the old content -> install again. Test rows removed afterwards.
 - **Page-title/hero postmeta:** already live (the live /castile/ HTML has no theme hero or title block); the installer only fills it if missing.
 - **Open:** the owner uploads and clicks Install; then the read-only live check against the design (last box). Mobile is ticket 15.
+- **Live check (2026-10-17, after the owner uploaded and clicked Install):** all 12 asset files on live match the kit by md5; the installer screen showed "Same as the install file: yes" and a backup of the previous content (24 sections, 186 KB); the live page has no PHP errors, the section 22 button, images by id 5311/5312 and no local host in the HTML. The compare harness against live gives section heights identical to the local build for all 24 sections; hero, buy box and section 22 crops looked right (fonts, images). Live differences from local are catalog data only: the live Lavender 250 ML SKU reads `SL-CT-OR-LV0250-1`. The install tool needed the owner's click (the auto-mode classifier blocks Claude from clicking production write buttons).
